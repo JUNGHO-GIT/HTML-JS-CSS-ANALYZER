@@ -1,44 +1,135 @@
 {
-	"name": "CSS-ANALYZER",
-	"displayName": "CSS-ANALYZER",
+	"name": "html-js-css-analyzer",
+	"displayName": "Html-Js-Css-Analyzer",
 	"publisher": "JUNGHO",
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
 	"type": "module",
-	"version": "2.1.2",
+	"version": "2.2.1",
+	"description": "Analyzes HTML & CSS: unused selectors + HTML best-practice lint (HTMLHint subset) in your HTML/JS/TS files.",
 	"main": "./out/extension.js",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/JUNGHO-GIT/CSS-ANALYZER.git"
+		"url": "https://github.com/JUNGHO-GIT/HTML-JS-CSS-ANALYZER.git"
 	},
 	"engines": {
 		"vscode": "^1.104.0",
 		"node": ">=18.0.0",
 		"npm": ">=10.0.0"
 	},
+	"categories": [
+		"Programming Languages",
+		"Linters"
+	],
+	"keywords": [
+		"css",
+		"html",
+		"intellisense",
+		"diagnostics",
+		"unused",
+		"selectors"
+	],
+	"activationEvents": [
+		"onStartupFinished",
+		"onLanguage:html",
+		"onLanguage:css",
+		"onLanguage:scss",
+		"onCommand:Html-Js-Css-Analyzer.validate",
+		"onCommand:Html-Js-Css-Analyzer.clear"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "Html-Js-Css-Analyzer.validate",
+				"title": "Html-Js-Css-Analyzer: Validate Current Document"
+			},
+			{
+				"command": "Html-Js-Css-Analyzer.clear",
+				"title": "Html-Js-Css-Analyzer: Clear Style Cache"
+			}
+		],
+		"configuration": {
+			"title": "Html-Js-Css-Analyzer",
+			"properties": {
+				"Html-Js-Css-Analyzer.logLevel": {
+					"type": "string",
+					"scope": "window",
+					"enum": [
+						"off",
+						"error",
+						"info",
+						"debug"
+					],
+					"default": "debug"
+				},
+				"Html-Js-Css-Analyzer.exclude": {
+					"type": "array",
+					"scope": "resource",
+					"default": [
+						"**/node_modules/**",
+						"**/.git/**",
+						"**/dist/**",
+						"**/out/**",
+						"**/.svn/**",
+						"**/.hg/**",
+						"**/CVS/**",
+						"**/.idea/**",
+						"**/.vscode/**",
+						"**/.settings/**",
+						"**/.metadata/**",
+						"**/.history/**",
+						"**/.backup/**",
+						"**/.etc/**",
+						"**/.cache/**",
+						"**/.gradle/**",
+						"**/.mvn/**",
+						"**/bin/**",
+						"**/build/**",
+						"**/target/**",
+						"**/logs/**",
+						"**/.pytest_cache/**",
+						"**/.scannerwork/**",
+						"**/.terraform/**",
+						"**/__pycache__/**",
+						"**/.venv/**",
+						"**/.classpath",
+						"**/.project",
+						"**/.factorypath",
+						"**/.DS_Store",
+						"**/Thumbs.db",
+						"**/desktop.ini",
+						"**/.coverage"
+					],
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		}
+	},
 	"scripts": {
-		"watch": "tsc -watch -p .",
-		"compile": "tsc -p .",
-		"vsce": "tsc -p . && vsce package",
+		"watch": "tsc -w -p .",
+		"compile": "npm run clean && tsc -p .",
+		"clean": "rimraf out",
+		"vsce": "npm run compile && vsce package",
 		"gcloud-deploy": "node .node/gcloud.cjs --full-deploy",
 		"npm-reset": "pwsh -NoProfile -Command \"try { Stop-Process -Name node -Force -ErrorAction SilentlyContinue } catch {}; Start-Sleep -Milliseconds 200; if (Test-Path 'node_modules') { cmd /c 'rd /s /q \\\"node_modules\\\"' } ; if (Test-Path 'package-lock.json') { cmd /c 'del /f /q \\\"package-lock.json\\\"' } ; npm install\""
 	},
 	"dependencies": {
 		"@babel/core": "^7.28.4",
 		"glob": "^11.0.3",
-		"terser": "^5.44.0"
+		"htmlhint": "^1.7.1",
+		"terser": "^5.44.0",
+		"typescript": "^5.9.2"
 	},
 	"devDependencies": {
 		"@types/glob": "^9.0.0",
+		"@types/htmlhint": "^1.1.5",
 		"@types/mocha": "^10.0.10",
 		"@types/node": "^24.5.2",
 		"@types/vscode": "^1.104.0",
-		"@typescript-eslint/eslint-plugin": "^8.44.0",
-		"@typescript-eslint/parser": "^8.44.0",
+		"@vscode/test-electron": "^2.5.2",
 		"@vscode/vsce": "^3.6.0",
-		"eslint": "^9.36.0",
-		"mocha": "^11.7.2",
-		"typescript": "^5.9.2",
-		"@vscode/test-electron": "^2.5.2"
+		"rimraf": "^6.0.1"
 	}
 }
