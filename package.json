@@ -1,0 +1,44 @@
+{
+	"name": "CSS-ANALYZER",
+	"displayName": "CSS-ANALYZER",
+	"publisher": "JUNGHO",
+	"icon": "logo_image.png",
+	"license": "Apache-2.0",
+	"type": "module",
+	"version": "2.1.2",
+	"main": "./out/extension.js",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/JUNGHO-GIT/CSS-ANALYZER.git"
+	},
+	"engines": {
+		"vscode": "^1.104.0",
+		"node": ">=18.0.0",
+		"npm": ">=10.0.0"
+	},
+	"scripts": {
+		"watch": "tsc -watch -p .",
+		"compile": "tsc -p .",
+		"vsce": "tsc -p . && vsce package",
+		"gcloud-deploy": "node .node/gcloud.cjs --full-deploy",
+		"npm-reset": "pwsh -NoProfile -Command \"try { Stop-Process -Name node -Force -ErrorAction SilentlyContinue } catch {}; Start-Sleep -Milliseconds 200; if (Test-Path 'node_modules') { cmd /c 'rd /s /q \\\"node_modules\\\"' } ; if (Test-Path 'package-lock.json') { cmd /c 'del /f /q \\\"package-lock.json\\\"' } ; npm install\""
+	},
+	"dependencies": {
+		"@babel/core": "^7.28.4",
+		"glob": "^11.0.3",
+		"terser": "^5.44.0"
+	},
+	"devDependencies": {
+		"@types/glob": "^9.0.0",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "^24.5.2",
+		"@types/vscode": "^1.104.0",
+		"@typescript-eslint/eslint-plugin": "^8.44.0",
+		"@typescript-eslint/parser": "^8.44.0",
+		"@vscode/vsce": "^3.6.0",
+		"eslint": "^9.36.0",
+		"mocha": "^11.7.2",
+		"typescript": "^5.9.2",
+		"@vscode/test-electron": "^2.5.2"
+	}
+}
