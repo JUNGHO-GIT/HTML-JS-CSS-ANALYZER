@@ -1,7 +1,7 @@
 // src/utils/lineIndex.ts
 
 // -------------------------------------------------------------------------------------------------
-type FromIndexPos = { line: number; col: number; } | null;
+type FromIndexPos = {line: number; col: number;} | null;
 type LineIndexMapperOverload = {
 	(text: string, options?: {origin?: number;}): LineIndex;
 	(text: string, options: number): FromIndexPos;
@@ -16,12 +16,11 @@ export type LineIndex = {
 	toIndex: (line: number, col?: number) => number;
 };
 
+// -------------------------------------------------------------------------------------------------
 const objectToString = {}.toString;
-const isArray =
-	Array.isArray ||
-	((value: unknown) => {
-		return "[object Array]" === objectToString.call(value);
-	});
+const isArray = Array.isArray || ((value: unknown) => {
+	return "[object Array]" === objectToString.call(value);
+});
 const isPlainObject = (value: unknown) => {
 	return value != null && typeof value === "object" && !1 === isArray(value);
 };
@@ -86,7 +85,6 @@ export const LineIndexMapper: LineIndexMapperOverload = ((text: string, options?
 
 		return {str, lineToIndex, origin, fromIndex, toIndex};
 	};
-
 	if (typeof options === "number") {
 		return create(text).fromIndex(options);
 	}

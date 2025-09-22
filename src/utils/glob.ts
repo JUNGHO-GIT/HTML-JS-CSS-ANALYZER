@@ -17,12 +17,9 @@ export const globToRegExp = (glob: string): RegExp => {
 export const isUriExcludedByGlob = (uri: vscode.Uri, patterns: string[]) => {
 	const rel = uri.fsPath.replace(/\\/g, "/");
 	for (const p of patterns) {
-		try {
-			if (globToRegExp(p).test(rel)) {
-				return true;
-			}
-		}
-		catch {
+		const re = globToRegExp(p);
+		if (re.test(rel)) {
+			return true;
 		}
 	}
 	return false;

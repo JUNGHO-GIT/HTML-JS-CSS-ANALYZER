@@ -20,9 +20,7 @@ export const scheduleValidate = (cssSupport: CssSupport, doc: vscode.TextDocumen
   }
   const key = doc.uri.toString();
   const prev = debounceTimers.get(key);
-  if (prev) {
-    clearTimeout(prev);
-  }
+  prev && clearTimeout(prev);
   const t = setTimeout(async () => {
     debounceTimers.delete(key);
     await updateDiagnostics(cssSupport, doc, triggerMode);
@@ -57,10 +55,7 @@ export const updateDiagnostics = async (cssSupport: CssSupport, doc: vscode.Text
 export const onClosed = (closedDoc: vscode.TextDocument) => {
   const key = closedDoc.uri.toString();
   const timer = debounceTimers.get(key);
-  if (timer) {
-    clearTimeout(timer);
-    debounceTimers.delete(key);
-  }
+  timer && (clearTimeout(timer), debounceTimers.delete(key));
   diagnosticCollection.delete(closedDoc.uri);
   cacheDelete(key);
   lastValidatedVersion.delete(key);
@@ -77,12 +72,6 @@ export const clearAll = () => {
   const sizeBefore = cacheSize();
   cacheClear();
   lastValidatedVersion.clear();
-  if (cssSupportRef) {
-    try {
-      cssSupportRef.clearWorkspaceIndex();
-    } catch {
-      // ignore
-    }
-  }
+  cssSupportRef && cssSupportRef.clearWorkspaceIndex();
   vscode.window.showInformationMessage(`Style cache cleared: ${sizeBefore}`);
 };

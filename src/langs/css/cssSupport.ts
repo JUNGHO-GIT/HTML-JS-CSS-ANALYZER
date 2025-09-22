@@ -27,7 +27,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     try {
       if (typeof (globalThis as any).fetch === "function") {
         const res = await (globalThis as any).fetch(url);
-        if (res && res.ok) return await res.text();
+        if (res && res.ok) {
+          return await res.text();
+        }
         throw new Error(res ? (res.statusText || `HTTP ${res.status}`) : "fetch failed");
       }
       return await new Promise<string>((resolve, reject) => {
@@ -50,7 +52,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
   // Remote stylesheet parsing -------------------------------------------
   async getRemote (url: string): Promise<SelectorPos[]> {
     const cached = cacheGet(url);
-    if (cached) return cached.data;
+    if (cached) {
+      return cached.data;
+    }
     const data = parseSelectors(await this.fetch(url));
     cacheSet(url, {version: -1, data});
     return data;
@@ -61,7 +65,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     const key = doc.uri.toString();
     const ver = doc.version;
     const cached = cacheGet(key);
-    if (cached && cached.version === ver) return cached.data;
+    if (cached && cached.version === ver) {
+      return cached.data;
+    }
     const txt = doc.getText();
     let data: SelectorPos[] = [];
     const isHtml = /\.html?$/i.test(doc.fileName) || doc.languageId === "html";
@@ -107,8 +113,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
       }
       try {
         if (this.isRemote.test(href)) {
-          if (!map.has(href)) map.set(href, await this.getRemote(href));
-        } else {
+          !map.has(href) && map.set(href, await this.getRemote(href));
+		}
+		else {
           let targetPath = href;
           if (!path.isAbsolute(targetPath)) {
             const baseDir = path.dirname(doc.uri.fsPath);
@@ -148,9 +155,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     // 2) HTML 문서라면 link rel=stylesheet 처리
     const linked = await this.getLinkedStyles(doc);
     for (const [k, v] of linked) {
-      if (!styleMap.has(k)) {
-        styleMap.set(k, v);
-      }
+      !styleMap.has(k) && styleMap.set(k, v);
     }
 
     // 3) 워크스페이스 전체 *.css / *.scss (최초 1회 파일 목록 캐시 후 재사용)
@@ -218,7 +223,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
   if (!isAnalyzable(doc)) {
     return undefined;
   }
-    if (token.isCancellationRequested) return undefined;
+    if (token.isCancellationRequested) {
+      return undefined;
+    }
     const prefixText = doc.getText(new vscode.Range(ZERO_POS, position));
     if (this.canComplete.test(prefixText)) {
       const isIdCtx = /(?:\bid\s*[=:]|[#])\s*["'`]?[^]*$/.test(prefixText);
@@ -234,7 +241,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     return [];
   }
     const wordRange = doc.getWordRangeAtPosition(position, this.wordRange as unknown as RegExp);
-    if (!wordRange) return [];
+    if (!wordRange) {
+      return [];
+    }
     const allStyles = await this.getStyles(doc);
     const target = doc.getText(wordRange);
     const locations: vscode.Location[] = [];

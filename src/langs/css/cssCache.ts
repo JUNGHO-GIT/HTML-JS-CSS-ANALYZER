@@ -23,17 +23,13 @@ const ensureLimit = () => {
 		return;
 	}
 	const first = styleCache.keys().next().value as string | undefined;
-	if (first) {
-		styleCache.delete(first);
-	}
+	first && styleCache.delete(first);
 };
 
 // -------------------------------------------------------------------------------------------------
 export const cacheGet = (key: string): CacheVal | undefined => {
 	const v = styleCache.get(key);
-	if (v) {
-		touch(key);
-	}
+	v && touch(key);
 	return v;
 };
 

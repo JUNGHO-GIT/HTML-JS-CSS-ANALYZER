@@ -18,18 +18,14 @@
 
 1. Please reply in "Korean" unless requested in English.
 2. Never change comments in the code I send, even if they are simple "-----" lines.
-3. Whenever possible, use the ternary operator or symbols like '&&' for conditional statements to make them more compact.
-4. All if statements must use braces { } and proper line breaks/indentation, especially when they contain return statements.
-5. Use single spaces around assignment operators (=) and avoid excessive spacing for alignment.
-6. Use line breaks and indentation!
-7-1. Never write "if" statements on a single line. Always use braces { } even for single-line statements.
-7-2. Use "}
-    else" or "}
-    catch" instead of "}else" or "}catch".
-7-3. Convert all single-line if statements like "if (condition) return value;" to:
-   "if (condition) {
-       return value;
-   }"
+3. Use single spaces around assignment operators (ex. '=' or ':') and avoid more than one spacing for alignment.
+4. Always use line breaks and indentation in parentheses, square brackets, etc.
+5. Whenever possible, use the ternary operator or symbols like '&&' for conditional statements to make them more compact.
+6. * When you have no choice but to use the 'if' conditional statement.
+6-1. All if statements must use braces { } and proper line breaks/indentation, especially when they contain return statements.
+6-2. Never write "if" statements on a single line. Always use braces { } even for single-line statements.
+6-3. Use "}\n\telse {" or "}\n\telse if {" or "}\n\tcatch {" instead of "}else{" or "}else if {" or "}catch{".
+6-4. Convert all single-line if statements like "if (condition) return value;" to:"if (condition) {\n\treturn value;\n}"
 
 Purpose: Enable an AI assistant to quickly contribute to this VS Code extension (HTML & CSS analyzer) with correct architecture alignment and minimal context switching.
 

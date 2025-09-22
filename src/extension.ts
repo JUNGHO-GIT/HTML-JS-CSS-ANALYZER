@@ -9,6 +9,7 @@ import {initLogger, setLogLevel, getChannel} from "./utils/logger.js";
 import {scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport} from "./utils/diagnostic.js";
 
 // -------------------------------------------------------------------------------------------------
+export const deactivate = () => {};
 export const activate = (context: vscode.ExtensionContext) => {
 	initLogger();
 	setLogLevel(getLogLevel());
@@ -17,7 +18,9 @@ export const activate = (context: vscode.ExtensionContext) => {
 	bindCssSupport(cssSupport);
 
 	const enabledLanguages: vscode.DocumentSelector = [
-		{language: "html"}, {language: "css"}, {language: "scss"}
+		{language: "html"},
+		{language: "css"},
+		{language: "scss"}
 	];
 
 	context.subscriptions.push(
@@ -27,8 +30,6 @@ export const activate = (context: vscode.ExtensionContext) => {
 			enabledLanguages,
 			cssSupport, ".", "#", "\"", "'", "`", " "
 		),
-
-		// (제거됨) HTML 인라인 <script> / on* 이벤트 영역 전역 함수 완성 제공
 
 		// 2. CSS 클래스 및 ID 정의로 이동 제공
 		vscode.languages.registerDefinitionProvider(
@@ -74,16 +75,10 @@ export const activate = (context: vscode.ExtensionContext) => {
 			clearAll();
 		}),
 
-		// (제거됨) 9. 강제 ambient 스캔 명령어
-
 		// 10. 출력 채널 등록
 		getChannel()
 	);
 
 	const ed = vscode.window.activeTextEditor;
 	ed && void updateDiagnostics(cssSupport, ed.document, AutoValidationMode.ALWAYS);
-};
-
-// -------------------------------------------------------------------------------------------------
-export const deactivate = () => {
 };
