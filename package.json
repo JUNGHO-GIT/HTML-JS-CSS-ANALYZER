@@ -5,7 +5,7 @@
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
 	"type": "module",
-	"version": "2.2.3",
+	"version": "2.2.4",
 	"description": "Analyzes HTML & CSS: unused selectors + HTML best-practice lint (HTMLHint subset) in your HTML/JS/TS files.",
 	"main": "./out/extension.js",
 	"repository": {
@@ -100,6 +100,14 @@
 						"**/desktop.ini",
 						"**/.coverage"
 					],
+					"items": {
+						"type": "string"
+					}
+				},
+				"Html-Js-Css-Analyzer.additionalExtensions": {
+					"type": "array",
+					"scope": "window",
+					"default": ["html", "htm", "js", "jsx", "ts", "tsx", "css", "scss"],
 					"items": {
 						"type": "string"
 					}

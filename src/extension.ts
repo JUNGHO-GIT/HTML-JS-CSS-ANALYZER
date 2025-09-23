@@ -20,7 +20,9 @@ export const activate = (context: vscode.ExtensionContext) => {
 	const enabledLanguages: vscode.DocumentSelector = [
 		{language: "html"},
 		{language: "css"},
-		{language: "scss"}
+		{language: "scss"},
+		{language: "less"},
+		{language: "sass"}
 	];
 
 	context.subscriptions.push(

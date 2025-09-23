@@ -12,10 +12,10 @@ export interface CssSupportLike {
 	getLocalDoc(doc: vscode.TextDocument): Promise<SelectorPos[]>;
 }
 
-// isHtmlDoc ---------------------------------------------------------------
+// isHtmlDoc -------------------------------------------------------------------------------------
 const isHtmlDoc = (doc: vscode.TextDocument) => /\.html?$/i.test(doc.fileName) || doc.languageId === "html";
 
-// isCssLikeDoc ------------------------------------------------------------
+// isCssLikeDoc ----------------------------------------------------------------------------------
 const isCssLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
@@ -23,7 +23,7 @@ const isCssLikeDoc = (doc: vscode.TextDocument) => {
 		f.endsWith(".css") || f.endsWith(".scss") || f.endsWith(".less") || f.endsWith(".sass");
 };
 
-// normalizeToken ----------------------------------------------------------
+// normalizeToken --------------------------------------------------------------------------------
 const normalizeToken = (t: string) => {
 	if (!t) {
 		return "";
@@ -35,13 +35,13 @@ const normalizeToken = (t: string) => {
 	return s;
 };
 
-// makeRange ---------------------------------------------------------------
+// makeRange -------------------------------------------------------------------------------------
 const makeRange = (doc: vscode.TextDocument, startIdx: number, length: number) => {
 	const endIdx = startIdx + length;
 	return new vscode.Range(doc.positionAt(startIdx), doc.positionAt(endIdx));
 };
 
-// collectKnownSelectors ---------------------------------------------------
+// collectKnownSelectors -------------------------------------------------------------------------
 const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 	const knownClasses = new Set<string>();
 	const knownIds = new Set<string>();
@@ -53,7 +53,7 @@ const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 	return {knownClasses, knownIds};
 };
 
-// scanDocumentUsages ------------------------------------------------------
+// scanDocumentUsages ----------------------------------------------------------------------------
 const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownClasses: Set<string>, knownIds: Set<string>) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const usedClassesFromMarkup = new Set<string>();
@@ -150,7 +150,7 @@ const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownCla
 	return {diagnostics, usedClassesFromMarkup, usedIdsFromMarkup};
 };
 
-// scanLocalUnused ---------------------------------------------------------
+// scanLocalUnused -------------------------------------------------------------------------------
 const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike, fullText: string) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const sels = await support.getLocalDoc(doc);
@@ -168,7 +168,7 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 			if (inComment) {
 				if (ch === '*' && nextCh === '/') {
 					inComment = false;
-					i++; // skip '/'
+					i++;
 				}
 				continue;
 			}
@@ -180,7 +180,7 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 			}
 			if (ch === '/' && nextCh === '*') {
 				inComment = true;
-				i++; // skip '*'
+				i++;
 				continue;
 			}
 			if ((ch === '"' || ch === "'") && fullText[i - 1] !== '\\') {
@@ -229,7 +229,7 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 	return diagnostics;
 };
 
-// scanEmbeddedUnused ------------------------------------------------------
+// scanEmbeddedUnused ----------------------------------------------------------------------------
 const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportLike, usedClassesFromMarkup: Set<string>, usedIdsFromMarkup: Set<string>) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const localDefs = await support.getLocalDoc(doc);
@@ -248,7 +248,7 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 	return diagnostics;
 };
 
-// validateDocument --------------------------------------------------------
+// validateDocument ------------------------------------------------------------------------------
 export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
 	if (!isAnalyzable(doc)) {
 		return [];

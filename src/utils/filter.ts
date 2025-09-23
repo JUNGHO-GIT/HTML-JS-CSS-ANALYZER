@@ -1,7 +1,7 @@
 // src/utils/filter.ts
 
 import * as vscode from "vscode";
-import {getCssExcludePatterns} from "../configs/setting.js";
+import {getCssExcludePatterns, getAnalyzableExtensions} from "../configs/setting.js";
 import {isUriExcludedByGlob} from "./glob.js";
 
 // -------------------------------------------------------------------------------------------------
@@ -15,5 +15,12 @@ export const isAnalyzable = (doc: vscode.TextDocument): boolean => {
 	if (file.includes("/appdata/roaming/code/user/") || file.endsWith("settings.json") || file.endsWith("mcp.json")) {
 		return false;
 	}
-	return /(\.html?|\.jsx?|\.tsx?|\.css|\.scss)$/.test(file) && !isUriExcludedByGlob(doc.uri, getCssExcludePatterns(doc.uri));
+	const exts = getAnalyzableExtensions(doc.uri);
+	// 뒤에서부터 '.' 찾고 확장자 추출
+	const idx = file.lastIndexOf('.') + 1;
+	if (idx <= 0 || idx >= file.length) {
+		return false;
+	}
+	const ext = file.slice(idx);
+	return exts.includes(ext) && !isUriExcludedByGlob(doc.uri, getCssExcludePatterns(doc.uri));
 };

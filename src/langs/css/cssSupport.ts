@@ -8,7 +8,7 @@ import * as fs from "fs";
 import {type SelectorPos, SelectorType} from "../types/common.js";
 import {parseSelectors} from "./cssParser.js";
 import {cacheGet, cacheSet} from "./cssCache.js";
-import {getCssExcludePatterns} from "../../configs/setting.js";
+import {getCssExcludePatterns, getAnalyzableExtensions} from "../../configs/setting.js";
 import {isUriExcludedByGlob} from "../../utils/glob.js";
 import {isAnalyzable} from "../../utils/filter.js";
 import {log} from "../../utils/logger.js";
@@ -272,7 +272,11 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     const MAX = 500; // 하드 제한 (너무 많을 경우 성능 보호)
     const collected: string[] = [];
     try {
-      const patterns = ["**/*.css", "**/*.scss"];
+      // analyzable 확장자 중 CSS 계열만 스캔 (css, scss, less, sass 등)
+      const styleExts = ["css", "scss", "less", "sass"]; // 기본 후보
+      const configured = getAnalyzableExtensions(folder.uri).filter(e => styleExts.includes(e));
+      const unique = Array.from(new Set(configured.length ? configured : styleExts));
+      const patterns = unique.map(e => `**/*.${e}`);
       for (const glob of patterns) {
         if (collected.length >= MAX) {
           break;

@@ -51,11 +51,11 @@ Commands (Command Palette):
 
 ## Settings
 
-`Html-Js-Css-Analyzer.logLevel` : off | error | info | debug (default debug)
+`Html-Js-Css-Analyzer.logLevel` : off | error | info | debug
 
 `Html-Js-Css-Analyzer.exclude` : glob array of files/folders to ignore in scanning
 
-Large build/output folders (dist, build, etc.) are excluded by default.
+`Html-Js-Css-Analyzer.additionalExtensions` : glob array of additional file extensions to include in scanning
 
 ---
 
