@@ -3,52 +3,85 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import {createRequire} from "module"; // ESM 환경에서 CJS 모듈(htmlhint) 로드를 위해 사용
+import {createRequire} from "module";
 import {log} from "../../utils/logger.js";
-import {CodeAction, CodeActionKind, Diagnostic, Position, Range, TextEdit} from "vscode";
+import {CodeAction, CodeActionKind, Diagnostic, Position, Range } from "vscode";
 
-// htmlhint 로더 (ESM + "type":"module" 패키지에서 기존 require 직접 호출 시 ReferenceError 발생)
-// createRequire 를 통해 CommonJS 패키지(htmlhint)를 안전하게 로드. 실패 시 null 유지하여 기능 비활성화.
-let htmlhint: any | null = null;
-(() => {
-  try {
-    // 일부 타입 환경에서 import.meta.url 선언이 없을 수 있으므로 any 캐스트
-    const meta: any = import.meta as any;
-    const metaUrl: string = meta && meta.url ? meta.url : path.join("/", "index.js"); // fallback path (static)
-    const req = createRequire(metaUrl);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    htmlhint = req("htmlhint");
-  } catch (e: any) {
-    htmlhint = null;
-    log("debug", `htmlhint not loaded (optional): ${e?.message || e}`);
-  }
-})();
+// -------------------------------------------------------------------------------------------------
+interface HtmlHintRule {
+	id: string;
+}
+interface HtmlHintError {
+	line: number;
+	col: number;
+	rule: HtmlHintRule;
+	message: string;
+	raw?: string;
+}
+interface HtmlHintInstance {
+	verify(html: string, config?: Record<string, any>): HtmlHintError[];
+}
+type FixFactory = (
+	doc: vscode.TextDocument,
+	d: Diagnostic
+) => CodeAction | null;
 
-interface HtmlHintError { line: number; col: number; rule: {id: string}; message: string; raw?: string; }
+// -------------------------------------------------------------------------------------------------
+const FALLBACK_META_URL = path.join("/", "index.js");
+const HEAD_TAG_REGEX = /<head(\s[^>]*)?>([\s\S]*?)<\/head>/i;
 
-// ---------------------------------- small helpers ----------------------------------
-const clamp = (v: number, min: number, max: number) => (v < min ? min : v > max ? max : v);
+// -------------------------------------------------------------------------------------------------
+const loadHtmlHint = (): HtmlHintInstance | null => {
+	try {
+		const metaUrl = (import.meta as any)?.url || FALLBACK_META_URL;
+		const requireFn = createRequire(metaUrl);
+		const htmlhintModule = requireFn("htmlhint");
 
-const getRuleId = (d: Diagnostic): string | undefined => {
-  try {
-    return (d as any).data?.ruleId ?? d.code?.toString();
-  } catch {
-    return undefined;
-  }
+		return htmlhintModule.default || htmlhintModule.HTMLHint || htmlhintModule;
+	}
+	catch (error: any) {
+		const errorMessage = error?.message || String(error);
+		log("debug", `[Html-Css-Js-Analyzer] HTMLHint module not loaded (optional): ${errorMessage}`);
+		return null;
+	}
 };
 
-const getDocLine = (doc: vscode.TextDocument, oneBasedLine: number): string => {
-  if (doc.lineCount <= 0) {
-    return "";
-  }
-  const idx = clamp(oneBasedLine - 1, 0, doc.lineCount - 1);
-  return doc.lineAt(idx).text;
+// -------------------------------------------------------------------------------------------------
+const htmlhint: HtmlHintInstance | null = loadHtmlHint();
+
+// -------------------------------------------------------------------------------------------------
+const clamp = (value: number, min: number, max: number): number => {
+	return value < min ? min : value > max ? max : value;
 };
 
-const getHeadMatch = (text: string) => {
-  return text.match(/<head(\s[^>]*)?>([\s\S]*?)<\/head>/i);
+// -------------------------------------------------------------------------------------------------
+const getRuleId = (diagnostic: Diagnostic): string | undefined => {
+	try {
+		const diagnosticData = (diagnostic as any).data;
+		return diagnosticData?.ruleId ?? diagnostic.code?.toString();
+	}
+	catch {
+		return undefined;
+	}
 };
 
+// -------------------------------------------------------------------------------------------------
+const getDocumentLine = (document: vscode.TextDocument, oneBasedLineNumber: number): string => {
+	const hasNoLines = document.lineCount <= 0;
+	if (hasNoLines) {
+		return "";
+	}
+
+	const zeroBasedLineIndex = clamp(oneBasedLineNumber - 1, 0, document.lineCount - 1);
+	return document.lineAt(zeroBasedLineIndex).text;
+};
+
+// -------------------------------------------------------------------------------------------------
+const getHeadMatch = (htmlText: string): RegExpMatchArray | null => {
+	return htmlText.match(HEAD_TAG_REGEX);
+};
+
+// -------------------------------------------------------------------------------------------------
 const makeQuickFix = (title: string, editBuilder: (we: vscode.WorkspaceEdit) => void, diagnostic: Diagnostic) => {
   const ca = new CodeAction(title, CodeActionKind.QuickFix);
   const we = new vscode.WorkspaceEdit();
@@ -58,7 +91,7 @@ const makeQuickFix = (title: string, editBuilder: (we: vscode.WorkspaceEdit) => 
   return ca;
 };
 
-// 간단 설정 탐색 (.htmlhintrc 또는 .htmlhintrc.json) - 상위 디렉토리로 올라가며 최초 발견 사용
+// -------------------------------------------------------------------------------------------------
 const loadConfig = (filePath: string): any => {
   try {
     let base = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
@@ -71,7 +104,7 @@ const loadConfig = (filePath: string): any => {
             const txt = fs.readFileSync(f, "utf8");
             return JSON.parse(txt);
           } catch (e: any) {
-            log("error", `htmlhint config parse error: ${f} -> ${e?.message || e}`);
+            log("error", `[Html-Css-Js-Analyzer] HTMLHint config file parsing error: ${f} -> ${e?.message || e}`);
             return {};
           }
         }
@@ -91,15 +124,13 @@ const loadConfig = (filePath: string): any => {
   return {};
 };
 
-// HTMLHint 실행 (htmlhint 없으면 빈 배열)
+// HTMLHint 실행 ------------------------------------------------------------------------------------
 export const runHtmlHint = (doc: vscode.TextDocument): vscode.Diagnostic[] => {
-  // Regression note: if htmlhint fails to load (null), simply return []; Extension still functions (CSS diagnostics).
-  // To verify manually: create an HTML missing <!DOCTYPE html> and run command 'Html-Js-Css-Analyzer: Validate Current Document'.
   if (!htmlhint) {
     return [];
   }
   try {
-    const engine = (htmlhint.default || htmlhint.HTMLHint || htmlhint);
+    const engine = htmlhint;
     const config = loadConfig(doc.uri.fsPath);
     const text = doc.getText();
     const errors: HtmlHintError[] = engine.verify(text, config) || [];
@@ -109,27 +140,26 @@ export const runHtmlHint = (doc: vscode.TextDocument): vscode.Diagnostic[] => {
       const col = Math.max(err.col - 1, 0);
       const start = new vscode.Position(line, col);
       const len = Math.max((err.raw?.length || 1), 1);
-      // 라인 길이 초과 방지 (VS Code Position 범위 안전)
       const lineText = doc.lineAt(Math.min(line, doc.lineCount - 1)).text;
       const endCol = Math.min(col + len, lineText.length > 0 ? lineText.length : col + len);
       const end = new vscode.Position(line, endCol);
       const range = new vscode.Range(start, end);
-      const d = new vscode.Diagnostic(range, err.message, vscode.DiagnosticSeverity.Warning);
-      d.source = "htmlhint";
+      const message = `${err.message}`;
+      const d = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+      d.source = "Html-Css-Js-Analyzer";
       d.code = err.rule?.id;
       (d as any).data = {ruleId: err.rule?.id, line: err.line, col: err.col, raw: err.raw};
       diags.push(d);
     }
     return diags;
-  } catch (e: any) {
-    log("error", `runHtmlHint error: ${e?.message || e}`);
+  }
+	catch (e: any) {
+    log("error", `[Html-Css-Js-Analyzer] HTMLHint execution error: ${e?.message || e}`);
     return [];
   }
 };
 
-// ---------------- Code Actions (간소화된 일부 rule) -----------------------------------------
-type FixFactory = (doc: vscode.TextDocument, d: Diagnostic) => CodeAction | null;
-
+// -------------------------------------------------------------------------------------------------
 const createLangFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "html-lang-require") {
     return null;
@@ -145,6 +175,7 @@ const createLangFix: FixFactory = (doc, diagnostic) => {
   }, diagnostic);
 };
 
+// -------------------------------------------------------------------------------------------------
 const createTitleFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "title-require") {
     return null;
@@ -164,6 +195,7 @@ const createTitleFix: FixFactory = (doc, diagnostic) => {
   }, diagnostic);
 };
 
+// -------------------------------------------------------------------------------------------------
 const createDoctypeFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "doctype-first") {
     return null;
@@ -178,7 +210,7 @@ const createDoctypeFix: FixFactory = (doc, diagnostic) => {
   }, diagnostic);
 };
 
-// attr-value-double-quotes ------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "attr-value-double-quotes") {
     return null;
@@ -187,7 +219,7 @@ const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -209,13 +241,13 @@ const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// tagname-lowercase --------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 const createTagnameLowercaseFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "tagname-lowercase") {
     return null;
   }
   const info = (diagnostic as any).data;
-  const lineStr = getDocLine(doc, info?.line);
+  const lineStr = getDocumentLine(doc, info?.line);
   if (!lineStr) {
     return null;
   }
@@ -236,13 +268,13 @@ const createTagnameLowercaseFix: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// attr-lowercase ---------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 const createAttrLowercaseFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== "attr-lowercase") {
     return null;
   }
   const info = (diagnostic as any).data;
-  const lineStr = getDocLine(doc, info?.line);
+  const lineStr = getDocumentLine(doc, info?.line);
   if (!lineStr) {
     return null;
   }
@@ -343,7 +375,7 @@ const createAltRequireFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -376,7 +408,7 @@ const createButtonTypeRequireFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -408,7 +440,7 @@ const createAttrNoUnnecessaryWhitespaceFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -438,7 +470,7 @@ const createAttrWhitespaceFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -472,7 +504,7 @@ const createTagSelfCloseFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -525,7 +557,7 @@ const createTagNoObsoleteFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -557,7 +589,7 @@ const createSpecCharEscapeFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== "number") {
     return null;
   }
-  const lineStr = getDocLine(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
     return null;
   }
@@ -598,7 +630,7 @@ const createSpecCharEscapeFix: FixFactory = (doc, diagnostic) => {
   }, diagnostic);
 };
 
-// factories 확장
+// -------------------------------------------------------------------------------------------------
 const factories: FixFactory[] = [
   createLangFix,
   createTitleFix,
@@ -618,7 +650,7 @@ const factories: FixFactory[] = [
   createSpecCharEscapeFix
 ];
 
-// ------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
   provideCodeActions(doc: vscode.TextDocument, range: Range, context: vscode.CodeActionContext): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
     const list: CodeAction[] = [];
@@ -629,11 +661,10 @@ export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
       for (const f of factories) {
         try {
           const act = f(doc, d as Diagnostic);
-          if (act) {
-            list.push(act);
-          }
-        } catch (e: any) {
-          log("error", `htmlhint codeAction error: ${e?.message || e}`);
+          act &&list.push(act);
+        }
+				catch (e: any) {
+          log("error", `[Html-Css-Js-Analyzer] HTMLHint code action error: ${e?.message || e}`);
         }
       }
     }

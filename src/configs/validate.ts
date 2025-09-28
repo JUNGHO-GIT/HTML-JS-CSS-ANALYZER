@@ -4,7 +4,9 @@ import * as vscode from "vscode";
 import {SelectorType, type SelectorPos} from "../langs/types/common.js";
 import {log} from "../utils/logger.js";
 import {runHtmlHint} from "../langs/html/htmlHint.js";
+import {runJSHint} from "../langs/js/jsHint.js";
 import {isAnalyzable} from "../utils/filter.js";
+import {isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled, isTsHintEnabled} from "./setting.js";
 
 // -------------------------------------------------------------------------------------------------
 export interface CssSupportLike {
@@ -23,16 +25,34 @@ const isCssLikeDoc = (doc: vscode.TextDocument) => {
 		f.endsWith(".css") || f.endsWith(".scss") || f.endsWith(".less") || f.endsWith(".sass");
 };
 
-// normalizeToken --------------------------------------------------------------------------------
-const normalizeToken = (t: string) => {
-	if (!t) {
+// isJsLikeDoc -----------------------------------------------------------------------------------
+const isJsLikeDoc = (doc: vscode.TextDocument) => {
+	const id = doc.languageId;
+	const f = doc.fileName.toLowerCase();
+	return id === "javascript" || id === "typescript" || id === "javascriptreact" || id === "typescriptreact" ||
+		f.endsWith(".js") || f.endsWith(".jsx") || f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".mjs");
+};
+
+// -------------------------------------------------------------------------------------------------
+const TEMPLATE_LITERAL_REGEX = /\$\{[^}]*\}/g;
+const VALID_CSS_IDENTIFIER_REGEX = /^[_a-zA-Z][-_a-zA-Z0-9]*$/;
+const QUOTE_CHARS = ["'", '"', '`'] as const;
+
+// -------------------------------------------------------------------------------------------------
+const normalizeToken = (token: string): string => {
+	if (!token) {
 		return "";
 	}
-	let s = t.replace(/\$\{[^}]*\}/g, " ");
-	if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("`") && s.endsWith("`"))) {
-		s = s.slice(1, -1);
-	}
-	return s;
+
+	// 템플릿 리터럴의 표현식 제거
+	let normalized = token.replace(TEMPLATE_LITERAL_REGEX, " ");
+
+	// 따옴표로 둘러싸인 경우 제거
+	const isQuoted = QUOTE_CHARS.some(quote =>
+		normalized.startsWith(quote) && normalized.endsWith(quote)
+	);
+
+	return isQuoted ? normalized.slice(1, -1) : normalized;
 };
 
 // makeRange -------------------------------------------------------------------------------------
@@ -53,50 +73,102 @@ const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 	return {knownClasses, knownIds};
 };
 
-// scanDocumentUsages ----------------------------------------------------------------------------
-const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownClasses: Set<string>, knownIds: Set<string>) => {
+// -------------------------------------------------------------------------------------------------
+const CLASS_ATTRIBUTE_REGEX = /(class|className)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
+const CLASSLIST_METHOD_REGEX = /classList\.(add|remove|toggle|contains)\s*\(([^)]*)\)/gis;
+const STRING_LITERAL_REGEX = /(['"`])([^'"`]*?)\1/g;
+
+// -------------------------------------------------------------------------------------------------
+const processClassAttribute = (
+	match: RegExpMatchArray,
+	document: vscode.TextDocument,
+	knownClasses: Set<string>,
+	diagnostics: vscode.Diagnostic[],
+	usedClasses: Set<string>
+): void => {
+	const rawClasses = match[3];
+	let cursor = 0;
+	const tokens = rawClasses.split(/\s+/);
+
+	for (const token of tokens) {
+		const normalizedValue = normalizeToken(token).trim();
+
+		if (normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
+			const isClassKnown = knownClasses.has(normalizedValue);
+
+			if (!isClassKnown) {
+				const baseOffset = match.index! + match[0].indexOf(rawClasses);
+				const tokenStart = baseOffset + rawClasses.indexOf(token, cursor);
+				const diagnostic = new vscode.Diagnostic(
+					makeRange(document, tokenStart, token.length),
+					`CSS class '${normalizedValue}' not found`,
+					vscode.DiagnosticSeverity.Warning
+				);
+				diagnostics.push(diagnostic);
+			}
+			else {
+				usedClasses.add(normalizedValue);
+			}
+		}
+
+		cursor += token.length + 1;
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
+const processClassListCall = (
+	match: RegExpMatchArray,
+	document: vscode.TextDocument,
+	knownClasses: Set<string>,
+	diagnostics: vscode.Diagnostic[],
+	usedClasses: Set<string>
+): void => {
+	const argumentsString = match[2];
+	let literalMatch: RegExpExecArray | null;
+
+	while ((literalMatch = STRING_LITERAL_REGEX.exec(argumentsString))) {
+		const normalizedValue = normalizeToken(literalMatch[2]).trim();
+
+		if (normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
+			const isClassKnown = knownClasses.has(normalizedValue);
+
+			if (!isClassKnown) {
+				const tokenStart = match.index! + match[0].indexOf(literalMatch[0]);
+				const diagnostic = new vscode.Diagnostic(
+					makeRange(document, tokenStart, literalMatch[0].length),
+					`CSS class '${normalizedValue}' not found`,
+					vscode.DiagnosticSeverity.Warning
+				);
+				diagnostics.push(diagnostic);
+			}
+			else {
+				usedClasses.add(normalizedValue);
+			}
+		}
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
+const scanDocumentUsages = (
+	fullText: string,
+	document: vscode.TextDocument,
+	knownClasses: Set<string>,
+	knownIds: Set<string>
+) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const usedClassesFromMarkup = new Set<string>();
 	const usedIdsFromMarkup = new Set<string>();
 
-	// class / className attributes
-	const classAttrRegex = /(class|className)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
-	let classAttrMatch: RegExpExecArray | null;
-	while ((classAttrMatch = classAttrRegex.exec(fullText))) {
-		const raw = classAttrMatch[3];
-		let cursor = 0;
-		const tokens = raw.split(/\s+/);
-		for (const t of tokens) {
-			const val = normalizeToken(t).trim();
-			if (val) {
-				if (/^[_a-zA-Z][-_a-zA-Z0-9]*$/.test(val) && !knownClasses.has(val)) {
-					const baseOffset = classAttrMatch.index + classAttrMatch[0].indexOf(raw);
-					const start = baseOffset + raw.indexOf(t, cursor);
-					diagnostics.push(new vscode.Diagnostic(makeRange(doc, start, t.length), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				}
-				knownClasses.has(val) && usedClassesFromMarkup.add(val);
-			}
-			cursor += t.length + 1;
-		}
+	// class / className 속성 처리
+	let classAttributeMatch: RegExpExecArray | null;
+	while ((classAttributeMatch = CLASS_ATTRIBUTE_REGEX.exec(fullText))) {
+		processClassAttribute(classAttributeMatch, document, knownClasses, diagnostics, usedClassesFromMarkup);
 	}
 
-	// classList.* calls
-	const classListRegex = /classList\.(add|remove|toggle|contains)\s*\(([^)]*)\)/gis;
-	let clMatch: RegExpExecArray | null;
-	while ((clMatch = classListRegex.exec(fullText))) {
-		const args = clMatch[2];
-		const litRegex = /(['"`])([^'"`]*?)\1/g;
-		let lit: RegExpExecArray | null;
-		while ((lit = litRegex.exec(args))) {
-			const val = normalizeToken(lit[2]).trim();
-			if (val) {
-				if (/^[_a-zA-Z][-_a-zA-Z0-9]*$/.test(val) && !knownClasses.has(val)) {
-					const start = clMatch.index + clMatch[0].indexOf(lit[0]);
-					diagnostics.push(new vscode.Diagnostic(makeRange(doc, start, lit[0].length), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				}
-				knownClasses.has(val) && usedClassesFromMarkup.add(val);
-			}
-		}
+	// classList 메서드 호출 처리
+	let classListMatch: RegExpExecArray | null;
+	while ((classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText))) {
+		processClassListCall(classListMatch, document, knownClasses, diagnostics, usedClassesFromMarkup);
 	}
 
 	// querySelector* selectors
@@ -113,7 +185,7 @@ const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownCla
 			if (val) {
 				if (!knownClasses.has(val)) {
 					const start = base + m.index + (m[1] ? 1 : 0) + 1;
-					diagnostics.push(new vscode.Diagnostic(makeRange(doc, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
+					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
 				}
 				knownClasses.has(val) && usedClassesFromMarkup.add(val);
 			}
@@ -123,7 +195,7 @@ const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownCla
 			if (val) {
 				if (!knownIds.has(val)) {
 					const start = base + m.index + (m[1] ? 1 : 0) + 1;
-					diagnostics.push(new vscode.Diagnostic(makeRange(doc, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning));
+					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning));
 				}
 				knownIds.has(val) && usedIdsFromMarkup.add(val);
 			}
@@ -140,7 +212,7 @@ const scanDocumentUsages = (fullText: string, doc: vscode.TextDocument, knownCla
 				const m = gebi[0].match(/(["'])([^"'`]+)\1/);
 				const litLen = m ? m[0].length : id.length + 2;
 				const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
-				diagnostics.push(new vscode.Diagnostic(makeRange(doc, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning));
+				diagnostics.push(new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning));
 			} else {
 				usedIdsFromMarkup.add(id);
 			}
@@ -253,7 +325,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	if (!isAnalyzable(doc)) {
 		return [];
 	}
-	log("debug", `validate start: ${doc.fileName}`);
+	log("debug", `[Html-Css-Js-Analyzer] Validation started: ${doc.fileName}`);
 	const allStyles = await support.getStyles(doc);
 	const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
 	const fullText = doc.getText();
@@ -261,17 +333,37 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 
 	const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = scanDocumentUsages(fullText, doc, knownClasses, knownIds);
 	let unusedDiagnostics: vscode.Diagnostic[] = [];
-	if (isCssLikeDoc(doc)) {
+	let lintDiagnostics: vscode.Diagnostic[] = [];
+
+	if (isCssLikeDoc(doc) && isCssHintEnabled(doc.uri)) {
 		unusedDiagnostics = await scanLocalUnused(doc, support, fullText);
 	}
 	else if (isHtml) {
-		unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup);
-		try {
-			const htmlHintDiagnostics = runHtmlHint(doc);
-			unusedDiagnostics.push(...htmlHintDiagnostics);
-		} catch (e: any) {
-			log("error", `htmlhint merge error: ${e?.message || e} in ${doc.fileName}`);
+		if (isCssHintEnabled(doc.uri)) {
+			unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup);
+		}
+		if (isHtmlHintEnabled(doc.uri)) {
+			try {
+				const htmlHintDiagnostics = runHtmlHint(doc);
+				lintDiagnostics.push(...htmlHintDiagnostics);
+			} catch (e: any) {
+				log("error", `[Html-Css-Js-Analyzer] HTMLHint merge error: ${e?.message || e} in ${doc.fileName}`);
+			}
 		}
 	}
-	return [...usageDiagnostics, ...unusedDiagnostics];
+	else if (isJsLikeDoc(doc)) {
+		const isTypeScript = doc.fileName.endsWith('.ts') || doc.fileName.endsWith('.tsx');
+		const shouldLint = isTypeScript ? isTsHintEnabled(doc.uri) : isJsHintEnabled(doc.uri);
+
+		if (shouldLint) {
+			try {
+				const jsHintDiagnostics = runJSHint(doc);
+				lintDiagnostics.push(...jsHintDiagnostics);
+			} catch (e: any) {
+				log("error", `[Html-Css-Js-Analyzer] JSHint merge error: ${e?.message || e} in ${doc.fileName}`);
+			}
+		}
+	}
+
+	return [...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics];
 };

@@ -1,12 +1,12 @@
 {
 	"name": "html-js-css-analyzer",
 	"displayName": "Html-Js-Css-Analyzer",
+	"description": "Analyzes HTML & CSS: unused selectors + HTML lint (HTMLHint) + JavaScript lint (JSHint) in your HTML/JS/TS/CSS files.",
 	"publisher": "JUNGHO",
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
 	"type": "module",
-	"version": "2.2.4",
-	"description": "Analyzes HTML & CSS: unused selectors + HTML best-practice lint (HTMLHint subset) in your HTML/JS/TS files.",
+	"version": "2.4.0",
 	"main": "./out/extension.js",
 	"repository": {
 		"type": "git",
@@ -24,6 +24,10 @@
 	"keywords": [
 		"css",
 		"html",
+		"javascript",
+		"typescript",
+		"jshint",
+		"htmlhint",
 		"intellisense",
 		"diagnostics",
 		"unused",
@@ -34,6 +38,10 @@
 		"onLanguage:html",
 		"onLanguage:css",
 		"onLanguage:scss",
+		"onLanguage:javascript",
+		"onLanguage:typescript",
+		"onLanguage:javascriptreact",
+		"onLanguage:typescriptreact",
 		"onCommand:Html-Js-Css-Analyzer.validate",
 		"onCommand:Html-Js-Css-Analyzer.clear"
 	],
@@ -107,26 +115,60 @@
 				"Html-Js-Css-Analyzer.additionalExtensions": {
 					"type": "array",
 					"scope": "window",
-					"default": ["html", "htm", "js", "jsx", "ts", "tsx", "css", "scss"],
+					"default": [
+						"html",
+						"htm",
+						"js",
+						"jsx",
+						"ts",
+						"tsx",
+						"css",
+						"scss"
+					],
 					"items": {
 						"type": "string"
 					}
+				},
+				"Html-Js-Css-Analyzer.htmlHint.enabled": {
+					"type": "boolean",
+					"scope": "window",
+					"default": true,
+					"description": "[Html-Css-Js-Analyzer] Enable/disable HTML analysis and hints"
+				},
+				"Html-Js-Css-Analyzer.cssHint.enabled": {
+					"type": "boolean",
+					"scope": "window",
+					"default": true,
+					"description": "[Html-Css-Js-Analyzer] Enable/disable CSS analysis and hints"
+				},
+				"Html-Js-Css-Analyzer.jsHint.enabled": {
+					"type": "boolean",
+					"scope": "window",
+					"default": true,
+					"description": "[Html-Css-Js-Analyzer] Enable/disable JavaScript analysis and hints"
+				},
+				"Html-Js-Css-Analyzer.tsHint.enabled": {
+					"type": "boolean",
+					"scope": "window",
+					"default": true,
+					"description": "[Html-Css-Js-Analyzer] Enable/disable TypeScript analysis and hints"
 				}
 			}
 		}
 	},
 	"scripts": {
 		"watch": "tsc -w -p .",
-		"compile": "npm run clean && tsc -p .",
-		"clean": "rimraf out",
+		"compile": "tsc -p .",
 		"vsce": "npm run compile && vsce package",
 		"gcloud-deploy": "node .node/gcloud.cjs --full-deploy",
 		"npm-reset": "pwsh -NoProfile -Command \"try { Stop-Process -Name node -Force -ErrorAction SilentlyContinue } catch {}; Start-Sleep -Milliseconds 200; if (Test-Path 'node_modules') { cmd /c 'rd /s /q \\\"node_modules\\\"' } ; if (Test-Path 'package-lock.json') { cmd /c 'del /f /q \\\"package-lock.json\\\"' } ; npm install\""
 	},
 	"dependencies": {
 		"@babel/core": "^7.28.4",
+		"@types/jshint": "^2.12.4",
 		"glob": "^11.0.3",
 		"htmlhint": "^1.7.1",
+		"jshint": "^2.13.6",
 		"terser": "^5.44.0",
 		"typescript": "^5.9.2"
 	},
@@ -137,7 +179,7 @@
 		"@types/node": "^24.5.2",
 		"@types/vscode": "^1.104.0",
 		"@vscode/test-electron": "^2.5.2",
-		"@vscode/vsce": "^3.6.0",
+		"@vscode/vsce": "^3.6.2",
 		"rimraf": "^6.0.1"
 	}
 }

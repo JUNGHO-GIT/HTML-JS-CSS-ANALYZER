@@ -5,22 +5,64 @@ import {getCssExcludePatterns, getAnalyzableExtensions} from "../configs/setting
 import {isUriExcludedByGlob} from "./glob.js";
 
 // -------------------------------------------------------------------------------------------------
-// - 분석 가능 여부 확인
-export const isAnalyzable = (doc: vscode.TextDocument): boolean => {
-	const scheme = doc.uri.scheme;
-	if (scheme !== "file" && scheme !== "vscode-file") {
+const SUPPORTED_SCHEMES = ["file", "vscode-file"] as const;
+const EXCLUDED_PATH_PATTERNS = [
+	"/appdata/roaming/code/user/",
+	"settings.json",
+	"mcp.json"
+] as const;
+
+// -------------------------------------------------------------------------------------------------
+const isValidScheme = (scheme: string): boolean => {
+	return SUPPORTED_SCHEMES.includes(scheme as any);
+};
+
+// -------------------------------------------------------------------------------------------------
+const isExcludedPath = (fileName: string): boolean => {
+	const normalizedPath = fileName.replace(/\\/g, "/").toLowerCase();
+
+	return EXCLUDED_PATH_PATTERNS.some(pattern =>
+		pattern.startsWith("/") ? normalizedPath.includes(pattern) : normalizedPath.endsWith(pattern)
+	);
+};
+
+// -------------------------------------------------------------------------------------------------
+const getFileExtension = (fileName: string): string | null => {
+	const normalizedPath = fileName.replace(/\\/g, "/").toLowerCase();
+	const lastDotIndex = normalizedPath.lastIndexOf('.');
+
+	return lastDotIndex > 0 && lastDotIndex < normalizedPath.length - 1
+		? normalizedPath.slice(lastDotIndex + 1)
+		: null;
+};
+
+// -------------------------------------------------------------------------------------------------
+export const isAnalyzable = (document: vscode.TextDocument): boolean => {
+	// 스키마 검증
+	const isSchemeSupported = isValidScheme(document.uri.scheme);
+	if (!isSchemeSupported) {
 		return false;
 	}
-	const file = doc.fileName.replace(/\\/g, "/").toLowerCase();
-	if (file.includes("/appdata/roaming/code/user/") || file.endsWith("settings.json") || file.endsWith("mcp.json")) {
+
+	// 제외 경로 검증
+	const isPathExcluded = isExcludedPath(document.fileName);
+	if (isPathExcluded) {
 		return false;
 	}
-	const exts = getAnalyzableExtensions(doc.uri);
-	// 뒤에서부터 '.' 찾고 확장자 추출
-	const idx = file.lastIndexOf('.') + 1;
-	if (idx <= 0 || idx >= file.length) {
+
+	// 파일 확장자 검증
+	const fileExtension = getFileExtension(document.fileName);
+	if (!fileExtension) {
 		return false;
 	}
-	const ext = file.slice(idx);
-	return exts.includes(ext) && !isUriExcludedByGlob(doc.uri, getCssExcludePatterns(doc.uri));
+
+	const analyzableExtensions = getAnalyzableExtensions(document.uri);
+	const isExtensionSupported = analyzableExtensions.includes(fileExtension);
+	if (!isExtensionSupported) {
+		return false;
+	}
+
+	// Glob 패턴 제외 검증
+	const excludePatterns = getCssExcludePatterns(document.uri);
+	return !isUriExcludedByGlob(document.uri, excludePatterns);
 };
