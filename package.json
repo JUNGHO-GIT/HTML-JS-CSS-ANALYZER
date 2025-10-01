@@ -157,11 +157,12 @@
 		}
 	},
 	"scripts": {
-		"watch": "tsc -w -p .",
+		"watch": "tsc -watch -p .",
 		"compile": "tsc -p .",
-		"vsce": "npm run compile && vsce package",
-		"gcloud-deploy": "node .node/gcloud.cjs --full-deploy",
-		"npm-reset": "pwsh -NoProfile -Command \"try { Stop-Process -Name node -Force -ErrorAction SilentlyContinue } catch {}; Start-Sleep -Milliseconds 200; if (Test-Path 'node_modules') { cmd /c 'rd /s /q \\\"node_modules\\\"' } ; if (Test-Path 'package-lock.json') { cmd /c 'del /f /q \\\"package-lock.json\\\"' } ; npm install\""
+		"vsce": "tsc -p . && vsce package",
+		"reset": "node .node/reset.cjs --npm",
+		"autofix": "node .node/autofix.cjs",
+		"gcloud": "node .node/gcloud.cjs"
 	},
 	"dependencies": {
 		"@babel/core": "^7.28.4",
@@ -170,13 +171,13 @@
 		"htmlhint": "^1.7.1",
 		"jshint": "^2.13.6",
 		"terser": "^5.44.0",
-		"typescript": "^5.9.2"
+		"typescript": "^5.9.3"
 	},
 	"devDependencies": {
 		"@types/glob": "^9.0.0",
 		"@types/htmlhint": "^1.1.5",
 		"@types/mocha": "^10.0.10",
-		"@types/node": "^24.5.2",
+		"@types/node": "^24.6.1",
 		"@types/vscode": "^1.104.0",
 		"@vscode/test-electron": "^2.5.2",
 		"@vscode/vsce": "^3.6.2",
