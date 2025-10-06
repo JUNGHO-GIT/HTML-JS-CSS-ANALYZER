@@ -21,16 +21,14 @@ const isHtmlDoc = (doc: vscode.TextDocument) => /\.html?$/i.test(doc.fileName) |
 const isCssLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
-	return id === "css" || id === "scss" || id === "less" || id === "sass" ||
-		f.endsWith(".css") || f.endsWith(".scss") || f.endsWith(".less") || f.endsWith(".sass");
+	return ["css", "scss", "less", "sass"].includes(id) || [".css", ".scss", ".less", ".sass"].some(ext => f.endsWith(ext));
 };
 
 // isJsLikeDoc -----------------------------------------------------------------------------------
 const isJsLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
-	return id === "javascript" || id === "typescript" || id === "javascriptreact" || id === "typescriptreact" ||
-		f.endsWith(".js") || f.endsWith(".jsx") || f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".mjs");
+	return ["javascript", "typescript", "javascriptreact", "typescriptreact"].includes(id) || [".js", ".jsx", ".ts", ".tsx", ".mjs"].some(ext => f.endsWith(ext));
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -40,18 +38,8 @@ const QUOTE_CHARS = ["'", '"', '`'] as const;
 
 // -------------------------------------------------------------------------------------------------
 const normalizeToken = (token: string): string => {
-	if (!token) {
-		return "";
-	}
-
-	// 템플릿 리터럴의 표현식 제거
-	let normalized = token.replace(TEMPLATE_LITERAL_REGEX, " ");
-
-	// 따옴표로 둘러싸인 경우 제거
-	const isQuoted = QUOTE_CHARS.some(quote =>
-		normalized.startsWith(quote) && normalized.endsWith(quote)
-	);
-
+	const normalized = !token ? "" : token.replace(TEMPLATE_LITERAL_REGEX, " ");
+	const isQuoted = normalized && QUOTE_CHARS.some(quote => normalized.startsWith(quote) && normalized.endsWith(quote));
 	return isQuoted ? normalized.slice(1, -1) : normalized;
 };
 
@@ -65,11 +53,7 @@ const makeRange = (doc: vscode.TextDocument, startIdx: number, length: number) =
 const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 	const knownClasses = new Set<string>();
 	const knownIds = new Set<string>();
-	for (const arr of all.values()) {
-		for (const s of arr) {
-			(s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector);
-		}
-	}
+	[...all.values()].forEach(arr => arr.forEach(s => (s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector)));
 	return {knownClasses, knownIds};
 };
 
@@ -77,6 +61,9 @@ const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 const CLASS_ATTRIBUTE_REGEX = /(class|className)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
 const CLASSLIST_METHOD_REGEX = /classList\.(add|remove|toggle|contains)\s*\(([^)]*)\)/gis;
 const STRING_LITERAL_REGEX = /(['"`])([^'"`]*?)\1/g;
+const INNERHTML_REGEX = /\.(innerHTML|outerHTML)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
+const INSERTADJACENTHTML_REGEX = /\.insertAdjacentHTML\s*\(\s*["'`][^"'`]*["'`]\s*,\s*(["'`])([\s\S]*?)\1\s*\)/gis;
+const TEMPLATE_LITERAL_HTML_REGEX = /(?:innerHTML|outerHTML)\s*[=:]\s*`([^`]*)`/gis;
 
 // -------------------------------------------------------------------------------------------------
 const processClassAttribute = (
@@ -90,29 +77,19 @@ const processClassAttribute = (
 	let cursor = 0;
 	const tokens = rawClasses.split(/\s+/);
 
-	for (const token of tokens) {
+	tokens.forEach(token => {
 		const normalizedValue = normalizeToken(token).trim();
 
-		if (normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
-			const isClassKnown = knownClasses.has(normalizedValue);
-
-			if (!isClassKnown) {
+		normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue) && (
+			knownClasses.has(normalizedValue) ? usedClasses.add(normalizedValue) : (() => {
 				const baseOffset = match.index! + match[0].indexOf(rawClasses);
 				const tokenStart = baseOffset + rawClasses.indexOf(token, cursor);
-				const diagnostic = new vscode.Diagnostic(
-					makeRange(document, tokenStart, token.length),
-					`CSS class '${normalizedValue}' not found`,
-					vscode.DiagnosticSeverity.Warning
-				);
-				diagnostics.push(diagnostic);
-			}
-			else {
-				usedClasses.add(normalizedValue);
-			}
-		}
+				diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, token.length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
+			})()
+		);
 
 		cursor += token.length + 1;
-	}
+	});
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -129,23 +106,42 @@ const processClassListCall = (
 	while ((literalMatch = STRING_LITERAL_REGEX.exec(argumentsString))) {
 		const normalizedValue = normalizeToken(literalMatch[2]).trim();
 
-		if (normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
-			const isClassKnown = knownClasses.has(normalizedValue);
-
-			if (!isClassKnown) {
+		normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue) && (
+			knownClasses.has(normalizedValue) ? usedClasses.add(normalizedValue) : (() => {
 				const tokenStart = match.index! + match[0].indexOf(literalMatch[0]);
-				const diagnostic = new vscode.Diagnostic(
-					makeRange(document, tokenStart, literalMatch[0].length),
-					`CSS class '${normalizedValue}' not found`,
-					vscode.DiagnosticSeverity.Warning
-				);
-				diagnostics.push(diagnostic);
-			}
-			else {
-				usedClasses.add(normalizedValue);
-			}
-		}
+				diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[0].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
+			})()
+		);
 	}
+};
+
+// -------------------------------------------------------------------------------------------------
+const extractHtmlFromInnerHtml = (fullText: string): Array<{html: string, offset: number}> => {
+	const results: Array<{html: string, offset: number}> = [];
+	let match: RegExpExecArray | null;
+
+	// innerHTML/outerHTML with quotes
+	while ((match = INNERHTML_REGEX.exec(fullText))) {
+		const htmlContent = match[3];
+		const offset = match.index + match[0].indexOf(htmlContent);
+		results.push({html: htmlContent, offset});
+	}
+
+	// insertAdjacentHTML
+	while ((match = INSERTADJACENTHTML_REGEX.exec(fullText))) {
+		const htmlContent = match[2];
+		const offset = match.index + match[0].lastIndexOf(htmlContent);
+		results.push({html: htmlContent, offset});
+	}
+
+	// Template literals with innerHTML/outerHTML
+	while ((match = TEMPLATE_LITERAL_HTML_REGEX.exec(fullText))) {
+		const htmlContent = match[1];
+		const offset = match.index + match[0].indexOf(htmlContent);
+		results.push({html: htmlContent, offset});
+	}
+
+	return results;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -170,6 +166,47 @@ const scanDocumentUsages = (
 	while ((classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText))) {
 		processClassListCall(classListMatch, document, knownClasses, diagnostics, usedClassesFromMarkup);
 	}
+
+	// JS/TS 파일의 innerHTML 등에서 HTML 추출 및 처리
+	const isJsTs = isJsLikeDoc(document);
+	isJsTs && extractHtmlFromInnerHtml(fullText).forEach(({html, offset}) => {
+		// 추출된 HTML에서 class 속성 검색
+		const classRegex = /class\s*=\s*(["'])([^"']*)\1/gis;
+		let classMatch: RegExpExecArray | null;
+		while ((classMatch = classRegex.exec(html))) {
+			const matchCopy = classMatch;
+			const classes = matchCopy[2].split(/\s+/).filter(c => c.trim());
+			classes.forEach(className => {
+				const normalized = normalizeToken(className).trim();
+				normalized && VALID_CSS_IDENTIFIER_REGEX.test(normalized) && (
+					knownClasses.has(normalized) ? usedClassesFromMarkup.add(normalized) : diagnostics.push(
+						new vscode.Diagnostic(
+							makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(className), className.length),
+							`CSS class '${normalized}' not found`,
+							vscode.DiagnosticSeverity.Warning
+						)
+					)
+				);
+			});
+		}
+
+		// 추출된 HTML에서 id 속성 검색
+		const idRegex = /\bid\s*=\s*(["'])([^"']*)\1/gis;
+		let idMatch: RegExpExecArray | null;
+		while ((idMatch = idRegex.exec(html))) {
+			const matchCopy = idMatch;
+			const idValue = normalizeToken(matchCopy[2]).trim();
+			idValue && VALID_CSS_IDENTIFIER_REGEX.test(idValue) && (
+				knownIds.has(idValue) ? usedIdsFromMarkup.add(idValue) : diagnostics.push(
+					new vscode.Diagnostic(
+						makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(idValue), idValue.length),
+						`CSS id '#${idValue}' not found`,
+						vscode.DiagnosticSeverity.Warning
+					)
+				)
+			);
+		}
+	});
 
 	// querySelector* selectors
 	const qsRegex = /querySelector(All)?\s*\(\s*(["'`])([\s\S]*?)\2\s*\)/gis;

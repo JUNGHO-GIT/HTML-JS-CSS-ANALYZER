@@ -36,75 +36,52 @@ class DiagnosticManager {
 
 	// -------------------------------------------------------------------------------------------------
 	scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void {
-		if (!isAnalyzable(document)) {
-			return;
-		}
+		!isAnalyzable(document) || (() => {
+			const documentKey = document.uri.toString();
+			const now = Date.now();
+			const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
+			const changeCount = this.changeCounters.get(documentKey) || 0;
+			const isRapidChange = (now - lastChange) < 1000;
+			const newChangeCount = isRapidChange ? changeCount + 1 : 1;
 
-		const documentKey = document.uri.toString();
-		const now = Date.now();
+			this.changeCounters.set(documentKey, newChangeCount);
+			this.lastChangeTimestamps.set(documentKey, now);
 
-		// 변경 빈도 추적
-		const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
-		const changeCount = this.changeCounters.get(documentKey) || 0;
+			const existingTimer = this.debounceTimers.get(documentKey);
+			existingTimer && clearTimeout(existingTimer);
 
-		// 빠른 연속 변경 감지 (1초 내 여러 변경)
-		const isRapidChange = (now - lastChange) < 1000;
-		const newChangeCount = isRapidChange ? changeCount + 1 : 1;
+			const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS) : BASE_VALIDATION_DELAY_MS;
 
-		this.changeCounters.set(documentKey, newChangeCount);
-		this.lastChangeTimestamps.set(documentKey, now);
+			const newTimer = setTimeout(async () => {
+				this.debounceTimers.delete(documentKey);
+				this.changeCounters.delete(documentKey);
+				await this.updateDiagnostics(cssSupport, document, triggerMode);
+			}, delay);
 
-		// 기존 타이머 정리
-		const existingTimer = this.debounceTimers.get(documentKey);
-		existingTimer && clearTimeout(existingTimer);
-
-		// 적응형 지연 시간 계산
-		let delay = BASE_VALIDATION_DELAY_MS;
-		if (newChangeCount >= RAPID_CHANGE_THRESHOLD) {
-			// 빠른 변경이 많을 경우 지연 시간 증가
-			delay = Math.min(
-				BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount),
-				MAX_VALIDATION_DELAY_MS
-			);
-		}
-
-		// 새 타이머 설정
-		const newTimer = setTimeout(async () => {
-			this.debounceTimers.delete(documentKey);
-			this.changeCounters.delete(documentKey);
-			await this.updateDiagnostics(cssSupport, document, triggerMode);
-		}, delay);
-
-		this.debounceTimers.set(documentKey, newTimer);
+			this.debounceTimers.set(documentKey, newTimer);
+		})();
 	}
 
 	// -------------------------------------------------------------------------------------------------
 	async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> {
-		if (!isAnalyzable(document)) {
-			this.collection.delete(document.uri);
-			return;
-		}
+		!isAnalyzable(document) ? this.collection.delete(document.uri) : await (async () => {
+			try {
+				const isForceMode = triggerMode === AutoValidationMode.FORCE;
+				const documentKey = document.uri.toString();
+				const lastVersion = this.lastValidatedVersions.get(documentKey);
 
-		try {
-			const isForceMode = triggerMode === AutoValidationMode.FORCE;
-			const documentKey = document.uri.toString();
-			const lastVersion = this.lastValidatedVersions.get(documentKey);
-
-			// 강제 모드가 아니고 동일한 버전이면 스킵
-			if (!isForceMode && lastVersion === document.version) {
-				return;
+				!isForceMode && lastVersion === document.version || await (async () => {
+					const diagnostics = await cssSupport.validate(document);
+					this.collection.set(document.uri, diagnostics);
+					this.lastValidatedVersions.set(documentKey, document.version);
+					log("info", `[Html-Css-Js-Analyzer] Diagnostics: ${document.fileName} -> ${diagnostics.length} items`);
+				})();
 			}
-
-			const diagnostics = await cssSupport.validate(document);
-			this.collection.set(document.uri, diagnostics);
-			this.lastValidatedVersions.set(documentKey, document.version);
-
-			log("info", `[Html-Css-Js-Analyzer] Diagnostics: ${document.fileName} -> ${diagnostics.length} items`);
-		}
-		catch (error: any) {
-			const errorMessage = error?.stack || error?.message || String(error);
-			log("error", `[Html-Css-Js-Analyzer] Diagnostic update error: ${errorMessage}`);
-		}
+			catch (error: any) {
+				const errorMessage = error?.stack || error?.message || String(error);
+				log("error", `[Html-Css-Js-Analyzer] Diagnostic update error: ${errorMessage}`);
+			}
+		})();
 	}
 
 	// -------------------------------------------------------------------------------------------------

@@ -341,38 +341,30 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 
   // VS Code CompletionItemProvider ---------------------------------------
   async provideCompletionItems (doc: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): Promise<vscode.CompletionItem[] | undefined> {
-  if (!isAnalyzable(doc)) {
-    return undefined;
-  }
-    if (token.isCancellationRequested) {
-      return undefined;
-    }
-    const prefixText = doc.getText(new vscode.Range(ZERO_POSITION, position));
-    if (this.canComplete.test(prefixText)) {
-      const isIdCtx = /(?:\bid\s*[=:]|[#])\s*["'`]?[^]*$/.test(prefixText);
-      const kind = isIdCtx ? SelectorType.ID : SelectorType.CLASS;
-      return await this.getCompletionItems(doc, position, kind);
-    }
-    return undefined;
+    return (!isAnalyzable(doc) || token.isCancellationRequested) ? undefined : (() => {
+      const prefixText = doc.getText(new vscode.Range(ZERO_POSITION, position));
+      return this.canComplete.test(prefixText) ? (async () => {
+        const isIdCtx = /(?:\bid\s*[=:]|[#])\s*["'`]?[^]*$/.test(prefixText);
+        const kind = isIdCtx ? SelectorType.ID : SelectorType.CLASS;
+        return await this.getCompletionItems(doc, position, kind);
+      })() : undefined;
+    })();
   }
 
   // VS Code DefinitionProvider -------------------------------------------
   async provideDefinition (doc: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): Promise<vscode.Definition> {
-  if (!isAnalyzable(doc) || token.isCancellationRequested) {
-    return [];
-  }
-    const wordRange = doc.getWordRangeAtPosition(position, this.wordRange as unknown as RegExp);
-    if (!wordRange) {
-      return [];
-    }
-    const allStyles = await this.getStyles(doc);
-    const target = doc.getText(wordRange);
-    const locations: vscode.Location[] = [];
-    for (const entry of allStyles) {
-      if (REMOTE_URL_REGEX.test(entry[0])) continue; // skip remote for definition
-      for (const s of entry[1]) if (s.selector === target) locations.push(new vscode.Location(vscode.Uri.parse(entry[0]), new vscode.Position(s.line, s.col)));
-    }
-    return locations;
+    return (!isAnalyzable(doc) || token.isCancellationRequested) ? [] : (async () => {
+      const wordRange = doc.getWordRangeAtPosition(position, this.wordRange as unknown as RegExp);
+      return !wordRange ? [] : (async () => {
+        const allStyles = await this.getStyles(doc);
+        const target = doc.getText(wordRange);
+        const locations: vscode.Location[] = [];
+        for (const entry of allStyles) {
+          !REMOTE_URL_REGEX.test(entry[0]) && entry[1].forEach(s => s.selector === target && locations.push(new vscode.Location(vscode.Uri.parse(entry[0]), new vscode.Position(s.line, s.col))));
+        }
+        return locations;
+      })();
+    })();
   }
 
   // Delegate validation --------------------------------------------------

@@ -38,31 +38,12 @@ const getFileExtension = (fileName: string): string | null => {
 
 // -------------------------------------------------------------------------------------------------
 export const isAnalyzable = (document: vscode.TextDocument): boolean => {
-	// 스키마 검증
 	const isSchemeSupported = isValidScheme(document.uri.scheme);
-	if (!isSchemeSupported) {
-		return false;
-	}
-
-	// 제외 경로 검증
 	const isPathExcluded = isExcludedPath(document.fileName);
-	if (isPathExcluded) {
-		return false;
-	}
-
-	// 파일 확장자 검증
 	const fileExtension = getFileExtension(document.fileName);
-	if (!fileExtension) {
-		return false;
-	}
-
 	const analyzableExtensions = getAnalyzableExtensions(document.uri);
-	const isExtensionSupported = analyzableExtensions.includes(fileExtension);
-	if (!isExtensionSupported) {
-		return false;
-	}
-
-	// Glob 패턴 제외 검증
+	const isExtensionSupported = fileExtension && analyzableExtensions.includes(fileExtension);
 	const excludePatterns = getCssExcludePatterns(document.uri);
-	return !isUriExcludedByGlob(document.uri, excludePatterns);
+
+	return !(!isSchemeSupported || isPathExcluded || !fileExtension || !isExtensionSupported || isUriExcludedByGlob(document.uri, excludePatterns));
 };
