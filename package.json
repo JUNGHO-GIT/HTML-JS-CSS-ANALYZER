@@ -13,7 +13,7 @@
 		"url": "https://github.com/JUNGHO-GIT/HTML-JS-CSS-ANALYZER.git"
 	},
 	"engines": {
-		"vscode": "^1.104.0",
+		"vscode": "^1.105.0",
 		"node": ">=18.0.0",
 		"npm": ">=10.0.0"
 	},
