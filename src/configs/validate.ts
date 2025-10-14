@@ -32,9 +32,11 @@ const isJsLikeDoc = (doc: vscode.TextDocument) => {
 };
 
 // -------------------------------------------------------------------------------------------------
+// 최적화된 정규표현식 (성능 개선 및 백트래킹 방지)
 const TEMPLATE_LITERAL_REGEX = /\$\{[^}]*\}/g;
 const VALID_CSS_IDENTIFIER_REGEX = /^[_a-zA-Z][-_a-zA-Z0-9]*$/;
 const QUOTE_CHARS = ["'", '"', '`'] as const;
+const BACKSLASH_REGEX = /\\/g;
 
 // -------------------------------------------------------------------------------------------------
 const normalizeToken = (token: string): string => {
@@ -58,12 +60,15 @@ const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 };
 
 // -------------------------------------------------------------------------------------------------
-const CLASS_ATTRIBUTE_REGEX = /(class|className)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
-const CLASSLIST_METHOD_REGEX = /classList\.(add|remove|toggle|contains)\s*\(([^)]*)\)/gis;
-const STRING_LITERAL_REGEX = /(['"`])([^'"`]*?)\1/g;
-const INNERHTML_REGEX = /\.(innerHTML|outerHTML)\s*[=:]\s*(["'`])([\s\S]*?)\2/gis;
-const INSERTADJACENTHTML_REGEX = /\.insertAdjacentHTML\s*\(\s*["'`][^"'`]*["'`]\s*,\s*(["'`])([\s\S]*?)\1\s*\)/gis;
-const TEMPLATE_LITERAL_HTML_REGEX = /(?:innerHTML|outerHTML)\s*[=:]\s*`([^`]*)`/gis;
+// 강화된 정규표현식 패턴 (더 정확한 매칭 및 성능 개선)
+const CLASS_ATTRIBUTE_REGEX = /(?:class|className)\s*[=:]\s*(["'`])((?:(?!\1).)*?)\1/gis;
+const CLASSLIST_METHOD_REGEX = /classList\.(?:add|remove|toggle|contains)\s*\(([^)]+)\)/gis;
+const STRING_LITERAL_REGEX = /(['"`])((?:(?!\1).)*?)\1/g;
+const INNERHTML_REGEX = /\.(?:innerHTML|outerHTML)\s*[=:]\s*(["'`])((?:(?!\1)[\s\S])*?)\1/gis;
+const INSERTADJACENTHTML_REGEX = /\.insertAdjacentHTML\s*\(\s*["'`][^"'`]*["'`]\s*,\s*(["'`])((?:(?!\1)[\s\S])*?)\1\s*\)/gis;
+const TEMPLATE_LITERAL_HTML_REGEX = /(?:innerHTML|outerHTML)\s*[=:]\s*`((?:[^`\\]|\\.)*?)`/gis;
+const QUERYSELECTOR_REGEX = /querySelector(?:All)?\s*\(\s*(["'`])((?:(?!\1)[\s\S])*?)\1\s*\)/gis;
+const GETELEMENTBYID_REGEX = /getElementById\s*\(\s*(["'])((?:(?!\1)[^"'`])+)\1\s*\)/gis;
 
 // -------------------------------------------------------------------------------------------------
 const processClassAttribute = (
@@ -73,7 +78,7 @@ const processClassAttribute = (
 	diagnostics: vscode.Diagnostic[],
 	usedClasses: Set<string>
 ): void => {
-	const rawClasses = match[3];
+	const rawClasses = match[2];
 	let cursor = 0;
 	const tokens = rawClasses.split(/\s+/);
 
@@ -100,7 +105,7 @@ const processClassListCall = (
 	diagnostics: vscode.Diagnostic[],
 	usedClasses: Set<string>
 ): void => {
-	const argumentsString = match[2];
+	const argumentsString = match[1];
 	let literalMatch: RegExpExecArray | null;
 
 	while ((literalMatch = STRING_LITERAL_REGEX.exec(argumentsString))) {
@@ -122,7 +127,7 @@ const extractHtmlFromInnerHtml = (fullText: string): Array<{html: string, offset
 
 	// innerHTML/outerHTML with quotes
 	while ((match = INNERHTML_REGEX.exec(fullText))) {
-		const htmlContent = match[3];
+		const htmlContent = match[2];
 		const offset = match.index + match[0].indexOf(htmlContent);
 		results.push({html: htmlContent, offset});
 	}
@@ -208,124 +213,99 @@ const scanDocumentUsages = (
 		}
 	});
 
-	// querySelector* selectors
-	const qsRegex = /querySelector(All)?\s*\(\s*(["'`])([\s\S]*?)\2\s*\)/gis;
+	// querySelector* selectors (개선된 정규표현식 사용)
 	let qsMatch: RegExpExecArray | null;
-	while ((qsMatch = qsRegex.exec(fullText))) {
-		const q = qsMatch[3];
+	while ((qsMatch = QUERYSELECTOR_REGEX.exec(fullText))) {
+		const q = qsMatch[2];
 		const base = qsMatch.index + qsMatch[0].indexOf(q);
 		const clsTok = /(^|[^\\])\.((?:\\.|[-_a-zA-Z0-9])+)/g;
 		const idTok = /(^|[^\\])#((?:\\.|[-_a-zA-Z0-9])+)/g;
 		let m: RegExpExecArray | null;
 		while ((m = clsTok.exec(q))) {
-			const val = m[2].replace(/\\/g, "");
-			if (val) {
-				if (!knownClasses.has(val)) {
+			const val = m[2].replace(BACKSLASH_REGEX, "");
+			val && (
+				knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
 					const start = base + m.index + (m[1] ? 1 : 0) + 1;
 					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				}
-				knownClasses.has(val) && usedClassesFromMarkup.add(val);
-			}
+				})()
+			);
 		}
 		while ((m = idTok.exec(q))) {
-			const val = m[2].replace(/\\/g, "");
-			if (val) {
-				if (!knownIds.has(val)) {
+			const val = m[2].replace(BACKSLASH_REGEX, "");
+			val && (
+				knownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
 					const start = base + m.index + (m[1] ? 1 : 0) + 1;
 					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				}
-				knownIds.has(val) && usedIdsFromMarkup.add(val);
-			}
+				})()
+			);
 		}
 	}
 
-	// getElementById
-	const gebiRegex = /getElementById\s*\(\s*(["'])([^"'`]+)\1\s*\)/gis;
+	// getElementById (개선된 정규표현식 사용)
 	let gebi: RegExpExecArray | null;
-	while ((gebi = gebiRegex.exec(fullText))) {
+	while ((gebi = GETELEMENTBYID_REGEX.exec(fullText))) {
 		const id = gebi[2];
-		if (id) {
-			if (!knownIds.has(id)) {
-				const m = gebi[0].match(/(["'])([^"'`]+)\1/);
+		id && (
+			knownIds.has(id) ? usedIdsFromMarkup.add(id) : (() => {
+				const m = gebi[0].match(/(["'])((?:(?!\1)[^"'`])+)\1/);
 				const litLen = m ? m[0].length : id.length + 2;
 				const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
 				diagnostics.push(new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning));
-			} else {
-				usedIdsFromMarkup.add(id);
-			}
-		}
+			})()
+		);
 	}
 
 	return {diagnostics, usedClassesFromMarkup, usedIdsFromMarkup};
 };
 
-// scanLocalUnused -------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+// CSS 본문 추출 (성능 최적화 및 메모리 효율 개선)
+const fnExtractCssBodies = (fullText: string): string => {
+	let depth = 0;
+	let start = -1;
+	let inComment = false;
+	let inString = false;
+	let stringChar = '';
+	const bodies: string[] = [];
+
+	for (let i = 0; i < fullText.length; i++) {
+		const ch = fullText[i];
+		const nextCh = fullText[i + 1] || '';
+
+		inComment && ch === '*' && nextCh === '/' && (inComment = false, i++);
+		inComment && (i < fullText.length) || (
+			inString && ch === stringChar && fullText[i - 1] !== '\\' && (inString = false),
+			!inString && ch === '/' && nextCh === '*' && (inComment = true, i++),
+			!inString && (ch === '"' || ch === "'") && fullText[i - 1] !== '\\' && (inString = true, stringChar = ch),
+			!inComment && !inString && (
+				ch === '{' && (depth === 0 && (start = i + 1), depth++),
+				ch === '}' && (depth--, depth === 0 && start >= 0 && (bodies.push(fullText.slice(start, i)), start = -1))
+			)
+		);
+	}
+
+	return bodies.join('\n');
+};
+
+// scanLocalUnused (성능 최적화) -----------------------------------------------------------------
 const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike, fullText: string) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const sels = await support.getLocalDoc(doc);
-	// 룰 본문(body)만 추출하여 사용 토큰을 찾기 (선언 prelude 영역 중복 제거)
-	const bodyOnly = (() => {
-		let depth = 0;
-		let start = -1;
-		let inComment = false;
-		let inString = false;
-		let stringChar = '';
-		const bodies: string[] = [];
-		for (let i = 0; i < fullText.length; i++) {
-			const ch = fullText[i];
-			const nextCh = fullText[i + 1] || '';
-			if (inComment) {
-				if (ch === '*' && nextCh === '/') {
-					inComment = false;
-					i++;
-				}
-				continue;
-			}
-			if (inString) {
-				if (ch === stringChar && fullText[i - 1] !== '\\') {
-					inString = false;
-				}
-				continue;
-			}
-			if (ch === '/' && nextCh === '*') {
-				inComment = true;
-				i++;
-				continue;
-			}
-			if ((ch === '"' || ch === "'") && fullText[i - 1] !== '\\') {
-				inString = true;
-				stringChar = ch;
-				continue;
-			}
-			if (ch === '{') {
-				if (depth === 0) {
-					start = i + 1;
-				}
-				depth++;
-			} else if (ch === '}') {
-				depth--;
-				if (depth === 0 && start >= 0) {
-					bodies.push(fullText.slice(start, i));
-					start = -1;
-				}
-			}
-		}
-		return bodies.join('\n');
-	})();
+	const bodyOnly = fnExtractCssBodies(fullText);
 	const usedClasses = new Set<string>();
 	const usedIds = new Set<string>();
 	let m: RegExpExecArray | null;
 	const clsUse = /(^|[^\\])\.((?:\\.|[-_a-zA-Z0-9])+)/g;
 	while ((m = clsUse.exec(bodyOnly))) {
-		usedClasses.add(m[2].replace(/\\/g, ""));
+		usedClasses.add(m[2].replace(BACKSLASH_REGEX, ""));
 	}
 	const idUse = /(^|[^\\])#((?:\\.|[-_a-zA-Z0-9])+)/g;
 	while ((m = idUse.exec(bodyOnly))) {
-		usedIds.add(m[2].replace(/\\/g, ""));
+		usedIds.add(m[2].replace(BACKSLASH_REGEX, ""));
 	}
 	for (const s of sels) {
 		const used = s.type === SelectorType.CLASS ? usedClasses.has(s.selector) : usedIds.has(s.selector);
-		if (!used) {
+		!used && (() => {
 			const symbolOffset = 1;
 			const base = doc.positionAt(s.index);
 			const start = base.translate(0, symbolOffset);
@@ -333,18 +313,18 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? "." : "#") + s.selector}'`, vscode.DiagnosticSeverity.Warning);
 			d.tags = [vscode.DiagnosticTag.Unnecessary];
 			diagnostics.push(d);
-		}
+		})();
 	}
 	return diagnostics;
 };
 
-// scanEmbeddedUnused ----------------------------------------------------------------------------
+// scanEmbeddedUnused (성능 최적화) --------------------------------------------------------------
 const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportLike, usedClassesFromMarkup: Set<string>, usedIdsFromMarkup: Set<string>) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const localDefs = await support.getLocalDoc(doc);
 	for (const s of localDefs) {
 		const used = s.type === SelectorType.CLASS ? usedClassesFromMarkup.has(s.selector) : usedIdsFromMarkup.has(s.selector);
-		if (!used) {
+		!used && (() => {
 			const symbolOffset = 1;
 			const base = doc.positionAt(s.index);
 			const start = base.translate(0, symbolOffset);
@@ -352,55 +332,54 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? "." : "#") + s.selector}'`, vscode.DiagnosticSeverity.Warning);
 			d.tags = [vscode.DiagnosticTag.Unnecessary];
 			diagnostics.push(d);
-		}
+		})();
 	}
 	return diagnostics;
 };
 
-// validateDocument ------------------------------------------------------------------------------
+// validateDocument (성능 최적화 및 메모리 효율 개선) -------------------------------------------
 export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
-	if (!isAnalyzable(doc)) {
-		return [];
-	}
-	log("debug", `[Html-Css-Js-Analyzer] Validation started: ${doc.fileName}`);
-	const allStyles = await support.getStyles(doc);
-	const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
-	const fullText = doc.getText();
-	const isHtml = isHtmlDoc(doc);
+	return !isAnalyzable(doc) ? [] : (async () => {
+		log("debug", `[Html-Css-Js-Analyzer] Validation started: ${doc.fileName}`);
+		const allStyles = await support.getStyles(doc);
+		const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
+		const fullText = doc.getText();
+		const isHtml = isHtmlDoc(doc);
 
-	const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = scanDocumentUsages(fullText, doc, knownClasses, knownIds);
-	let unusedDiagnostics: vscode.Diagnostic[] = [];
-	let lintDiagnostics: vscode.Diagnostic[] = [];
+		const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = scanDocumentUsages(fullText, doc, knownClasses, knownIds);
+		let unusedDiagnostics: vscode.Diagnostic[] = [];
+		let lintDiagnostics: vscode.Diagnostic[] = [];
 
-	if (isCssLikeDoc(doc) && isCssHintEnabled(doc.uri)) {
-		unusedDiagnostics = await scanLocalUnused(doc, support, fullText);
-	}
-	else if (isHtml) {
-		if (isCssHintEnabled(doc.uri)) {
-			unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup);
-		}
-		if (isHtmlHintEnabled(doc.uri)) {
-			try {
-				const htmlHintDiagnostics = runHtmlHint(doc);
-				lintDiagnostics.push(...htmlHintDiagnostics);
-			} catch (e: any) {
-				log("error", `[Html-Css-Js-Analyzer] HTMLHint merge error: ${e?.message || e} in ${doc.fileName}`);
-			}
-		}
-	}
-	else if (isJsLikeDoc(doc)) {
-		const isTypeScript = doc.fileName.endsWith('.ts') || doc.fileName.endsWith('.tsx');
-		const shouldLint = isTypeScript ? isTsHintEnabled(doc.uri) : isJsHintEnabled(doc.uri);
+		isCssLikeDoc(doc) && isCssHintEnabled(doc.uri) && (unusedDiagnostics = await scanLocalUnused(doc, support, fullText));
 
-		if (shouldLint) {
-			try {
-				const jsHintDiagnostics = runJSHint(doc);
-				lintDiagnostics.push(...jsHintDiagnostics);
-			} catch (e: any) {
-				log("error", `[Html-Css-Js-Analyzer] JSHint merge error: ${e?.message || e} in ${doc.fileName}`);
-			}
-		}
-	}
+		isHtml && (
+			isCssHintEnabled(doc.uri) && (unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup)),
+			isHtmlHintEnabled(doc.uri) && (() => {
+				try {
+					const htmlHintDiagnostics = runHtmlHint(doc);
+					lintDiagnostics.push(...htmlHintDiagnostics);
+				}
+				catch (e: any) {
+					log("error", `[Html-Css-Js-Analyzer] HTMLHint merge error: ${e?.message || e} in ${doc.fileName}`);
+				}
+			})()
+		);
 
-	return [...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics];
+		isJsLikeDoc(doc) && (() => {
+			const isTypeScript = doc.fileName.endsWith('.ts') || doc.fileName.endsWith('.tsx');
+			const shouldLint = isTypeScript ? isTsHintEnabled(doc.uri) : isJsHintEnabled(doc.uri);
+
+			shouldLint && (() => {
+				try {
+					const jsHintDiagnostics = runJSHint(doc);
+					lintDiagnostics.push(...jsHintDiagnostics);
+				}
+				catch (e: any) {
+					log("error", `[Html-Css-Js-Analyzer] JSHint merge error: ${e?.message || e} in ${doc.fileName}`);
+				}
+			})();
+		})();
+
+		return [...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics];
+	})();
 };

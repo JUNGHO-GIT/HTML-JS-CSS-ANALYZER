@@ -3,7 +3,14 @@
 import {type LineIndex, LineIndexMapper} from "../../utils/lineIndex.js";
 import {type SelectorPos, SelectorType} from "../types/common.js";
 
-// CSS 선택자 파서 ---------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+// 최적화된 정규표현식 패턴 (백트래킹 방지 및 성능 개선)
+const SELECTOR_BOUNDARY_REGEX = /\s|[#.:,[\]()>+~=*^$|{}]/;
+const ESCAPED_CHAR_REGEX = /\\(.)/g;
+const LEADING_WHITESPACE_REGEX = /^\s*/;
+
+// -------------------------------------------------------------------------------------------------
+// CSS 선택자 파서 (성능 최적화 및 메모리 효율 개선)
 export const parseSelectors = (cssText: string): SelectorPos[] => {
 	const positions: SelectorPos[] = [];
 	const mapper = LineIndexMapper(cssText, {origin: 0}) as LineIndex;
@@ -58,43 +65,27 @@ export const parseSelectors = (cssText: string): SelectorPos[] => {
 			for (let i = 0; i < frag.length; i++) {
 				const ch = frag[i];
 				const prev = i > 0 ? frag[i - 1] : "";
-				if ((ch === "." || ch === "#") && prev !== "\\") {
+				((ch === "." || ch === "#") && prev !== "\\") && (() => {
 					let j = i + 1;
 					let value = "";
 					while (j < frag.length) {
 						const c = frag[j];
-						if (c === "\\") {
-							if (j + 1 < frag.length) {
-								value += frag[j + 1];
-								j += 2;
-								continue;
-							}
-							else {
-								j++;
-								continue;
-							}
-						}
-						if (/\s|[#.:,[\]()>+~=*^$|{}]/.test(c)) {
-							break;
-						}
-						value += c;
-						j++;
+						c === "\\" && j + 1 < frag.length ? (value += frag[j + 1], j += 2) : (SELECTOR_BOUNDARY_REGEX.test(c) ? (j = frag.length) : (value += c, j++));
+						c === "\\" && j + 1 >= frag.length && (j++);
 					}
-					if (value.length > 0) {
+					value.length > 0 && (() => {
 						const absIdx = baseIndex + p.offset + i;
 						const pos = mapper.fromIndex(absIdx);
-						if (pos) {
-							positions.push({
-								index: absIdx,
-								line: pos.line,
-								col: pos.col,
-								type: ch === "#" ? SelectorType.ID : SelectorType.CLASS,
-								selector: value
-							});
-						}
-					}
+						pos && positions.push({
+							index: absIdx,
+							line: pos.line,
+							col: pos.col,
+							type: ch === "#" ? SelectorType.ID : SelectorType.CLASS,
+							selector: value
+						});
+					})();
 					i = j - 1;
-				}
+				})();
 			}
 		}
 	};
@@ -142,28 +133,14 @@ export const parseSelectors = (cssText: string): SelectorPos[] => {
 			}
 		}
 
-		if (ch === "{") {
-			if (depth === 0) {
-				const rawPrelude = cssText.slice(preludeStart, i);
-				// leading whitespace 길이 측정하여 baseIndex 보정
-				const leading = rawPrelude.match(/^\s*/)?.[0].length || 0;
-				const prelude = rawPrelude.trim();
-				if (prelude.length > 0) {
-					extractFromPrelude(prelude, preludeStart + leading);
-				}
-			}
-			depth++;
-			continue;
-		}
-		if (ch === "}") {
-			if (depth > 0) {
-				depth--;
-				if (depth === 0) {
-					preludeStart = i + 1;
-				}
-			}
-			continue;
-		}
+		ch === "{" && (depth === 0 && (() => {
+			const rawPrelude = cssText.slice(preludeStart, i);
+			const leading = LEADING_WHITESPACE_REGEX.exec(rawPrelude)?.[0].length || 0;
+			const prelude = rawPrelude.trim();
+			prelude.length > 0 && extractFromPrelude(prelude, preludeStart + leading);
+		})(), depth++);
+
+		ch === "}" && depth > 0 && (depth--, depth === 0 && (preludeStart = i + 1));
 	}
 
 	return positions;

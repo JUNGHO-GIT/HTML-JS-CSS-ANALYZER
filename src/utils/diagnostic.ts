@@ -52,13 +52,13 @@ class DiagnosticManager {
 
 			const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS) : BASE_VALIDATION_DELAY_MS;
 
-			const newTimer = setTimeout(async () => {
+			const fnUpdateDiagnostics = async () => {
 				this.debounceTimers.delete(documentKey);
 				this.changeCounters.delete(documentKey);
 				await this.updateDiagnostics(cssSupport, document, triggerMode);
-			}, delay);
+			};
 
-			this.debounceTimers.set(documentKey, newTimer);
+			this.debounceTimers.set(documentKey, setTimeout(fnUpdateDiagnostics, delay));
 		})();
 	}
 
@@ -88,14 +88,14 @@ class DiagnosticManager {
 	handleDocumentClosed(document: vscode.TextDocument): void {
 		const documentKey = document.uri.toString();
 
-		// 타이머 정리
 		const timer = this.debounceTimers.get(documentKey);
 		timer && (clearTimeout(timer), this.debounceTimers.delete(documentKey));
 
-		// 진단 정보 정리
 		this.collection.delete(document.uri);
 		cacheDelete(documentKey);
 		this.lastValidatedVersions.delete(documentKey);
+		this.changeCounters.delete(documentKey);
+		this.lastChangeTimestamps.delete(documentKey);
 	}
 
 	// -------------------------------------------------------------------------------------------------
