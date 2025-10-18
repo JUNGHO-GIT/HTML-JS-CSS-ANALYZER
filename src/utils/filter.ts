@@ -5,7 +5,7 @@ import {getCssExcludePatterns, getAnalyzableExtensions} from "../configs/setting
 import {isUriExcludedByGlob} from "./glob.js";
 
 // -------------------------------------------------------------------------------------------------
-const SUPPORTED_SCHEMES = ["file", "vscode-file"] as const;
+const SUPPORTED_SCHEMES = ["file", "vscode-file", "vscode-remote"] as const;
 const EXCLUDED_PATH_PATTERNS = [
 	"/appdata/roaming/code/user/",
 	"settings.json",

@@ -70,7 +70,7 @@ class DiagnosticManager {
 				const documentKey = document.uri.toString();
 				const lastVersion = this.lastValidatedVersions.get(documentKey);
 
-				!isForceMode && lastVersion === document.version || await (async () => {
+				(!isForceMode && lastVersion === document.version) ? void 0 : await (async () => {
 					const diagnostics = await cssSupport.validate(document);
 					this.collection.set(document.uri, diagnostics);
 					this.lastValidatedVersions.set(documentKey, document.version);

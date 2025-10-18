@@ -6,7 +6,7 @@
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
 	"type": "module",
-	"version": "2.4.4",
+	"version": "2.4.6",
 	"main": "./out/extension.js",
 	"repository": {
 		"type": "git",
@@ -173,7 +173,7 @@
 		"@types/glob": "^9.0.0",
 		"@types/htmlhint": "^1.1.5",
 		"@types/mocha": "^10.0.10",
-		"@types/node": "^24.7.2",
+		"@types/node": "^24.8.1",
 		"@types/vscode": "^1.105.0",
 		"@vscode/test-electron": "^2.5.2",
 		"@vscode/vsce": "^3.6.2",

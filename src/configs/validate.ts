@@ -79,22 +79,37 @@ const processClassAttribute = (
 	usedClasses: Set<string>
 ): void => {
 	const rawClasses = match[2];
-	let cursor = 0;
+	let searchOffset = 0;
 	const tokens = rawClasses.split(/\s+/);
 
-	tokens.forEach(token => {
+	for (const token of tokens) {
 		const normalizedValue = normalizeToken(token).trim();
+		if (!normalizedValue || !VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
+			searchOffset += token.length + 1;
+			continue;
+		}
 
-		normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue) && (
-			knownClasses.has(normalizedValue) ? usedClasses.add(normalizedValue) : (() => {
-				const baseOffset = match.index! + match[0].indexOf(rawClasses);
-				const tokenStart = baseOffset + rawClasses.indexOf(token, cursor);
-				diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, token.length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
-			})()
-		);
+		const baseOffset = match.index! + match[0].indexOf(rawClasses);
+		const relativeIdx = rawClasses.indexOf(token, searchOffset);
+		if (relativeIdx < 0) {
+			searchOffset += token.length + 1;
+			continue;
+		}
 
-		cursor += token.length + 1;
-	});
+		const tokenStart = baseOffset + relativeIdx;
+		const innerIdx = token.indexOf(normalizedValue);
+		const highlightStart = innerIdx >= 0 ? tokenStart + innerIdx : tokenStart;
+		const highlightLen = normalizedValue.length;
+
+		if (knownClasses.has(normalizedValue)) {
+			usedClasses.add(normalizedValue);
+		}
+		else {
+			diagnostics.push(new vscode.Diagnostic(makeRange(document, highlightStart, highlightLen), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
+		}
+
+		searchOffset = relativeIdx + token.length;
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -111,12 +126,19 @@ const processClassListCall = (
 	while ((literalMatch = STRING_LITERAL_REGEX.exec(argumentsString))) {
 		const normalizedValue = normalizeToken(literalMatch[2]).trim();
 
-		normalizedValue && VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue) && (
-			knownClasses.has(normalizedValue) ? usedClasses.add(normalizedValue) : (() => {
-				const tokenStart = match.index! + match[0].indexOf(literalMatch[0]);
-				diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[0].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
-			})()
-		);
+		if (!normalizedValue || !VALID_CSS_IDENTIFIER_REGEX.test(normalizedValue)) {
+			continue;
+		}
+
+		if (knownClasses.has(normalizedValue)) {
+			usedClasses.add(normalizedValue);
+			continue;
+		}
+
+		const baseOffset = match.index! + match[0].indexOf(literalMatch[0]);
+		const innerIdx = literalMatch[0].indexOf(literalMatch[2]);
+		const tokenStart = baseOffset + (innerIdx >= 0 ? innerIdx : 0);
+		diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[2].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
 	}
 };
 
@@ -263,25 +285,69 @@ const scanDocumentUsages = (
 const fnExtractCssBodies = (fullText: string): string => {
 	let depth = 0;
 	let start = -1;
-	let inComment = false;
+	let inBlockComment = false;
+	let inLineComment = false;
 	let inString = false;
 	let stringChar = '';
 	const bodies: string[] = [];
 
 	for (let i = 0; i < fullText.length; i++) {
 		const ch = fullText[i];
-		const nextCh = fullText[i + 1] || '';
+		const prev = i > 0 ? fullText[i - 1] : '';
+		const next = fullText[i + 1] || '';
 
-		inComment && ch === '*' && nextCh === '/' && (inComment = false, i++);
-		inComment && (i < fullText.length) || (
-			inString && ch === stringChar && fullText[i - 1] !== '\\' && (inString = false),
-			!inString && ch === '/' && nextCh === '*' && (inComment = true, i++),
-			!inString && (ch === '"' || ch === "'") && fullText[i - 1] !== '\\' && (inString = true, stringChar = ch),
-			!inComment && !inString && (
-				ch === '{' && (depth === 0 && (start = i + 1), depth++),
-				ch === '}' && (depth--, depth === 0 && start >= 0 && (bodies.push(fullText.slice(start, i)), start = -1))
-			)
-		);
+		if (inBlockComment) {
+			if (prev === '*' && ch === '/') {
+				inBlockComment = false;
+			}
+			continue;
+		}
+
+		if (inLineComment) {
+			if (ch === '\n') {
+				inLineComment = false;
+			}
+			continue;
+		}
+
+		if (inString) {
+			if (ch === stringChar && prev !== '\\') {
+				inString = false;
+			}
+			continue;
+		}
+
+		if (prev === '/' && ch === '*') {
+			inBlockComment = true;
+			continue;
+		}
+
+		if (prev === '/' && ch === '/') {
+			inLineComment = true;
+			continue;
+		}
+
+		if (ch === '"' || ch === "'" || ch === '`') {
+			inString = true;
+			stringChar = ch;
+			continue;
+		}
+
+		if (!inBlockComment && !inString && !inLineComment) {
+			if (ch === '{') {
+				if (depth === 0) {
+					start = i + 1;
+				}
+				depth++;
+			}
+			else if (ch === '}') {
+				depth--;
+				if (depth === 0 && start >= 0) {
+					bodies.push(fullText.slice(start, i));
+					start = -1;
+				}
+			}
+		}
 	}
 
 	return bodies.join('\n');

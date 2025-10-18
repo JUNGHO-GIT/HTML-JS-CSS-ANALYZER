@@ -133,14 +133,23 @@ export const parseSelectors = (cssText: string): SelectorPos[] => {
 			}
 		}
 
-		ch === "{" && (depth === 0 && (() => {
+		if (ch === "{") {
 			const rawPrelude = cssText.slice(preludeStart, i);
 			const leading = LEADING_WHITESPACE_REGEX.exec(rawPrelude)?.[0].length || 0;
 			const prelude = rawPrelude.trim();
-			prelude.length > 0 && extractFromPrelude(prelude, preludeStart + leading);
-		})(), depth++);
+			// skip at-rules like @media, but extract selectors for nested rules
+			prelude.length > 0 && !prelude.startsWith("@") && extractFromPrelude(prelude, preludeStart + leading);
+			depth++;
+			preludeStart = i + 1;
+		}
 
-		ch === "}" && depth > 0 && (depth--, depth === 0 && (preludeStart = i + 1));
+		if (ch === "}") {
+			if (depth > 0) {
+				depth--;
+			}
+			// move prelude start to just after the closing brace to prepare for next rule
+			preludeStart = i + 1;
+		}
 	}
 
 	return positions;

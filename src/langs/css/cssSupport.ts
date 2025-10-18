@@ -42,7 +42,10 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	private get canComplete(): RegExp { return COMPLETION_CONTEXT_REGEX; }
 
 	// -------------------------------------------------------------------------------------------------
-	private async fetchWithNativeFetch(url: string): Promise<string> {
+	// Ongoing style collection promises to deduplicate concurrent requests
+	private pendingStyles: Map<string, Promise<Map<string, SelectorPos[]>>> = new Map();
+
+	private fnFetchWithNativeFetch = async (url: string): Promise<string> => {
 		const response = await (globalThis as any).fetch(url) as FetchResponse;
 
 		if (!response?.ok) {
@@ -51,54 +54,89 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 
 		return await response.text();
-	}
+	};
 
 	// -------------------------------------------------------------------------------------------------
-	private async fetchWithNodeHttp(url: string): Promise<string> {
+	private fnFetchWithNodeHttp = async (url: string, redirectsRemaining = 5): Promise<string> => {
+		const REQUEST_TIMEOUT_MS = 10000; // 10s
 		return new Promise<string>((resolve, reject) => {
 			const httpLib = url.startsWith("https") ? https : http;
 
 			const request = httpLib.get(url, (response) => {
+				const status = response.statusCode || 0;
+
+				// follow redirects
+				if (status >= 300 && status < 400 && response.headers && response.headers.location) {
+					const location = response.headers.location as string;
+					if (redirectsRemaining > 0) {
+						try {
+							// resolve relative locations against original url
+							const newUrl = location.startsWith('http') ? location : new URL(location, url).toString();
+							response.resume();
+							resolve(this.fnFetchWithNodeHttp(newUrl, redirectsRemaining - 1));
+							return;
+						}
+						catch (e: any) {
+							response.resume();
+							reject(new Error(`Invalid redirect location: ${location}`));
+							return;
+						}
+					}
+					response.resume();
+					reject(new Error('Too many redirects'));
+					return;
+				}
+
 				let data = "";
+				response.setEncoding && response.setEncoding('utf8');
 
 				response.on("data", (chunk: string) => {
 					data += chunk;
 				});
 
 				response.on("end", () => {
-					const isSuccessStatus = response.statusCode && response.statusCode >= 200 && response.statusCode < 300;
-					isSuccessStatus ? resolve(data) : reject(new Error(`HTTP ${response.statusCode}`));
+					const isSuccessStatus = status >= 200 && status < 300;
+					isSuccessStatus ? resolve(data) : reject(new Error(`HTTP ${status}`));
 				});
 			});
 
-			request.on("error", reject);
+			request.on("error", (err: Error) => reject(err));
+			request.setTimeout && request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+				try {
+					request.abort();
+				}
+				catch (_e) {
+					// ignore
+				}
+				reject(new Error('Request timeout'));
+			});
 		});
-	}
+	};
 
 	// -------------------------------------------------------------------------------------------------
-	async fetch(url: string): Promise<string> {
+	fnFetch = async (url: string): Promise<string> => {
 		try {
 			// 네이티브 fetch가 사용 가능한 경우
 			if (typeof (globalThis as any).fetch === "function") {
-				return await this.fetchWithNativeFetch(url);
+				return await this.fnFetchWithNativeFetch(url);
 			}
 
 			// Node.js HTTP 모듈 사용
-			return await this.fetchWithNodeHttp(url);
+			return await this.fnFetchWithNodeHttp(url);
 		}
 		catch (error: any) {
 			const errorMessage = error?.message || String(error);
 			log("error", `[Html-Css-Js-Analyzer] CSS file fetch failed (${url}): ${errorMessage}`);
 			return "";
 		}
-	}
+	};
 
 	// -------------------------------------------------------------------------------------------------
 	// Remote stylesheet parsing (성능 최적화)
 	getRemote = async (url: string): Promise<SelectorPos[]> => {
 		const cached = cacheGet(url);
 		return cached ? cached.data : (async () => {
-			const data = parseSelectors(await this.fetch(url));
+			const data = parseSelectors(await this.fnFetch(url));
 			cacheSet(url, {version: -1, data});
 			return data;
 		})();
@@ -137,65 +175,107 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	// Linked stylesheet (<link rel="stylesheet" href="...">) 수집 (성능 최적화)
 	private fnGetLinkedStyles = async (doc: vscode.TextDocument): Promise<Map<string, SelectorPos[]>> => {
 		const map = new Map<string, SelectorPos[]>();
-		return (!/\.html?$/i.test(doc.fileName) && doc.languageId !== "html") ? map : (async () => {
-			const text = doc.getText();
-			let m: RegExpExecArray | null;
-			while ((m = LINK_STYLESHEET_REGEX.exec(text))) {
-				const tag = m[0];
-				const hrefMatch = HREF_ATTRIBUTE_REGEX.exec(tag);
-				hrefMatch && (async () => {
-					const href = hrefMatch[2].trim();
-					href && (async () => {
+		if (!/\.html?$/i.test(doc.fileName) && doc.languageId !== "html") {
+			return map;
+		}
+		const text = doc.getText();
+		let m: RegExpExecArray | null;
+		while ((m = LINK_STYLESHEET_REGEX.exec(text))) {
+			const tag = m[0];
+			const hrefMatch = HREF_ATTRIBUTE_REGEX.exec(tag);
+			if (!hrefMatch) {
+				continue;
+			}
+			const href = hrefMatch[2].trim();
+			if (!href) {
+				continue;
+			}
+			try {
+				if (this.isRemoteUrl.test(href)) {
+					if (!map.has(href)) {
+						const sels = await this.getRemote(href);
+						map.set(href, sels);
+					}
+				}
+				else {
+					let targetPath = href;
+					if (!path.isAbsolute(targetPath)) {
+						targetPath = path.join(path.dirname(doc.uri.fsPath), targetPath);
+					}
+					targetPath = path.normalize(targetPath);
+					if (!fs.existsSync(targetPath)) {
+						const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
+						if (workspaceFolder && (targetPath.startsWith(path.sep) || targetPath.startsWith('/'))) {
+							const candidate = path.join(workspaceFolder.uri.fsPath, targetPath.replace(/^[/\\]+/, ''));
+							if (fs.existsSync(candidate)) {
+								targetPath = path.normalize(candidate);
+							}
+						}
+					}
+					if (fs.existsSync(targetPath)) {
 						try {
-							this.isRemoteUrl.test(href) ? (
-								!map.has(href) && map.set(href, await this.getRemote(href))
-							) : (async () => {
-								let targetPath = href;
-								!path.isAbsolute(targetPath) && (targetPath = path.join(path.dirname(doc.uri.fsPath), targetPath));
-								targetPath = path.normalize(targetPath);
-								fs.existsSync(targetPath) && (async () => {
-									try {
-										const sels = await this.fnReadSelectorsFromFsPath(targetPath);
-										map.set(vscode.Uri.file(targetPath).toString(), sels);
-									}
-									catch (e: any) {
-										log("error", `[Html-Css-Js-Analyzer] Linked stylesheet read failed: ${href} -> ${e?.message || e}`);
-									}
-								})();
-							})();
+							const sels = await this.fnReadSelectorsFromFsPath(targetPath);
+							map.set(vscode.Uri.file(targetPath).toString(), sels);
 						}
 						catch (e: any) {
-							log("error", `[Html-Css-Js-Analyzer] Linked stylesheet parsing error: ${href} -> ${e?.message || e}`);
+							log("error", `[Html-Css-Js-Analyzer] Linked stylesheet read failed: ${href} -> ${e?.message || e}`);
 						}
-					})();
-				})();
+					}
+				}
 			}
-			return map;
-		})();
+			catch (e: any) {
+				log("error", `[Html-Css-Js-Analyzer] Linked stylesheet parsing error: ${href} -> ${e?.message || e}`);
+			}
+		}
+		log("debug", `[Html-Css-Js-Analyzer] Linked stylesheet parsing: ${map.size} entries found for ${doc.fileName}`);
+		return map;
 	};
 
 	// -------------------------------------------------------------------------------------------------
 	// Aggregate all configured styles (성능 최적화)
 	getStyles = async (doc: vscode.TextDocument): Promise<Map<string, SelectorPos[]>> => {
+		const key = doc.uri.toString();
+		if (this.pendingStyles.has(key)) {
+			return await this.pendingStyles.get(key)!;
+		}
+
 		const styleMap: Map<string, SelectorPos[]> = new Map();
-		return !isAnalyzable(doc) ? styleMap : (async () => {
-			const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
-			const excludePatterns = getCssExcludePatterns(doc.uri);
+		if (!isAnalyzable(doc)) {
+			return styleMap;
+		}
+
+		const promise = (async () => {
+		const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
+		const excludePatterns = getCssExcludePatterns(doc.uri);
 
 			styleMap.set(doc.uri.toString(), await this.getLocalDoc(doc));
 
 			const linked = await this.fnGetLinkedStyles(doc);
 			for (const [k, v] of linked) {
-				!styleMap.has(k) && styleMap.set(k, v);
+				if (!styleMap.has(k)) {
+					styleMap.set(k, v);
+				}
 			}
 
-			workspaceFolder && (async () => {
+			if (workspaceFolder) {
 				await this.fnEnsureWorkspaceCssFiles(workspaceFolder, excludePatterns);
-				workspaceCssFiles && await this.fnProcessCssFilesInBatches(workspaceCssFiles, styleMap);
-			})();
+				if (workspaceCssFiles) {
+					await this.fnProcessCssFilesInBatches(workspaceCssFiles, styleMap);
+				}
+			}
+
+			log("debug", `[Html-Css-Js-Analyzer] Styles collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
 
 			return styleMap;
 		})();
+
+		this.pendingStyles.set(key, promise);
+		try {
+			return await promise;
+		}
+		finally {
+			this.pendingStyles.delete(key);
+		}
 	};
 
 	// -------------------------------------------------------------------------------------------------
@@ -241,23 +321,11 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	// 배치 단위로 CSS 파일들을 병렬 처리 (성능 최적화)
 	private fnProcessCssFilesInBatches = async (filePaths: string[], styleMap: Map<string, SelectorPos[]>): Promise<void> => {
 		const BATCH_SIZE = 10;
-		const MAX_CONCURRENT = 5;
-
 		const uncachedFiles = filePaths.filter(filePath => !styleMap.has(vscode.Uri.file(filePath).toString()));
 
 		for (let i = 0; i < uncachedFiles.length; i += BATCH_SIZE) {
 			const batch = uncachedFiles.slice(i, i + BATCH_SIZE);
-			const semaphore = new Array(MAX_CONCURRENT).fill(Promise.resolve());
-			let semaphoreIndex = 0;
-
-			const batchPromises = batch.map(async (filePath) => {
-				await semaphore[semaphoreIndex % MAX_CONCURRENT];
-				const processingPromise = this.fnProcessSingleCssFile(filePath, styleMap);
-				semaphore[semaphoreIndex % MAX_CONCURRENT] = processingPromise;
-				semaphoreIndex++;
-				return processingPromise;
-			});
-
+			const batchPromises = batch.map(filePath => ResourceLimiter.execute(async () => this.fnProcessSingleCssFile(filePath, styleMap)));
 			await Promise.allSettled(batchPromises);
 		}
 	};
@@ -267,7 +335,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	private fnProcessSingleCssFile = async (filePath: string, styleMap: Map<string, SelectorPos[]>): Promise<void> => {
 		return withPerformanceMonitoring(
 			`CSS file processing: ${path.basename(filePath)}`,
-			async () => ResourceLimiter.execute(async () => {
+			async () => {
 				try {
 					const uri = vscode.Uri.file(filePath);
 					const k = uri.toString();
@@ -276,7 +344,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				catch (e: any) {
 					log("error", `[Html-Css-Js-Analyzer] CSS file read failed: ${filePath} -> ${e?.message || e}`);
 				}
-			})
+			}
 		);
 	};
 
@@ -346,31 +414,42 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	// -------------------------------------------------------------------------------------------------
 	// 내부: 워크스페이스 CSS/SCSS 파일 목록 1회 수집 (성능 최적화)
 	private fnEnsureWorkspaceCssFiles = async (folder: vscode.WorkspaceFolder, excludePatterns: string[]): Promise<void> => {
-		return workspaceCssFiles ? undefined : (async () => {
-			const MAX = 500;
-			const collected: string[] = [];
-			try {
-				const styleExts = ["css", "scss", "less", "sass"];
-				const configured = getAnalyzableExtensions(folder.uri).filter(e => styleExts.includes(e));
-				const unique = Array.from(new Set(configured.length ? configured : styleExts));
-				const patterns = unique.map(e => `**/*.${e}`);
-				for (const glob of patterns) {
-					collected.length >= MAX && (log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`), void 0);
-					collected.length >= MAX || (async () => {
-						const include = new vscode.RelativePattern(folder, glob);
-						const uris = await vscode.workspace.findFiles(include);
-						for (const uri of uris) {
-							collected.length >= MAX || (!isUriExcludedByGlob(uri, excludePatterns) && collected.push(uri.fsPath));
-							collected.length >= MAX && (log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`), void 0);
-						}
-					})();
+		if (workspaceCssFiles) {
+			return;
+		}
+		const MAX = 500;
+		const collected: string[] = [];
+		try {
+			const styleExts = ["css", "scss", "less", "sass"];
+			const configured = getAnalyzableExtensions(folder.uri).filter(e => styleExts.includes(e));
+			const unique = Array.from(new Set(configured.length ? configured : styleExts));
+			const patterns = unique.map(e => `**/*.${e}`);
+			for (const glob of patterns) {
+				if (collected.length >= MAX) {
+					log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+					break;
+				}
+				const include = new vscode.RelativePattern(folder, glob);
+				const uris = await vscode.workspace.findFiles(include);
+				for (const uri of uris) {
+					if (collected.length >= MAX) {
+						break;
+					}
+					if (!isUriExcludedByGlob(uri, excludePatterns)) {
+						collected.push(uri.fsPath);
+					}
+					if (collected.length >= MAX) {
+						log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+						break;
+					}
 				}
 			}
-			catch (e: any) {
-				log("error", `[Html-Css-Js-Analyzer] Workspace CSS file check error: ${e?.message || e}`);
-			}
-			workspaceCssFiles = collected;
-		})();
+		}
+		catch (e: any) {
+			log("error", `[Html-Css-Js-Analyzer] Workspace CSS file check error: ${e?.message || e}`);
+		}
+		log("info", `[Html-Css-Js-Analyzer] Workspace CSS files collected: ${collected.length} items`);
+		workspaceCssFiles = collected;
 	};
 }
 
