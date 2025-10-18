@@ -6,7 +6,7 @@
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
 	"type": "module",
-	"version": "2.4.6",
+	"version": "2.4.9",
 	"main": "./out/extension.js",
 	"repository": {
 		"type": "git",
