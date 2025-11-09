@@ -1,12 +1,11 @@
 {
 	"name": "html-js-css-analyzer",
-	"displayName": "Html-Js-Css-Analyzer",
-	"description": "Analyzes HTML & CSS: unused selectors + HTML lint (HTMLHint) + JavaScript lint (JSHint) in your HTML/JS/TS/CSS files.",
+	"displayName": "html-js-css-analyzer",
+	"description": "CSS(unused selectors), HTML(lint), JavaScript(lint) analyzer extension for VsCode.",
 	"publisher": "JUNGHO",
 	"icon": "logo_image.png",
 	"license": "Apache-2.0",
-	"type": "module",
-	"version": "2.4.9",
+	"version": "2.5.2",
 	"main": "./out/extension.js",
 	"repository": {
 		"type": "git",
@@ -42,24 +41,24 @@
 		"onLanguage:typescript",
 		"onLanguage:javascriptreact",
 		"onLanguage:typescriptreact",
-		"onCommand:Html-Js-Css-Analyzer.validate",
-		"onCommand:Html-Js-Css-Analyzer.clear"
+		"onCommand:html-js-css-analyzer.validate",
+		"onCommand:html-js-css-analyzer.clear"
 	],
 	"contributes": {
 		"commands": [
 			{
-				"command": "Html-Js-Css-Analyzer.validate",
-				"title": "Html-Js-Css-Analyzer: Validate Current Document"
+				"command": "html-js-css-analyzer.validate",
+				"title": "html-js-css-analyzer: Validate Current Document"
 			},
 			{
-				"command": "Html-Js-Css-Analyzer.clear",
-				"title": "Html-Js-Css-Analyzer: Clear Style Cache"
+				"command": "html-js-css-analyzer.clear",
+				"title": "html-js-css-analyzer: Clear Style Cache"
 			}
 		],
 		"configuration": {
-			"title": "Html-Js-Css-Analyzer",
+			"title": "html-js-css-analyzer",
 			"properties": {
-				"Html-Js-Css-Analyzer.logLevel": {
+				"html-js-css-analyzer.logLevel": {
 					"type": "string",
 					"scope": "window",
 					"enum": [
@@ -70,7 +69,7 @@
 					],
 					"default": "debug"
 				},
-				"Html-Js-Css-Analyzer.exclude": {
+				"html-js-css-analyzer.exclude": {
 					"type": "array",
 					"scope": "resource",
 					"default": [
@@ -112,7 +111,7 @@
 						"type": "string"
 					}
 				},
-				"Html-Js-Css-Analyzer.additionalExtensions": {
+				"html-js-css-analyzer.additionalExtensions": {
 					"type": "array",
 					"scope": "window",
 					"default": [
@@ -125,25 +124,25 @@
 						"type": "string"
 					}
 				},
-				"Html-Js-Css-Analyzer.htmlHint.enabled": {
+				"html-js-css-analyzer.htmlHint.enabled": {
 					"type": "boolean",
 					"scope": "window",
 					"default": true,
 					"description": "[Html-Css-Js-Analyzer] Enable/disable HTML analysis and hints"
 				},
-				"Html-Js-Css-Analyzer.cssHint.enabled": {
+				"html-js-css-analyzer.cssHint.enabled": {
 					"type": "boolean",
 					"scope": "window",
 					"default": true,
 					"description": "[Html-Css-Js-Analyzer] Enable/disable CSS analysis and hints"
 				},
-				"Html-Js-Css-Analyzer.jsHint.enabled": {
+				"html-js-css-analyzer.jsHint.enabled": {
 					"type": "boolean",
 					"scope": "window",
 					"default": true,
 					"description": "[Html-Css-Js-Analyzer] Enable/disable JavaScript analysis and hints"
 				},
-				"Html-Js-Css-Analyzer.tsHint.enabled": {
+				"html-js-css-analyzer.tsHint.enabled": {
 					"type": "boolean",
 					"scope": "window",
 					"default": true,
@@ -152,31 +151,42 @@
 			}
 		}
 	},
-	"scripts": {
-		"watch": "tsc -watch -p .",
-		"compile": "tsc -p .",
-		"vsce": "tsc -p . && vsce package",
-		"reset": "node .node/reset.cjs --npm",
-		"autofix": "node .node/autofix.cjs",
-		"gcloud": "node .node/gcloud.cjs"
-	},
+  "scripts": {
+    "watch": "node .node/swc.cjs --watch",
+    "compile": "node .node/swc.cjs --compile",
+    "reset": "node .node/reset.cjs --pnpm",
+    "gcloud": "node .node/gcloud.cjs --only-git",
+    "autofix": "node .node/autofix.cjs",
+    "vsce": "node .node/vsce.cjs"
+  },
 	"dependencies": {
-		"@babel/core": "^7.28.4",
-		"@types/jshint": "^2.12.4",
-		"glob": "^11.0.3",
+		"@babel/core": "^7.28.5",
+    "@swc/helpers": "^0.5.17",
 		"htmlhint": "^1.7.1",
 		"jshint": "^2.13.6",
-		"terser": "^5.44.0",
-		"typescript": "^5.9.3"
+    "minimatch": "^10.1.1",
+    "terser": "^5.44.1"
 	},
 	"devDependencies": {
-		"@types/glob": "^9.0.0",
-		"@types/htmlhint": "^1.1.5",
+		"@types/jshint": "^2.12.4",
 		"@types/mocha": "^10.0.10",
-		"@types/node": "^24.8.1",
+		"@types/node": "^24.10.0",
 		"@types/vscode": "^1.105.0",
-		"@vscode/test-electron": "^2.5.2",
-		"@vscode/vsce": "^3.6.2",
-		"rimraf": "^6.0.1"
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.0",
+		"@types/htmlhint": "^1.1.5",
+    "@swc/cli": "^0.7.9",
+    "@swc/core": "^1.15.1",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.26.0",
+		"eslint": "^9.39.1",
+		"rimraf": "^6.1.0",
+		"mocha": "^11.7.5",
+    "ts-morph": "^27.0.2",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3",
+    "ts-prune": "^0.10.3"
 	}
 }
