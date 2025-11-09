@@ -1,13 +1,19 @@
-// langs/css/CssParser.ts
+// src/langs/css/cssParser.ts
 
-import { regexSelectorBoundary, regexLeadingWhitespace } from "@exportConsts";
-import { lineIndexMapper } from "@exportScripts";
-import type { SelectorPosType, LineIndexDataType } from "@exportTypes";
+import {type LineIndex, LineIndexMapper} from "../../utils/lineIndex.js";
+import {type SelectorPos, SelectorType} from "../types/common.js";
 
-// CSS 선택자 파서 ----------------------------------------------------------------------------------
-export const parseSelectors = (cssText: string): SelectorPosType[] => {
-	const positions: SelectorPosType[] = [];
-	const mapper = lineIndexMapper(cssText, {origin: 0}) as LineIndexDataType;
+// -------------------------------------------------------------------------------------------------
+// 최적화된 정규표현식 패턴 (백트래킹 방지 및 성능 개선)
+const SELECTOR_BOUNDARY_REGEX = /\s|[#.:,[\]()>+~=*^$|{}]/;
+const ESCAPED_CHAR_REGEX = /\\(.)/g;
+const LEADING_WHITESPACE_REGEX = /^\s*/;
+
+// -------------------------------------------------------------------------------------------------
+// CSS 선택자 파서 (성능 최적화 및 메모리 효율 개선)
+export const parseSelectors = (cssText: string): SelectorPos[] => {
+	const positions: SelectorPos[] = [];
+	const mapper = LineIndexMapper(cssText, {origin: 0}) as LineIndex;
 
 	let depth = 0;
 	let inStr: "'" | '"' | "`" | null = null;
@@ -64,7 +70,7 @@ export const parseSelectors = (cssText: string): SelectorPosType[] => {
 					let value = "";
 					while (j < frag.length) {
 						const c = frag[j];
-						c === "\\" && j + 1 < frag.length ? (value += frag[j + 1], j += 2) : (regexSelectorBoundary.test(c) ? (j = frag.length) : (value += c, j++));
+						c === "\\" && j + 1 < frag.length ? (value += frag[j + 1], j += 2) : (SELECTOR_BOUNDARY_REGEX.test(c) ? (j = frag.length) : (value += c, j++));
 						c === "\\" && j + 1 >= frag.length && (j++);
 					}
 					value.length > 0 && (() => {
@@ -74,7 +80,7 @@ export const parseSelectors = (cssText: string): SelectorPosType[] => {
 							index: absIdx,
 							line: pos.line,
 							col: pos.col,
-							type: ch === "#" ? "#" : ".",
+							type: ch === "#" ? SelectorType.ID : SelectorType.CLASS,
 							selector: value
 						});
 					})();
@@ -129,8 +135,9 @@ export const parseSelectors = (cssText: string): SelectorPosType[] => {
 
 		if (ch === "{") {
 			const rawPrelude = cssText.slice(preludeStart, i);
-			const leading = regexLeadingWhitespace.exec(rawPrelude)?.[0].length || 0;
+			const leading = LEADING_WHITESPACE_REGEX.exec(rawPrelude)?.[0].length || 0;
 			const prelude = rawPrelude.trim();
+			// skip at-rules like @media, but extract selectors for nested rules
 			prelude.length > 0 && !prelude.startsWith("@") && extractFromPrelude(prelude, preludeStart + leading);
 			depth++;
 			preludeStart = i + 1;
@@ -140,6 +147,7 @@ export const parseSelectors = (cssText: string): SelectorPosType[] => {
 			if (depth > 0) {
 				depth--;
 			}
+			// move prelude start to just after the closing brace to prepare for next rule
 			preludeStart = i + 1;
 		}
 	}

@@ -1,6 +1,20 @@
 // src/utils/lineIndex.ts
 
-import type { LineIndexMapperOverloadType, LineIndexDataType, FromIndexPosType } from "@exportTypes";
+// -------------------------------------------------------------------------------------------------
+type FromIndexPos = {line: number; col: number;} | null;
+type LineIndexMapperOverload = {
+	(text: string, options?: {origin?: number;}): LineIndex;
+	(text: string, options: number): FromIndexPos;
+};
+
+// -------------------------------------------------------------------------------------------------
+export type LineIndex = {
+	str: string;
+	lineToIndex: number[];
+	origin: number;
+	fromIndex: (idx: number) => FromIndexPos;
+	toIndex: (line: number, col?: number) => number;
+};
 
 // -------------------------------------------------------------------------------------------------
 const objectToString = {}.toString;
@@ -12,8 +26,8 @@ const isPlainObject = (value: unknown) => {
 };
 
 // -------------------------------------------------------------------------------------------------
-export const lineIndexMapper: LineIndexMapperOverloadType = ((text: string, options?: {origin?: number;} | number): LineIndexDataType | FromIndexPosType => {
-	const create = (sourceText: string, opts?: {origin?: number;}): LineIndexDataType => {
+export const LineIndexMapper: LineIndexMapperOverload = ((text: string, options?: {origin?: number;} | number): LineIndex | FromIndexPos => {
+	const create = (sourceText: string, opts?: {origin?: number;}): LineIndex => {
 		const str = sourceText || "";
 		const lines = str.split("\n");
 		const lineToIndex = new Array<number>(lines.length);
@@ -24,7 +38,7 @@ export const lineIndexMapper: LineIndexMapperOverloadType = ((text: string, opti
 		}
 		const origin = opts && typeof opts.origin === "number" ? opts.origin : 0;
 
-		const fromIndex = (idx: number): FromIndexPosType => {
+		const fromIndex = (idx: number): FromIndexPos => {
 			if (idx < 0 || idx >= str.length || isNaN(idx)) {
 				return null;
 			}
@@ -77,4 +91,4 @@ export const lineIndexMapper: LineIndexMapperOverloadType = ((text: string, opti
 	else {
 		return create(text, options);
 	}
-}) as LineIndexMapperOverloadType;
+}) as LineIndexMapperOverload;

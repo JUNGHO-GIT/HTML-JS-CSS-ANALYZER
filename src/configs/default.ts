@@ -1,0 +1,38 @@
+// src/configs/default.ts
+
+// -------------------------------------------------------------------------------------------------------
+export const DEFAULT_CSS_EXCLUDE: string[] = [
+	"**/node_modules/**",
+	"**/.git/**",
+	"**/dist/**",
+	"**/out/**",
+	"**/.svn/**",
+	"**/.hg/**",
+	"**/CVS/**",
+	"**/.idea/**",
+	"**/.vscode/**",
+	"**/.settings/**",
+	"**/.metadata/**",
+	"**/.history/**",
+	"**/.backup/**",
+	"**/.etc/**",
+	"**/.cache/**",
+	"**/.gradle/**",
+	"**/.mvn/**",
+	"**/bin/**",
+	"**/build/**",
+	"**/target/**",
+	"**/logs/**",
+	"**/.pytest_cache/**",
+	"**/.scannerwork/**",
+	"**/.terraform/**",
+	"**/__pycache__/**",
+	"**/.venv/**",
+	"**/.classpath",
+	"**/.project",
+	"**/.factorypath",
+	"**/.DS_Store",
+	"**/Thumbs.db",
+	"**/desktop.ini",
+	"**/.coverage"
+];

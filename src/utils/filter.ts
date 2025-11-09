@@ -1,18 +1,27 @@
-// assets/scripts/filter.ts
+// src/utils/filter.ts
 
-import { vscode } from "@exportLibs";
-import { getCssExcludePatterns, getAnalyzableExtensions, isUriExcludedByGlob } from "@exportScripts";
-import { supportedSchemes, excludedPathPatterns } from "@exportConsts";
+import * as vscode from "vscode";
+import {getCssExcludePatterns, getAnalyzableExtensions} from "../configs/setting.js";
+import {isUriExcludedByGlob} from "./glob.js";
+
+// -------------------------------------------------------------------------------------------------
+const SUPPORTED_SCHEMES = ["file", "vscode-file", "vscode-remote"] as const;
+const EXCLUDED_PATH_PATTERNS = [
+	"/appdata/roaming/code/user/",
+	"settings.json",
+	"mcp.json"
+] as const;
 
 // -------------------------------------------------------------------------------------------------
 const isValidScheme = (scheme: string): boolean => {
-	return supportedSchemes.includes(scheme);
+	return SUPPORTED_SCHEMES.includes(scheme as any);
 };
 
 // -------------------------------------------------------------------------------------------------
 const isExcludedPath = (fileName: string): boolean => {
 	const normalizedPath = fileName.replace(/\\/g, "/").toLowerCase();
-	return excludedPathPatterns.some((pattern: string) =>
+
+	return EXCLUDED_PATH_PATTERNS.some(pattern =>
 		pattern.startsWith("/") ? normalizedPath.includes(pattern) : normalizedPath.endsWith(pattern)
 	);
 };

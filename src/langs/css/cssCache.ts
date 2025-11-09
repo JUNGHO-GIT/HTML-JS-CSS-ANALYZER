@@ -1,11 +1,22 @@
-// langs/css/CssCache.ts
+// src/langs/css/cssCache.ts
 
-import type { CacheValType } from "@exportTypes";
-import { maxCache, cacheTTL, styleCache } from "@exportConsts";
+import {type SelectorPos} from "../types/common.js";
 
 // -------------------------------------------------------------------------------------------------
-const isExpired = (cacheVal: CacheValType): boolean => {
-	return (Date.now() - cacheVal.timestamp) > cacheTTL;
+type CacheVal = {
+	version: number;
+	data: SelectorPos[];
+	timestamp: number;
+	accessCount: number;
+};
+
+const styleCache: Map<string, CacheVal> = new Map();
+const MAX_CACHE = 300; // Increased for better performance
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes TTL
+
+// -------------------------------------------------------------------------------------------------
+const isExpired = (cacheVal: CacheVal): boolean => {
+	return (Date.now() - cacheVal.timestamp) > CACHE_TTL_MS;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -30,7 +41,7 @@ const cleanExpired = (): void => {
 	const expiredKeys: string[] = [];
 
 	for (const [key, val] of styleCache.entries()) {
-		if ((now - val.timestamp) > cacheTTL) {
+		if ((now - val.timestamp) > CACHE_TTL_MS) {
 			expiredKeys.push(key);
 		}
 	}
@@ -43,26 +54,26 @@ const ensureLimit = (): void => {
 	// Clean expired entries first
 	cleanExpired();
 
-	if (styleCache.size <= maxCache) {
+	if (styleCache.size <= MAX_CACHE) {
 		return;
 	}
 
 	// Remove LRU entries based on access patterns
 	const entries = Array.from(styleCache.entries());
-	entries.sort((a: [string, CacheValType], b: [string, CacheValType]) => {
+	entries.sort((a, b) => {
 		// Sort by access count (ascending) then by timestamp (ascending)
 		const accessDiff = a[1].accessCount - b[1].accessCount;
 		return accessDiff !== 0 ? accessDiff : a[1].timestamp - b[1].timestamp;
 	});
 
 	const toRemove = Math.ceil(styleCache.size * 0.2); // Remove 20% of cache
-	for (let i = 0; i < toRemove && styleCache.size > maxCache; i++) {
+	for (let i = 0; i < toRemove && styleCache.size > MAX_CACHE; i++) {
 		styleCache.delete(entries[i][0]);
 	}
 };
 
 // -------------------------------------------------------------------------------------------------
-export const cacheGet = (key: string): CacheValType | undefined => {
+export const cacheGet = (key: string): CacheVal | undefined => {
 	const val = styleCache.get(key);
 	if (!val) {
 		return undefined;
@@ -79,10 +90,10 @@ export const cacheGet = (key: string): CacheValType | undefined => {
 };
 
 // -------------------------------------------------------------------------------------------------
-export const cacheSet = (key: string, value: Omit<CacheValType, 'timestamp' | 'accessCount'>): void => {
+export const cacheSet = (key: string, value: Omit<CacheVal, 'timestamp' | 'accessCount'>): void => {
 	ensureLimit();
 
-	const enrichedValue: CacheValType = {
+	const enrichedValue: CacheVal = {
 		...value,
 		timestamp: Date.now(),
 		accessCount: 1
@@ -110,7 +121,7 @@ export const cacheSize = (): number => {
 export const cacheStats = (): {size: number; maxSize: number; ttlMs: number} => {
 	return {
 		size: styleCache.size,
-		maxSize: maxCache,
-		ttlMs: cacheTTL
+		maxSize: MAX_CACHE,
+		ttlMs: CACHE_TTL_MS
 	};
 };

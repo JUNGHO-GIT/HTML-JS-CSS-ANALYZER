@@ -1,6 +1,6 @@
 // src/utils/glob.ts
 
-import { vscode } from "@exportLibs";
+import * as vscode from "vscode";
 
 // -------------------------------------------------------------------------------------------------
 export const globToRegExp = (glob: string): RegExp => {
