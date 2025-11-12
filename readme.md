@@ -1,6 +1,6 @@
 # 🚀 Html-Js-Css-Analyzer
 
-html-js-css-analyzer is a lightweight Visual Studio Code extension that analyzes class and id usage across HTML, CSS/SCSS and JavaScript/TypeScript files. It reports undefined classes/ids, highlights unused selectors, provides completion and go-to-definition, and integrates HTMLHint and JsHint diagnostics with Quick Fixes.
+Html-Css-Js-Analyzer is a lightweight Visual Studio Code extension that analyzes class and id usage across HTML, CSS/SCSS and JavaScript/TypeScript files. It reports undefined classes/ids, highlights unused selectors, provides completion and go-to-definition, and integrates HTMLHint and JsHint diagnostics with Quick Fixes.
 
 ## Key features 🔎
 
@@ -13,7 +13,7 @@ html-js-css-analyzer is a lightweight Visual Studio Code extension that analyzes
 
 ## Installation ⬇️
 
-- ⬇️ Install from the Visual Studio Code Marketplace: `html-js-css-analyzer`
+- ⬇️ Install from the Visual Studio Code Marketplace: `Html-Css-Js-Analyzer`
 - ⚙️ Or build and package locally: `npm run vsce`
 - ⚠️ Requirements: Node >= 18, npm >= 10, VS Code >= 1.105.0
 
@@ -21,19 +21,19 @@ html-js-css-analyzer is a lightweight Visual Studio Code extension that analyzes
 
 - ▶️ Activate by opening or editing HTML/CSS/SCSS/LESS/JavaScript/TypeScript files. Validation runs automatically on open/save/change (250ms debounce, adaptive up to 1s under rapid edits).
 - 🛠️ Commands (Command Palette):
-  - `html-js-css-analyzer: Validate Current Document` — revalidate the active document
-  - `html-js-css-analyzer: Clear Style Cache` — clear cached style data
+  - `Html-Css-Js-Analyzer: Validate Current Document` — revalidate the active document
+  - `Html-Css-Js-Analyzer: Clear Style Cache` — clear cached style data
 - ⌨️ Shortcuts: F12 (Go to Definition), Ctrl+Space (Completion)
 
 ## Settings ⚙️
 
-- `html-js-css-analyzer.logLevel` — logging level (`off` | `error` | `info` | `debug`)
-- `html-js-css-analyzer.exclude` — array of glob patterns to exclude from scanning
-- `html-js-css-analyzer.additionalExtensions` — additional file extensions to analyze
-- `html-js-css-analyzer.htmlHint.enabled` — enable HTML analysis
-- `html-js-css-analyzer.cssHint.enabled` — enable CSS analysis
-- `html-js-css-analyzer.jsHint.enabled` — enable JavaScript analysis
-- `html-js-css-analyzer.tsHint.enabled` — enable TypeScript analysis
+- `Html-Css-Js-Analyzer.logLevel` — logging level (`off` | `error` | `info` | `debug`)
+- `Html-Css-Js-Analyzer.exclude` — array of glob patterns to exclude from scanning
+- `Html-Css-Js-Analyzer.additionalExtensions` — additional file extensions to analyze
+- `Html-Css-Js-Analyzer.htmlHint.enabled` — enable HTML analysis
+- `Html-Css-Js-Analyzer.cssHint.enabled` — enable CSS analysis
+- `Html-Css-Js-Analyzer.jsHint.enabled` — enable JavaScript analysis
+- `Html-Css-Js-Analyzer.tsHint.enabled` — enable TypeScript analysis
 
 ## Notes & limitations ⚠️
 

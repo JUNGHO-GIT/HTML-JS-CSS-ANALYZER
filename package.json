@@ -1,11 +1,11 @@
 {
   "name": "html-js-css-analyzer",
-  "displayName": "html-js-css-analyzer",
+  "displayName": "Html-Css-Js-Analyzer",
   "description": "CSS(unused selectors), HTML(lint), JavaScript(lint) analyzer extension for VsCode.",
   "publisher": "JUNGHO",
   "icon": "logo_image.png",
   "license": "Apache-2.0",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -41,24 +41,24 @@
     "onLanguage:typescript",
     "onLanguage:javascriptreact",
     "onLanguage:typescriptreact",
-    "onCommand:html-js-css-analyzer.validate",
-    "onCommand:html-js-css-analyzer.clear"
+    "onCommand:Html-Css-Js-Analyzer.validate",
+    "onCommand:Html-Css-Js-Analyzer.clear"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "html-js-css-analyzer.validate",
-        "title": "html-js-css-analyzer: Validate Current Document"
+        "command": "Html-Css-Js-Analyzer.validate",
+        "title": "Html-Css-Js-Analyzer: Validate Current Document"
       },
       {
-        "command": "html-js-css-analyzer.clear",
-        "title": "html-js-css-analyzer: Clear Style Cache"
+        "command": "Html-Css-Js-Analyzer.clear",
+        "title": "Html-Css-Js-Analyzer: Clear Style Cache"
       }
     ],
     "configuration": {
-      "title": "html-js-css-analyzer",
+      "title": "Html-Css-Js-Analyzer",
       "properties": {
-        "html-js-css-analyzer.logLevel": {
+        "Html-Css-Js-Analyzer.logLevel": {
           "type": "string",
           "scope": "window",
           "enum": [
@@ -69,7 +69,7 @@
           ],
           "default": "debug"
         },
-        "html-js-css-analyzer.exclude": {
+        "Html-Css-Js-Analyzer.exclude": {
           "type": "array",
           "scope": "resource",
           "default": [
@@ -111,7 +111,7 @@
             "type": "string"
           }
         },
-        "html-js-css-analyzer.additionalExtensions": {
+        "Html-Css-Js-Analyzer.additionalExtensions": {
           "type": "array",
           "scope": "window",
           "default": [
@@ -124,25 +124,25 @@
             "type": "string"
           }
         },
-        "html-js-css-analyzer.htmlHint.enabled": {
+        "Html-Css-Js-Analyzer.htmlHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
           "description": "[Html-Css-Js-Analyzer] Enable/disable HTML analysis and hints"
         },
-        "html-js-css-analyzer.cssHint.enabled": {
+        "Html-Css-Js-Analyzer.cssHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
           "description": "[Html-Css-Js-Analyzer] Enable/disable CSS analysis and hints"
         },
-        "html-js-css-analyzer.jsHint.enabled": {
+        "Html-Css-Js-Analyzer.jsHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
           "description": "[Html-Css-Js-Analyzer] Enable/disable JavaScript analysis and hints"
         },
-        "html-js-css-analyzer.tsHint.enabled": {
+        "Html-Css-Js-Analyzer.tsHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
@@ -155,7 +155,7 @@
     "watch": "node .node/swc.cjs --watch",
     "compile": "node .node/swc.cjs --compile",
     "reset": "node .node/reset.cjs --pnpm",
-    "gcloud": "node .node/gcloud.cjs --only-git",
+    "gcloud": "node .node/gcloud.cjs --git",
     "autofix": "node .node/autofix.cjs --fix",
     "vsce": "node .node/vsce.cjs"
   },
@@ -170,17 +170,17 @@
   "devDependencies": {
     "@types/jshint": "^2.12.4",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^24.10.0",
+    "@types/node": "^24.10.1",
     "@types/vscode": "^1.105.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.3",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.0",
     "@types/htmlhint": "^1.1.5",
     "@swc/cli": "^0.7.9",
     "@swc/core": "^1.15.1",
     "concurrently": "^9.2.1",
-    "esbuild": "^0.26.0",
+    "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
     "rimraf": "^6.1.0",
     "mocha": "^11.7.5",
