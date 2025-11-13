@@ -5,14 +5,14 @@
   "publisher": "JUNGHO",
   "icon": "logo_image.png",
   "license": "Apache-2.0",
-  "version": "2.5.6",
+  "version": "2.5.8",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/JUNGHO-GIT/HTML-JS-CSS-ANALYZER.git"
   },
   "engines": {
-    "vscode": "^1.105.0",
+    "vscode": "^1.106.0",
     "node": ">=18.0.0",
     "npm": ">=10.0.0"
   },
