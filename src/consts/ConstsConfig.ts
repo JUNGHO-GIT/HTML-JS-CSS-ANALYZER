@@ -1,7 +1,44 @@
-// src/configs/setting.ts
+// consts/ConstsConfig.ts
 
-import * as vscode from "vscode";
-import {DEFAULT_CSS_EXCLUDE} from "./default.js";
+import { vscode } from "@exportLibs";
+
+// -------------------------------------------------------------------------------------------------------
+export const DEFAULT_CSS_EXCLUDE: string[] = [
+	"**/node_modules/**",
+	"**/.git/**",
+	"**/dist/**",
+	"**/out/**",
+	"**/.svn/**",
+	"**/.hg/**",
+	"**/CVS/**",
+	"**/.idea/**",
+	"**/.vscode/**",
+	"**/.settings/**",
+	"**/.metadata/**",
+	"**/.history/**",
+	"**/.backup/**",
+	"**/.etc/**",
+	"**/.cache/**",
+	"**/.gradle/**",
+	"**/.mvn/**",
+	"**/bin/**",
+	"**/build/**",
+	"**/target/**",
+	"**/logs/**",
+	"**/.pytest_cache/**",
+	"**/.scannerwork/**",
+	"**/.terraform/**",
+	"**/__pycache__/**",
+	"**/.venv/**",
+	"**/.classpath",
+	"**/.project",
+	"**/.factorypath",
+	"**/.DS_Store",
+	"**/Thumbs.db",
+	"**/desktop.ini",
+	"**/.coverage"
+];
+
 
 // -------------------------------------------------------------------------------------------------
 export type LogLevel = "off" | "error" | "info" | "debug";
@@ -39,10 +76,10 @@ export const getAdditionalExtensions = (resource?: vscode.Uri): string[] => {
 	const extensions = getConfiguration(resource).get<string[]>("additionalExtensions", []) || [];
 
 	return extensions
-		.filter((ext): ext is string => typeof ext === "string")
-		.map(ext => ext.trim().replace(/^\./, "").toLowerCase())
-		.filter(ext => EXTENSION_VALIDATION_REGEX.test(ext))
-		.filter((ext, index, array) => array.indexOf(ext) === index);
+		.filter((ext: string): ext is string => typeof ext === "string")
+		.map((ext: string) => ext.trim().replace(/^\./, "").toLowerCase())
+		.filter((ext: string) => EXTENSION_VALIDATION_REGEX.test(ext))
+		.filter((ext: string, index: number, array: string[]) => array.indexOf(ext) === index);
 };
 
 // -------------------------------------------------------------------------------------------------

@@ -1,11 +1,10 @@
 // src/utils/diagnostic.ts
 
-import * as vscode from "vscode";
-import {AutoValidationMode} from "../langs/types/common.js";
-import {CssSupport} from "../langs/css/cssSupport.js";
-import {cacheClear, cacheDelete, cacheSize} from "../langs/css/cssCache.js";
-import {isAnalyzable} from "./filter.js";
-import {log} from "./logger.js";
+import { vscode } from "@exportLibs";
+import { AutoValidationMode } from "@exportTypes";
+import { CssSupport, cacheClear, cacheDelete, cacheSize } from "@exportLangs";
+import { isAnalyzable } from "@exportScripts";
+import { logger } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 const BASE_VALIDATION_DELAY_MS = 250;
@@ -74,12 +73,12 @@ class DiagnosticManager {
 					const diagnostics = await cssSupport.validate(document);
 					this.collection.set(document.uri, diagnostics);
 					this.lastValidatedVersions.set(documentKey, document.version);
-					log("info", `[Html-Js-Css-Analyzer] Diagnostics: ${document.fileName} -> ${diagnostics.length} items`);
+					logger(`debug`, `Diagnostics`, `${document.fileName} -> ${diagnostics.length} items`);
 				})();
 			}
 			catch (error: any) {
 				const errorMessage = error?.stack || error?.message || String(error);
-				log("error", `[Html-Js-Css-Analyzer] Diagnostic update error: ${errorMessage}`);
+				logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
 			}
 		})();
 	}

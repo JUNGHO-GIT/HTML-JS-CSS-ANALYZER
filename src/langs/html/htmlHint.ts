@@ -1,11 +1,7 @@
 // src/langs/html/htmlHint.ts
 
-import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
-import {createRequire} from "module";
-import {log} from "../../utils/logger.js";
-import {CodeAction, CodeActionKind, Diagnostic, Position, Range } from "vscode";
+import { vscode, path, fs, createRequire, CodeAction, CodeActionKind, Diagnostic, Position, Range } from "@exportLibs";
+import { logger } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 interface HtmlHintRule {
@@ -41,7 +37,7 @@ const loadHtmlHint = (): HtmlHintInstance | null => {
 	}
 	catch (error: any) {
 		const errorMessage = error?.message || String(error);
-		log("debug", `[Html-Js-Css-Analyzer] HTMLHint module not loaded (optional): ${errorMessage}`);
+		logger(`debug`, `HTMLHint`, `module not loaded (optional): ${errorMessage}`);
 		return null;
 	}
 };
@@ -104,7 +100,7 @@ const loadConfig = (filePath: string): any => {
             const txt = fs.readFileSync(f, "utf8");
             return JSON.parse(txt);
           } catch (e: any) {
-            log("error", `[Html-Js-Css-Analyzer] HTMLHint config file parsing error: ${f} -> ${e?.message || e}`);
+            logger(`error`, `HTMLHint config`, `file parsing error: ${f} -> ${e?.message || e}`);
             return {};
           }
         }
@@ -154,7 +150,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): vscode.Diagnostic[] => {
     return diags;
   }
 	catch (e: any) {
-    log("error", `[Html-Js-Css-Analyzer] HTMLHint execution error: ${e?.message || e}`);
+    logger(`error`, `HTMLHint`, `execution error: ${e?.message || e}`);
     return [];
   }
 };
@@ -664,7 +660,7 @@ export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
           act &&list.push(act);
         }
 				catch (e: any) {
-          log("error", `[Html-Js-Css-Analyzer] HTMLHint code action error: ${e?.message || e}`);
+          logger(`error`, `HTMLHint`, `code action error: ${e?.message || e}`);
         }
       }
     }

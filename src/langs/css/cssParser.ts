@@ -1,7 +1,7 @@
 // src/langs/css/cssParser.ts
 
-import {type LineIndex, LineIndexMapper} from "../../utils/lineIndex.js";
-import {type SelectorPos, SelectorType} from "../types/common.js";
+import { type LineIndex, LineIndexMapper } from "@exportScripts";
+import { type SelectorPos, SelectorType } from "@exportTypes";
 
 // -------------------------------------------------------------------------------------------------
 // 최적화된 정규표현식 패턴 (백트래킹 방지 및 성능 개선)

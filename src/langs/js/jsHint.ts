@@ -1,11 +1,7 @@
 // src/langs/js/jsHint.ts
 
-import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
-import {createRequire} from "module";
-import {log} from "../../utils/logger.js";
-import {CodeAction, CodeActionKind, Diagnostic, Position, Range} from "vscode";
+import { vscode, path, fs, createRequire, CodeAction, CodeActionKind, Diagnostic, Position, Range } from "@exportLibs";
+import { logger } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 interface JSHintError {
@@ -144,7 +140,7 @@ const loadJSHint = (): JSHintInstance | null => {
 	}
 	catch (error: any) {
 		const errorMessage = error?.message || String(error);
-		log("debug", `jshint not loaded (optional): ${errorMessage}`);
+		logger(`debug`, `JSHint`, `not loaded (optional): ${errorMessage}`);
 		return null;
 	}
 };
@@ -183,7 +179,7 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
 				try {
 					config = JSON.parse(moduleExportsMatch[1]);
 				} catch {
-					log("error", "JSHint JS config parsing failed - module.exports format");
+					logger(`error`, `JSHint`, `JS config parsing failed - module.exports format`);
 				}
 			}
 		}
@@ -206,7 +202,7 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
 		return { ...DEFAULT_JSHINT_CONFIG, ...config };
 
 	} catch (error: any) {
-		log("error", `JSHint JS config file parsing failed: ${error?.message || error}`);
+		logger(`error`, `JSHint`, `JS config file parsing failed: ${error?.message || error}`);
 		return DEFAULT_JSHINT_CONFIG;
 	}
 };
@@ -303,7 +299,7 @@ const parseJSHintConfigGeneric = (configContent: string): Record<string, any> =>
 		return { ...DEFAULT_JSHINT_CONFIG, ...config };
 
 	} catch (error: any) {
-		log("error", `Generic config file parsing failed: ${error?.message || error}`);
+		logger(`error`, `Generic config`, `file parsing failed: ${error?.message || error}`);
 		return DEFAULT_JSHINT_CONFIG;
 	}
 };
@@ -339,7 +335,7 @@ const loadJSHintConfig = (filePath: string): Record<string, any> => {
 						}
 					}
 					catch (parseError: any) {
-						log("error", `JSHint config file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
+						logger(`error`, `JSHint config`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
 						return DEFAULT_JSHINT_CONFIG;
 					}
 				}
@@ -359,7 +355,7 @@ const loadJSHintConfig = (filePath: string): Record<string, any> => {
 		}
 	}
 	catch (error: any) {
-		log("debug", `JSHint config search error: ${error?.message || error}`);
+		logger(`debug`, `JSHint config`, `search error: ${error?.message || error}`);
 	}
 
 	return DEFAULT_JSHINT_CONFIG;
@@ -906,7 +902,7 @@ const calculateSeverity = (error: JSHintError): vscode.DiagnosticSeverity => {
 // -------------------------------------------------------------------------------------------------
 export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] => {
 	if (!jshint) {
-		log("debug", "JSHint not loaded");
+		logger(`debug`, `JSHint`, `not loaded`);
 		return [];
 	}
 
@@ -936,13 +932,13 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 		const originalCode = document.getText();
 		const { processedCode, analysis } = analyzeSourceCode(originalCode, document);
 
-		log("debug", `JSHint analysis started: ${document.fileName}`);
+		logger(`debug`, `JSHint`, `analysis started: ${document.fileName}`);
 
 		// JSHint 실행
 		const isValid = jshint.JSHINT(processedCode, config);
 
 		if (isValid) {
-			log("info", `JSHint analysis completed: no errors (${document.fileName})`);
+			logger(`debug`, `JSHint`, `analysis completed: no errors (${document.fileName})`);
 			return [];
 		}
 
@@ -999,7 +995,7 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 				}
 			}
 
-			log("info", `JSHint analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
+			logger(`debug`, `JSHint`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
 		}
 
 		// 추가 정교한 분석 결과를 진단으로 변환
@@ -1011,16 +1007,16 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 		const additionalIssues = additionalDiagnostics.length;
 
 		if (additionalIssues > 0) {
-			log("info", `Additional analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
+			logger(`debug`, `Additional`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
 		}
 
-		log("info", `Complete analysis finished: total ${totalIssues} issues (${document.fileName})`);
+		logger(`debug`, `Complete`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
 
 		return diagnostics;
 	}
 	catch (error: any) {
 		const errorMessage = error?.message || String(error);
-		log("error", `JSHint execution error: ${errorMessage} (${document.fileName})`);
+		logger(`error`, `JSHint`, `execution error: ${errorMessage} (${document.fileName})`);
 		return [];
 	}
 };

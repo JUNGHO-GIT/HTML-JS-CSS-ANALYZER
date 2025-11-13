@@ -1,12 +1,11 @@
 // src/configs/validate.ts
 
-import * as vscode from "vscode";
-import {SelectorType, type SelectorPos} from "../langs/types/common.js";
-import {log} from "../utils/logger.js";
-import {runHtmlHint} from "../langs/html/htmlHint.js";
-import {runJSHint} from "../langs/js/jsHint.js";
-import {isAnalyzable} from "../utils/filter.js";
-import {isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled, isTsHintEnabled} from "./setting.js";
+import { vscode } from "@exportLibs";
+import { SelectorType, type SelectorPos } from "@exportTypes";
+import { logger } from "@exportScripts";
+import { runHtmlHint, runJSHint } from "@exportLangs";
+import { isAnalyzable } from "@exportScripts";
+import { isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled, isTsHintEnabled } from "@exportConsts";
 
 // -------------------------------------------------------------------------------------------------
 export interface CssSupportLike {
@@ -406,7 +405,7 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 // validateDocument (성능 최적화 및 메모리 효율 개선) -------------------------------------------
 export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
 	return !isAnalyzable(doc) ? [] : (async () => {
-		log("debug", `[Html-Js-Css-Analyzer] Validation started: ${doc.fileName}`);
+		logger(`debug`, `Validation`, `started: ${doc.fileName}`);
 		const allStyles = await support.getStyles(doc);
 		const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
 		const fullText = doc.getText();
@@ -426,7 +425,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 					lintDiagnostics.push(...htmlHintDiagnostics);
 				}
 				catch (e: any) {
-					log("error", `[Html-Js-Css-Analyzer] HTMLHint merge error: ${e?.message || e} in ${doc.fileName}`);
+					logger(`error`, `HTMLHint`, `merge error: ${e?.message || e} in ${doc.fileName}`);
 				}
 			})()
 		);
@@ -441,7 +440,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 					lintDiagnostics.push(...jsHintDiagnostics);
 				}
 				catch (e: any) {
-					log("error", `[Html-Js-Css-Analyzer] JSHint merge error: ${e?.message || e} in ${doc.fileName}`);
+					logger(`error`, `JSHint`, `merge error: ${e?.message || e} in ${doc.fileName}`);
 				}
 			})();
 		})();

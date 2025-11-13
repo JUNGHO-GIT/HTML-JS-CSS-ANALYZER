@@ -3,9 +3,9 @@
   "displayName": "Html-Js-Css-Analyzer",
   "description": "CSS(unused selectors), HTML(lint), JavaScript(lint) analyzer extension for VsCode.",
   "publisher": "JUNGHO",
-  "icon": "logo_image.png",
+  "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.5.8",
+  "version": "2.5.9",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",

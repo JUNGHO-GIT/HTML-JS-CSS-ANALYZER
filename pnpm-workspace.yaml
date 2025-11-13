@@ -1,3 +1,7 @@
+ignoredBuiltDependencies:
+  - '@swc/core'
+  - esbuild
+
 onlyBuiltDependencies:
   - '@vscode/vsce-sign'
   - keytar

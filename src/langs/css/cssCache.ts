@@ -1,6 +1,6 @@
 // src/langs/css/cssCache.ts
 
-import {type SelectorPos} from "../types/common.js";
+import { type SelectorPos } from "@exportTypes";
 
 // -------------------------------------------------------------------------------------------------
 type CacheVal = {

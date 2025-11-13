@@ -1,8 +1,8 @@
 // src/utils/filter.ts
 
-import * as vscode from "vscode";
-import {getCssExcludePatterns, getAnalyzableExtensions} from "../configs/setting.js";
-import {isUriExcludedByGlob} from "./glob.js";
+import { vscode } from "@exportLibs";
+import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
+import { isUriExcludedByGlob } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 const SUPPORTED_SCHEMES = ["file", "vscode-file", "vscode-remote"] as const;

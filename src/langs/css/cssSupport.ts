@@ -1,19 +1,11 @@
 // src/langs/css/cssSupport.ts
 
-import * as vscode from "vscode";
-import * as https from "https";
-import * as http from "http";
-import * as path from "path";
-import * as fs from "fs";
-import {type SelectorPos, SelectorType} from "../types/common.js";
-import {parseSelectors} from "./cssParser.js";
-import {cacheGet, cacheSet} from "./cssCache.js";
-import {getCssExcludePatterns, getAnalyzableExtensions} from "../../configs/setting.js";
-import {isUriExcludedByGlob} from "../../utils/glob.js";
-import {isAnalyzable} from "../../utils/filter.js";
-import {log} from "../../utils/logger.js";
-import {validateDocument} from "../../configs/validate.js";
-import {withPerformanceMonitoring, ResourceLimiter} from "../../utils/performance.js";
+import { vscode, https, http, path, fs } from "@exportLibs";
+import { type SelectorPos, SelectorType } from "@exportTypes";
+import { parseSelectors } from "@exportLangs";
+import { cacheGet, cacheSet } from "@exportLangs";
+import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
+import { isUriExcludedByGlob, isAnalyzable, logger, validateDocument, withPerformanceMonitoring, resourceLimiter } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 const ZERO_POSITION = new vscode.Position(0, 0);
@@ -126,7 +118,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (error: any) {
 			const errorMessage = error?.message || String(error);
-			log("error", `[Html-Js-Css-Analyzer] CSS file fetch failed (${url}): ${errorMessage}`);
+			logger(`error`, `CSS`, `file fetch failed (${url}): ${errorMessage}`);
 			return "";
 		}
 	};
@@ -164,7 +156,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						data.push({index: absIndex, line: pos.line, col: pos.character, type: sel.type, selector: sel.selector});
 					}
 				}
-				log("debug", `[Html-Js-Css-Analyzer] Embedded style selectors: ${data.length} found`);
+				logger(`debug`, `Embedded`, `style selectors: ${data.length} found`);
 			})() : (data = parseSelectors(txt));
 			cacheSet(key, {version: ver, data});
 			return data;
@@ -218,16 +210,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 							map.set(vscode.Uri.file(targetPath).toString(), sels);
 						}
 						catch (e: any) {
-							log("error", `[Html-Js-Css-Analyzer] Linked stylesheet read failed: ${href} -> ${e?.message || e}`);
+							logger(`error`, `Linked stylesheet`, `read failed: ${href} -> ${e?.message || e}`);
 						}
 					}
 				}
 			}
 			catch (e: any) {
-				log("error", `[Html-Js-Css-Analyzer] Linked stylesheet parsing error: ${href} -> ${e?.message || e}`);
+				logger(`error`, `Linked stylesheet`, `parsing error: ${href} -> ${e?.message || e}`);
 			}
 		}
-		log("debug", `[Html-Js-Css-Analyzer] Linked stylesheet parsing: ${map.size} entries found for ${doc.fileName}`);
+		logger(`debug`, `Linked stylesheet`, `parsing: ${map.size} entries found for ${doc.fileName}`);
 		return map;
 	};
 
@@ -264,7 +256,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				}
 			}
 
-			log("debug", `[Html-Js-Css-Analyzer] Styles collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
+			logger(`debug`, `Styles`, `collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
 
 			return styleMap;
 		})();
@@ -288,13 +280,13 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			return (cached && cached.version === stat.mtimeMs) ? cached.data : (async () => {
 				const MAX_FILE_SIZE = 2 * 1024 * 1024;
 				return stat.size > MAX_FILE_SIZE ? (
-					log("info", `[Html-Js-Css-Analyzer] Large CSS file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
+					logger(`debug`, `Large CSS`, `file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
 					[]
 				) : (async () => {
 					const content = await fs.promises.readFile(fsPath, "utf8");
 					const MAX_CONTENT_LENGTH = 500000;
 					return content.length > MAX_CONTENT_LENGTH ? (
-						log("info", `[Html-Js-Css-Analyzer] Large CSS content sampled: ${fsPath}`),
+						logger(`debug`, `Large CSS`, `content sampled: ${fsPath}`),
 						(() => {
 							const parsed = parseSelectors(content.substring(0, MAX_CONTENT_LENGTH));
 							cacheSet(key, {version: stat.mtimeMs, data: parsed});
@@ -310,10 +302,10 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (e: any) {
 			return (e?.code === 'ENOMEM' || e?.message?.includes('out of memory')) ? (
-				log("error", `[Html-Js-Css-Analyzer] Memory limit reached processing: ${fsPath}`),
+				logger(`error`, `Memory`, `limit reached processing: ${fsPath}`),
 				[]
 			) : (
-				log("error", `[Html-Js-Css-Analyzer] Selector read from file failed: ${fsPath} -> ${e?.message || e}`),
+				logger(`error`, `Selector`, `read from file failed: ${fsPath} -> ${e?.message || e}`),
 				[]
 			);
 		}
@@ -325,7 +317,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 
 		for (let i = 0; i < uncachedFiles.length; i += BATCH_SIZE) {
 			const batch = uncachedFiles.slice(i, i + BATCH_SIZE);
-			const batchPromises = batch.map(filePath => ResourceLimiter.execute(async () => this.fnProcessSingleCssFile(filePath, styleMap)));
+			const batchPromises = batch.map(filePath => resourceLimiter().execute(async () => this.fnProcessSingleCssFile(filePath, styleMap)));
 			await Promise.allSettled(batchPromises);
 		}
 	};
@@ -342,7 +334,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 					!styleMap.has(k) && styleMap.set(k, await this.fnReadSelectorsFromFsPath(filePath));
 				}
 				catch (e: any) {
-					log("error", `[Html-Js-Css-Analyzer] CSS file read failed: ${filePath} -> ${e?.message || e}`);
+					logger(`error`, `CSS file`, `read failed: ${filePath} -> ${e?.message || e}`);
 				}
 			}
 		);
@@ -426,7 +418,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			const patterns = unique.map(e => `**/*.${e}`);
 			for (const glob of patterns) {
 				if (collected.length >= MAX) {
-					log("info", `[Html-Js-Css-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+					logger(`debug`, `Workspace CSS`, `file limit reached (${MAX} files), remaining files ignored`);
 					break;
 				}
 				const include = new vscode.RelativePattern(folder, glob);
@@ -439,16 +431,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						collected.push(uri.fsPath);
 					}
 					if (collected.length >= MAX) {
-						log("info", `[Html-Js-Css-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+						logger(`debug`, `Workspace CSS`, `file limit reached (${MAX} files), remaining files ignored`);
 						break;
 					}
 				}
 			}
 		}
 		catch (e: any) {
-			log("error", `[Html-Js-Css-Analyzer] Workspace CSS file check error: ${e?.message || e}`);
+			logger(`error`, `Workspace CSS`, `file check error: ${e?.message || e}`);
 		}
-		log("info", `[Html-Js-Css-Analyzer] Workspace CSS files collected: ${collected.length} items`);
+		logger(`debug`, `Workspace CSS`, `files collected: ${collected.length} items`);
 		workspaceCssFiles = collected;
 	};
 }

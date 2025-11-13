@@ -1,13 +1,10 @@
 // src/extension.ts
 
-import * as vscode from "vscode";
-import {CssSupport} from "./langs/css/cssSupport.js";
-import {HtmlHintCodeActionProvider} from "./langs/html/htmlHint.js";
-import {JSHintCodeActionProvider} from "./langs/js/jsHint.js";
-import {AutoValidationMode} from "./langs/types/common.js";
-import {getLogLevel} from "./configs/setting.js";
-import {initLogger, setLogLevel, getChannel} from "./utils/logger.js";
-import {scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport} from "./utils/diagnostic.js";
+import { vscode } from "@exportLibs";
+import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
+import { AutoValidationMode } from "@exportTypes";
+import { getLogLevel } from "@exportConsts";
+import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
 const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
@@ -67,17 +64,12 @@ const fnRegisterCommands = (context: vscode.ExtensionContext, cssSupport: CssSup
 
 // -------------------------------------------------------------------------------------------------
 export const activate = (context: vscode.ExtensionContext): void => {
-	initLogger();
-	setLogLevel(getLogLevel());
-
 	const cssSupport = new CssSupport();
 	bindCssSupport(cssSupport);
 
 	fnRegisterProviders(context, cssSupport);
 	fnRegisterEventHandlers(context, cssSupport);
 	fnRegisterCommands(context, cssSupport);
-
-	context.subscriptions.push(getChannel());
 
 	const activeEditor = vscode.window.activeTextEditor;
 	activeEditor && void updateDiagnostics(cssSupport, activeEditor.document, AutoValidationMode.ALWAYS);
