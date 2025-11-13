@@ -34,10 +34,10 @@ export class PerformanceMonitor {
 
 		// 느린 작업 경고 (500ms 이상)
 		if (duration > 500) {
-			log("info", `[Html-Css-Js-Analyzer] Slow operation detected: ${metric.operationName} took ${formattedDuration}ms`);
+			log("info", `[Html-Js-Css-Analyzer] Slow operation detected: ${metric.operationName} took ${formattedDuration}ms`);
 		}
 		else if (duration > 100) {
-			log("debug", `[Html-Css-Js-Analyzer] Operation timing: ${metric.operationName} took ${formattedDuration}ms`);
+			log("debug", `[Html-Js-Css-Analyzer] Operation timing: ${metric.operationName} took ${formattedDuration}ms`);
 		}
 
 		this.metrics.delete(key);
@@ -55,7 +55,7 @@ export class PerformanceMonitor {
 		const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100;
 
 		if (heapUsedMB > 100) { // 100MB 이상
-			log("info", `[Html-Css-Js-Analyzer] High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
+			log("info", `[Html-Js-Css-Analyzer] High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
 		}
 	}
 

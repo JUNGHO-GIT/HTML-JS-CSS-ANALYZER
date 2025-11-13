@@ -74,12 +74,12 @@ class DiagnosticManager {
 					const diagnostics = await cssSupport.validate(document);
 					this.collection.set(document.uri, diagnostics);
 					this.lastValidatedVersions.set(documentKey, document.version);
-					log("info", `[Html-Css-Js-Analyzer] Diagnostics: ${document.fileName} -> ${diagnostics.length} items`);
+					log("info", `[Html-Js-Css-Analyzer] Diagnostics: ${document.fileName} -> ${diagnostics.length} items`);
 				})();
 			}
 			catch (error: any) {
 				const errorMessage = error?.stack || error?.message || String(error);
-				log("error", `[Html-Css-Js-Analyzer] Diagnostic update error: ${errorMessage}`);
+				log("error", `[Html-Js-Css-Analyzer] Diagnostic update error: ${errorMessage}`);
 			}
 		})();
 	}

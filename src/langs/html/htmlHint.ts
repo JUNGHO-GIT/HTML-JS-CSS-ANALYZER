@@ -41,7 +41,7 @@ const loadHtmlHint = (): HtmlHintInstance | null => {
 	}
 	catch (error: any) {
 		const errorMessage = error?.message || String(error);
-		log("debug", `[Html-Css-Js-Analyzer] HTMLHint module not loaded (optional): ${errorMessage}`);
+		log("debug", `[Html-Js-Css-Analyzer] HTMLHint module not loaded (optional): ${errorMessage}`);
 		return null;
 	}
 };
@@ -104,7 +104,7 @@ const loadConfig = (filePath: string): any => {
             const txt = fs.readFileSync(f, "utf8");
             return JSON.parse(txt);
           } catch (e: any) {
-            log("error", `[Html-Css-Js-Analyzer] HTMLHint config file parsing error: ${f} -> ${e?.message || e}`);
+            log("error", `[Html-Js-Css-Analyzer] HTMLHint config file parsing error: ${f} -> ${e?.message || e}`);
             return {};
           }
         }
@@ -146,7 +146,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): vscode.Diagnostic[] => {
       const range = new vscode.Range(start, end);
       const message = `${err.message}`;
       const d = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
-      d.source = "Html-Css-Js-Analyzer";
+      d.source = "Html-Js-Css-Analyzer";
       d.code = err.rule?.id;
       (d as any).data = {ruleId: err.rule?.id, line: err.line, col: err.col, raw: err.raw};
       diags.push(d);
@@ -154,7 +154,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): vscode.Diagnostic[] => {
     return diags;
   }
 	catch (e: any) {
-    log("error", `[Html-Css-Js-Analyzer] HTMLHint execution error: ${e?.message || e}`);
+    log("error", `[Html-Js-Css-Analyzer] HTMLHint execution error: ${e?.message || e}`);
     return [];
   }
 };
@@ -664,7 +664,7 @@ export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
           act &&list.push(act);
         }
 				catch (e: any) {
-          log("error", `[Html-Css-Js-Analyzer] HTMLHint code action error: ${e?.message || e}`);
+          log("error", `[Html-Js-Css-Analyzer] HTMLHint code action error: ${e?.message || e}`);
         }
       }
     }

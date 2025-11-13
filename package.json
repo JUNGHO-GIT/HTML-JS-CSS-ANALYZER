@@ -1,6 +1,6 @@
 {
   "name": "html-js-css-analyzer",
-  "displayName": "Html-Css-Js-Analyzer",
+  "displayName": "Html-Js-Css-Analyzer",
   "description": "CSS(unused selectors), HTML(lint), JavaScript(lint) analyzer extension for VsCode.",
   "publisher": "JUNGHO",
   "icon": "logo_image.png",
@@ -41,24 +41,24 @@
     "onLanguage:typescript",
     "onLanguage:javascriptreact",
     "onLanguage:typescriptreact",
-    "onCommand:Html-Css-Js-Analyzer.validate",
-    "onCommand:Html-Css-Js-Analyzer.clear"
+    "onCommand:Html-Js-Css-Analyzer.validate",
+    "onCommand:Html-Js-Css-Analyzer.clear"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "Html-Css-Js-Analyzer.validate",
-        "title": "Html-Css-Js-Analyzer: Validate Current Document"
+        "command": "Html-Js-Css-Analyzer.validate",
+        "title": "Html-Js-Css-Analyzer: Validate Current Document"
       },
       {
-        "command": "Html-Css-Js-Analyzer.clear",
-        "title": "Html-Css-Js-Analyzer: Clear Style Cache"
+        "command": "Html-Js-Css-Analyzer.clear",
+        "title": "Html-Js-Css-Analyzer: Clear Style Cache"
       }
     ],
     "configuration": {
-      "title": "Html-Css-Js-Analyzer",
+      "title": "Html-Js-Css-Analyzer",
       "properties": {
-        "Html-Css-Js-Analyzer.logLevel": {
+        "Html-Js-Css-Analyzer.logLevel": {
           "type": "string",
           "scope": "window",
           "enum": [
@@ -69,7 +69,7 @@
           ],
           "default": "debug"
         },
-        "Html-Css-Js-Analyzer.exclude": {
+        "Html-Js-Css-Analyzer.exclude": {
           "type": "array",
           "scope": "resource",
           "default": [
@@ -111,7 +111,7 @@
             "type": "string"
           }
         },
-        "Html-Css-Js-Analyzer.additionalExtensions": {
+        "Html-Js-Css-Analyzer.additionalExtensions": {
           "type": "array",
           "scope": "window",
           "default": [
@@ -124,29 +124,29 @@
             "type": "string"
           }
         },
-        "Html-Css-Js-Analyzer.htmlHint.enabled": {
+        "Html-Js-Css-Analyzer.htmlHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
-          "description": "[Html-Css-Js-Analyzer] Enable/disable HTML analysis and hints"
+          "description": "[Html-Js-Css-Analyzer] Enable/disable HTML analysis and hints"
         },
-        "Html-Css-Js-Analyzer.cssHint.enabled": {
+        "Html-Js-Css-Analyzer.cssHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
-          "description": "[Html-Css-Js-Analyzer] Enable/disable CSS analysis and hints"
+          "description": "[Html-Js-Css-Analyzer] Enable/disable CSS analysis and hints"
         },
-        "Html-Css-Js-Analyzer.jsHint.enabled": {
+        "Html-Js-Css-Analyzer.jsHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
-          "description": "[Html-Css-Js-Analyzer] Enable/disable JavaScript analysis and hints"
+          "description": "[Html-Js-Css-Analyzer] Enable/disable JavaScript analysis and hints"
         },
-        "Html-Css-Js-Analyzer.tsHint.enabled": {
+        "Html-Js-Css-Analyzer.tsHint.enabled": {
           "type": "boolean",
           "scope": "window",
           "default": true,
-          "description": "[Html-Css-Js-Analyzer] Enable/disable TypeScript analysis and hints"
+          "description": "[Html-Js-Css-Analyzer] Enable/disable TypeScript analysis and hints"
         }
       }
     }
@@ -171,7 +171,7 @@
     "@types/jshint": "^2.12.4",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.1",
-    "@types/vscode": "^1.105.0",
+    "@types/vscode": "^1.106.0",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "@vscode/test-electron": "^2.5.2",

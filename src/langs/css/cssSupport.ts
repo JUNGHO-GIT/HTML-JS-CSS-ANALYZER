@@ -126,7 +126,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (error: any) {
 			const errorMessage = error?.message || String(error);
-			log("error", `[Html-Css-Js-Analyzer] CSS file fetch failed (${url}): ${errorMessage}`);
+			log("error", `[Html-Js-Css-Analyzer] CSS file fetch failed (${url}): ${errorMessage}`);
 			return "";
 		}
 	};
@@ -164,7 +164,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						data.push({index: absIndex, line: pos.line, col: pos.character, type: sel.type, selector: sel.selector});
 					}
 				}
-				log("debug", `[Html-Css-Js-Analyzer] Embedded style selectors: ${data.length} found`);
+				log("debug", `[Html-Js-Css-Analyzer] Embedded style selectors: ${data.length} found`);
 			})() : (data = parseSelectors(txt));
 			cacheSet(key, {version: ver, data});
 			return data;
@@ -218,16 +218,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 							map.set(vscode.Uri.file(targetPath).toString(), sels);
 						}
 						catch (e: any) {
-							log("error", `[Html-Css-Js-Analyzer] Linked stylesheet read failed: ${href} -> ${e?.message || e}`);
+							log("error", `[Html-Js-Css-Analyzer] Linked stylesheet read failed: ${href} -> ${e?.message || e}`);
 						}
 					}
 				}
 			}
 			catch (e: any) {
-				log("error", `[Html-Css-Js-Analyzer] Linked stylesheet parsing error: ${href} -> ${e?.message || e}`);
+				log("error", `[Html-Js-Css-Analyzer] Linked stylesheet parsing error: ${href} -> ${e?.message || e}`);
 			}
 		}
-		log("debug", `[Html-Css-Js-Analyzer] Linked stylesheet parsing: ${map.size} entries found for ${doc.fileName}`);
+		log("debug", `[Html-Js-Css-Analyzer] Linked stylesheet parsing: ${map.size} entries found for ${doc.fileName}`);
 		return map;
 	};
 
@@ -264,7 +264,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				}
 			}
 
-			log("debug", `[Html-Css-Js-Analyzer] Styles collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
+			log("debug", `[Html-Js-Css-Analyzer] Styles collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
 
 			return styleMap;
 		})();
@@ -288,13 +288,13 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			return (cached && cached.version === stat.mtimeMs) ? cached.data : (async () => {
 				const MAX_FILE_SIZE = 2 * 1024 * 1024;
 				return stat.size > MAX_FILE_SIZE ? (
-					log("info", `[Html-Css-Js-Analyzer] Large CSS file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
+					log("info", `[Html-Js-Css-Analyzer] Large CSS file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
 					[]
 				) : (async () => {
 					const content = await fs.promises.readFile(fsPath, "utf8");
 					const MAX_CONTENT_LENGTH = 500000;
 					return content.length > MAX_CONTENT_LENGTH ? (
-						log("info", `[Html-Css-Js-Analyzer] Large CSS content sampled: ${fsPath}`),
+						log("info", `[Html-Js-Css-Analyzer] Large CSS content sampled: ${fsPath}`),
 						(() => {
 							const parsed = parseSelectors(content.substring(0, MAX_CONTENT_LENGTH));
 							cacheSet(key, {version: stat.mtimeMs, data: parsed});
@@ -310,10 +310,10 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (e: any) {
 			return (e?.code === 'ENOMEM' || e?.message?.includes('out of memory')) ? (
-				log("error", `[Html-Css-Js-Analyzer] Memory limit reached processing: ${fsPath}`),
+				log("error", `[Html-Js-Css-Analyzer] Memory limit reached processing: ${fsPath}`),
 				[]
 			) : (
-				log("error", `[Html-Css-Js-Analyzer] Selector read from file failed: ${fsPath} -> ${e?.message || e}`),
+				log("error", `[Html-Js-Css-Analyzer] Selector read from file failed: ${fsPath} -> ${e?.message || e}`),
 				[]
 			);
 		}
@@ -342,7 +342,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 					!styleMap.has(k) && styleMap.set(k, await this.fnReadSelectorsFromFsPath(filePath));
 				}
 				catch (e: any) {
-					log("error", `[Html-Css-Js-Analyzer] CSS file read failed: ${filePath} -> ${e?.message || e}`);
+					log("error", `[Html-Js-Css-Analyzer] CSS file read failed: ${filePath} -> ${e?.message || e}`);
 				}
 			}
 		);
@@ -426,7 +426,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			const patterns = unique.map(e => `**/*.${e}`);
 			for (const glob of patterns) {
 				if (collected.length >= MAX) {
-					log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+					log("info", `[Html-Js-Css-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
 					break;
 				}
 				const include = new vscode.RelativePattern(folder, glob);
@@ -439,16 +439,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						collected.push(uri.fsPath);
 					}
 					if (collected.length >= MAX) {
-						log("info", `[Html-Css-Js-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
+						log("info", `[Html-Js-Css-Analyzer] Workspace CSS file limit reached (${MAX} files), remaining files ignored`);
 						break;
 					}
 				}
 			}
 		}
 		catch (e: any) {
-			log("error", `[Html-Css-Js-Analyzer] Workspace CSS file check error: ${e?.message || e}`);
+			log("error", `[Html-Js-Css-Analyzer] Workspace CSS file check error: ${e?.message || e}`);
 		}
-		log("info", `[Html-Css-Js-Analyzer] Workspace CSS files collected: ${collected.length} items`);
+		log("info", `[Html-Js-Css-Analyzer] Workspace CSS files collected: ${collected.length} items`);
 		workspaceCssFiles = collected;
 	};
 }

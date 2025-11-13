@@ -747,7 +747,7 @@ const generateAdditionalDiagnostics = (
 			severity
 		);
 
-		diagnostic.source = "Html-Css-Js-Analyzer";
+		diagnostic.source = "Html-Js-Css-Analyzer";
 		diagnostic.code = `complexity-${issue.type}`;
 
 		(diagnostic as any).data = {
@@ -781,7 +781,7 @@ const generateAdditionalDiagnostics = (
 			severity
 		);
 
-		diagnostic.source = "Html-Css-Js-Analyzer";
+		diagnostic.source = "Html-Js-Css-Analyzer";
 		diagnostic.code = `bug-${bug.type}`;
 
 		(diagnostic as any).data = {
@@ -810,7 +810,7 @@ const generateAdditionalDiagnostics = (
 				vscode.DiagnosticSeverity.Information
 			);
 
-			diagnostic.source = "Html-Css-Js-Analyzer";
+			diagnostic.source = "Html-Js-Css-Analyzer";
 			diagnostic.code = "function-too-many-params";
 
 			(diagnostic as any).data = {
@@ -842,7 +842,7 @@ const generateAdditionalDiagnostics = (
 			vscode.DiagnosticSeverity.Information
 		);
 
-		diagnostic.source = "Html-Css-Js-Analyzer";
+		diagnostic.source = "Html-Js-Css-Analyzer";
 		diagnostic.code = "prefer-let-const";
 
 		(diagnostic as any).data = {
@@ -864,7 +864,7 @@ const generateAdditionalDiagnostics = (
 			vscode.DiagnosticSeverity.Information
 		);
 
-		diagnostic.source = "Html-Css-Js-Analyzer";
+		diagnostic.source = "Html-Js-Css-Analyzer";
 		diagnostic.code = "missing-strict-mode";
 
 		(diagnostic as any).data = {
@@ -971,7 +971,7 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 
 				const diagnostic = new vscode.Diagnostic(range, message, severity);
 
-				diagnostic.source = "Html-Css-Js-Analyzer";
+				diagnostic.source = "Html-Js-Css-Analyzer";
 				diagnostic.code = error.code;
 
 				// 추가 정보 저장 (QuickFix를 위해)
@@ -1040,7 +1040,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
 
 		// JSHint 관련 진단만 처리
 		const jshintDiagnostics = context.diagnostics.filter(
-			diag => diag.source === "Html-Css-Js-Analyzer"
+			diag => diag.source === "Html-Js-Css-Analyzer"
 		);
 
 		for (const diagnostic of jshintDiagnostics) {
