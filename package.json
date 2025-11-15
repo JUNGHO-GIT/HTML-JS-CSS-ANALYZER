@@ -1,7 +1,7 @@
 {
   "name": "html-js-css-analyzer",
   "displayName": "Html-Js-Css-Analyzer",
-  "description": "CSS(unused selectors), HTML(lint), JavaScript(lint) analyzer extension for VsCode.",
+  "description": "HTML, JavaScript, CSS analyzer and linter extension for Visual Studio Code.",
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
@@ -112,18 +112,19 @@
           }
         },
         "Html-Js-Css-Analyzer.additionalExtensions": {
-          "type": "array",
-          "scope": "window",
-          "default": [
-            "html",
-            "htm",
-            "css",
-            "scss"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
+					"type": "array",
+					"scope": "resource",
+					"default": [
+						"html",
+						"htm",
+						"css",
+						"scss"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "[Html-Js-Css-Analyzer] Additional file extensions to analyze"
+				},
         "Html-Js-Css-Analyzer.htmlHint.enabled": {
           "type": "boolean",
           "scope": "window",
@@ -178,7 +179,7 @@
     "@vscode/vsce": "^3.7.0",
     "@types/htmlhint": "^1.1.5",
     "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.1",
+    "@swc/core": "^1.15.2",
     "concurrently": "^9.2.1",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
