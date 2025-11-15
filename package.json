@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.6.3",
+  "version": "2.6.4",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -61,11 +61,12 @@
           "scope": "window",
           "enum": [
             "off",
-            "error",
+            "debug",
             "info",
-            "debug"
+            "warn",
+            "error"
           ],
-          "default": "debug"
+          "default": "info"
         },
         "Html-Js-Css-Analyzer.exclude": {
           "type": "array",
@@ -154,8 +155,8 @@
     "watch": "node .node/swc.cjs --watch",
     "compile": "node .node/swc.cjs --compile",
     "reset": "node .node/reset.cjs --pnpm",
-    "gcloud": "node .node/gcloud.cjs --git",
     "autofix": "node .node/autofix.cjs --fix",
+    "gcloud": "node .node/gcloud.cjs --git",
     "vsce": "node .node/vsce.cjs"
   },
   "engines": {
