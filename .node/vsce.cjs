@@ -7,7 +7,7 @@ const process = require(`process`);
 
 // 인자 파싱 ------------------------------------------------------------------------------------
 const argv = process.argv.slice(2);
-const args1 = argv.find(arg => [`--npm`, `--pnpm`, `--yarn`, `--bun`].includes(arg))?.replace(`--`, ``) || `pnpm`;
+const args1 = argv.find(arg => [`--npm`, `--pnpm`, `--yarn`, `--bun`].includes(arg))?.replace(`--`, ``) || ``;
 
 // 로깅 함수 -----------------------------------------------------------------------------------
 const logger = (type=``, message=``) => {
@@ -63,33 +63,29 @@ const runCommand = (cmd=``, args=[]) => {
 // out 디렉토리 초기화 -----------------------------------------------------------------------
 const deleteOutDir = () => {
 	const outDir = path.join(process.cwd(), `out`);
-	fs.existsSync(outDir) && (() => {
-		fs.rmSync(outDir, { recursive: true, force: true });
-		logger(`info`, `기존 out 디렉토리 삭제 완료`);
-	});
+
+	fs.existsSync(outDir) && (
+		fs.rmSync(outDir, { recursive: true, force: true }),
+		logger(`info`, `기존 out 디렉토리 삭제 완료`)
+	);
 };
 
 // 메인 실행 함수 ------------------------------------------------------------------------------
 (() => {
 	logger(`info`, `VSCE 패키지 빌드 시작`);
 
-	// out 디렉토리 초기화
 	deleteOutDir();
 
-	// swc로 컴파일
-	runCommand(
-		args1, [`exec`, `swc`, `src`, `-d`, `out`, `--source-maps`, `--strip-leading-paths`],
+	args1 === `npm` ? (
+		runCommand(args1, [`exec`, `--`, `swc`, `src`, `-d`, `out`, `--source-maps`, `--strip-leading-paths`]),
+		runCommand(args1, [`exec`, `--`, `tsc-alias`, `-p`, `tsconfig.json`, `-f`])
+	)
+	: (
+		runCommand(args1, [`exec`, `swc`, `src`, `-d`, `out`, `--source-maps`, `--strip-leading-paths`]),
+		runCommand(args1, [`exec`, `tsc-alias`, `-p`, `tsconfig.json`, `-f`])
 	);
 
-	// tsc-alias로 경로 별칭 처리
-	runCommand(
-		args1, [`exec`, `tsc-alias`, `-p`, `tsconfig.json`, `-f`],
-	);
-
-	// vsce 패키지 생성
-	runCommand(
-		`vsce`, [`package`],
-	);
+	runCommand(`vsce`, [`package`]);
 
 	logger(`success`, `VSCE 패키지 빌드 완료`);
 })();

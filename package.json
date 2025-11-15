@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.6.6",
+  "version": "2.6.7",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -157,7 +157,7 @@
     "reset": "node .node/reset.cjs --npm",
     "autofix": "node .node/autofix.cjs --fix",
     "gcloud": "node .node/gcloud.cjs --git",
-    "vsce": "node .node/vsce.cjs"
+    "vsce": "node .node/vsce.cjs --npm"
   },
   "engines": {
     "vscode": "^1.106.0",
