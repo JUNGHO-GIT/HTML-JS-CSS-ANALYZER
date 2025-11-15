@@ -1,13 +1,28 @@
 // exports/ExportLibs.ts
 
-// -------------------------------------------------------------------------------
-import * as vscode from "vscode";
-export { vscode };
-export { CodeAction, CodeActionKind, Diagnostic, Position, Range } from "vscode";
-export { default as fs } from "fs";
-export { default as path } from "path";
-export { createRequire } from "module";
-export { default as http } from "http";
-export { default as https } from "https";
-export { Minimatch } from "minimatch";
-export { TextEncoder } from "util";
+// 1. import --------------------------------------------------------------------------------
+import _vscode from "vscode";
+import _fs from "fs";
+import _path from "path";
+import _http from "http";
+import _https from "https";
+import { createRequire as _createRequire } from "module";
+import { Minimatch as _Minimatch } from "minimatch";
+import { TextEncoder as _TextEncoder, TextDecoder as _TextDecoder } from "util";
+import { CodeAction as _CodeAction, CodeActionKind as _CodeActionKind, Diagnostic as _Diagnostic, Position as _Position, Range as _Range } from "vscode";
+
+// 2. export --------------------------------------------------------------------------------
+export { _vscode as vscode };
+export { _fs as fs };
+export { _path as path };
+export { _http as http };
+export { _https as https };
+export { _createRequire as createRequire };
+export { _Minimatch as Minimatch };
+export { _TextEncoder as TextEncoder };
+export { _TextDecoder as TextDecoder };
+export { _CodeAction as CodeAction };
+export { _CodeActionKind as CodeActionKind };
+export { _Diagnostic as Diagnostic };
+export { _Position as Position };
+export { _Range as Range };
