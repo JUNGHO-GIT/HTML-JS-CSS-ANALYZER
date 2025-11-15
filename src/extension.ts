@@ -3,8 +3,25 @@
 import { vscode } from "@exportLibs";
 import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
 import { AutoValidationMode } from "@exportTypes";
-import { getLogLevel } from "@exportConsts";
-import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
+import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport, initLogger } from "@exportScripts";
+
+// -------------------------------------------------------------------------------------------------
+export const deactivate = (): void => {};
+
+// -------------------------------------------------------------------------------------------------
+export const activate = (context: vscode.ExtensionContext): void => {
+	initLogger();
+
+	const cssSupport = new CssSupport();
+	bindCssSupport(cssSupport);
+
+	fnRegisterProviders(context, cssSupport);
+	fnRegisterEventHandlers(context, cssSupport);
+	fnRegisterCommands(context, cssSupport);
+
+	const activeEditor = vscode.window.activeTextEditor;
+	activeEditor && void updateDiagnostics(cssSupport, activeEditor.document, AutoValidationMode.ALWAYS);
+};
 
 // -------------------------------------------------------------------------------------------------
 const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
@@ -27,9 +44,6 @@ const JS_LANGUAGES: vscode.DocumentSelector = [
 	{language: "javascriptreact"},
 	{language: "typescriptreact"}
 ];
-
-// -------------------------------------------------------------------------------------------------
-export const deactivate = (): void => {};
 
 // -------------------------------------------------------------------------------------------------
 const fnRegisterProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
@@ -60,17 +74,4 @@ const fnRegisterCommands = (context: vscode.ExtensionContext, cssSupport: CssSup
 		}),
 		vscode.commands.registerCommand("Html-Js-Css-Analyzer.clear", clearAll)
 	);
-};
-
-// -------------------------------------------------------------------------------------------------
-export const activate = (context: vscode.ExtensionContext): void => {
-	const cssSupport = new CssSupport();
-	bindCssSupport(cssSupport);
-
-	fnRegisterProviders(context, cssSupport);
-	fnRegisterEventHandlers(context, cssSupport);
-	fnRegisterCommands(context, cssSupport);
-
-	const activeEditor = vscode.window.activeTextEditor;
-	activeEditor && void updateDiagnostics(cssSupport, activeEditor.document, AutoValidationMode.ALWAYS);
 };

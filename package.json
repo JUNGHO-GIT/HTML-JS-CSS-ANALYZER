@@ -5,16 +5,11 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.5.9",
+  "version": "2.5.11",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/JUNGHO-GIT/HTML-JS-CSS-ANALYZER.git"
-  },
-  "engines": {
-    "vscode": "^1.106.0",
-    "node": ">=18.0.0",
-    "npm": ">=10.0.0"
   },
   "categories": [
     "Programming Languages",
@@ -45,6 +40,9 @@
     "onCommand:Html-Js-Css-Analyzer.clear"
   ],
   "contributes": {
+    "outputChannels": [
+      "Html-Js-Css-Analyzer"
+    ],
     "commands": [
       {
         "command": "Html-Js-Css-Analyzer.validate",
@@ -112,19 +110,19 @@
           }
         },
         "Html-Js-Css-Analyzer.additionalExtensions": {
-					"type": "array",
-					"scope": "resource",
-					"default": [
-						"html",
-						"htm",
-						"css",
-						"scss"
-					],
-					"items": {
-						"type": "string"
-					},
-					"description": "[Html-Js-Css-Analyzer] Additional file extensions to analyze"
-				},
+          "type": "array",
+          "scope": "resource",
+          "default": [
+            "html",
+            "htm",
+            "css",
+            "scss"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "[Html-Js-Css-Analyzer] Additional file extensions to analyze"
+        },
         "Html-Js-Css-Analyzer.htmlHint.enabled": {
           "type": "boolean",
           "scope": "window",
@@ -159,6 +157,11 @@
     "gcloud": "node .node/gcloud.cjs --git",
     "autofix": "node .node/autofix.cjs --fix",
     "vsce": "node .node/vsce.cjs"
+  },
+  "engines": {
+    "vscode": "^1.106.0",
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
   },
   "dependencies": {
     "@babel/core": "^7.28.5",
