@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.7.2",
+  "version": "2.7.3",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -165,33 +165,33 @@
     "npm": ">=10.0.0"
   },
   "dependencies": {
-    "@babel/core": "^7.28.5",
-    "@swc/helpers": "^0.5.17",
     "htmlhint": "^1.7.1",
     "jshint": "^2.13.6",
     "minimatch": "^10.1.1",
     "terser": "^5.44.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@swc/cli": "^0.7.9",
+    "@swc/core": "^1.15.2",
+    "@swc/helpers": "^0.5.17",
+    "@types/htmlhint": "^1.1.5",
     "@types/jshint": "^2.12.4",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.1",
+    "@types/vscode": "^1.106.0",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
-    "@types/vscode": "^1.106.0",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.0",
-    "@types/htmlhint": "^1.1.5",
-    "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.2",
     "concurrently": "^9.2.1",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
-    "rimraf": "^6.1.0",
     "mocha": "^11.7.5",
+    "rimraf": "^6.1.0",
     "ts-morph": "^27.0.2",
+    "ts-prune": "^0.10.3",
     "tsc-alias": "^1.8.16",
-    "typescript": "^5.9.3",
-    "ts-prune": "^0.10.3"
+    "typescript": "^5.9.3"
   }
 }
