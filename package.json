@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.7.6",
+  "version": "2.7.7",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -160,9 +160,10 @@
     "vsce": "node .node/vsce.cjs --npm"
   },
   "engines": {
-    "vscode": "^1.106.0",
-    "node": ">=18.0.0",
-    "npm": ">=10.0.0"
+    "vscode": ">=1.106.1",
+    "node": ">=21.0.0",
+    "npm": ">=10.0.0",
+    "pnpm": ">=9.0.0"
   },
   "dependencies": {
     "htmlhint": "^1.7.1",
@@ -179,9 +180,9 @@
     "@types/jshint": "^2.12.4",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.1",
-    "@types/vscode": "^1.106.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.4",
-    "@typescript-eslint/parser": "^8.46.4",
+    "@types/vscode": "^1.106.1",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.0",
     "concurrently": "^9.2.1",
