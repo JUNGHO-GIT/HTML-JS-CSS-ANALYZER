@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.7.7",
+  "version": "2.7.8",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -152,12 +152,12 @@
     }
   },
   "scripts": {
-    "watch": "node .node/swc.cjs --npm --watch",
-    "compile": "node .node/swc.cjs --npm --compile",
-    "reset": "node .node/reset.cjs --npm",
-    "autofix": "node .node/autofix.cjs --fix",
-    "gcloud": "node .node/gcloud.cjs --git",
-    "vsce": "node .node/vsce.cjs --npm"
+    "watch": "bun .node/swc.cjs --bun --watch",
+    "compile": "bun .node/swc.cjs --bun --compile",
+    "reset": "bun .node/reset.cjs --bun --reset",
+    "fix": "bun .node/fix.cjs --bun --fix",
+    "gcloud": "bun .node/gcloud.cjs --bun --deploy",
+    "vsce": "bun .node/vsce.cjs --bun --package"
   },
   "engines": {
     "vscode": ">=1.106.1",
