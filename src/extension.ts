@@ -3,27 +3,36 @@
 import { vscode } from "@exportLibs";
 import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
 import { AutoValidationMode } from "@exportTypes";
-import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport, initLogger } from "@exportScripts";
+import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
+import { initLogger, logger } from "@exportScripts";
 
-// -------------------------------------------------------------------------------------------------
-export const deactivate = (): void => {};
+// 0. deactivate ---------------------------------------------------------------------------------
+export const deactivate = (
+): void => {
+	logger(`debug`, `deactivate`, ``);
+};
 
-// -------------------------------------------------------------------------------------------------
-export const activate = (context: vscode.ExtensionContext): void => {
+// 1. activate ---------------------------------------------------------------------------------
+export const activate = (
+	context: vscode.ExtensionContext
+): void => {
 	initLogger();
-
+	logger(`debug`, `activate`, ``);
 	const cssSupport = new CssSupport();
 	bindCssSupport(cssSupport);
 
-	fnRegisterProviders(context, cssSupport);
-	fnRegisterEventHandlers(context, cssSupport);
-	fnRegisterCommands(context, cssSupport);
+	registerProviders(context, cssSupport);
+	registerEventHandlers(context, cssSupport);
+	registerCommands(context, cssSupport);
 
 	const activeEditor = vscode.window.activeTextEditor;
 	activeEditor && void updateDiagnostics(cssSupport, activeEditor.document, AutoValidationMode.ALWAYS);
 };
 
 // -------------------------------------------------------------------------------------------------
+const HTML_LANGUAGE: vscode.DocumentSelector = [
+	{language: "html"}
+];
 const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
 	{language: "html"},
 	{language: "css"},
@@ -35,9 +44,6 @@ const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
 	{language: "javascriptreact"},
 	{language: "typescriptreact"}
 ];
-
-const HTML_LANGUAGE: vscode.DocumentSelector = [{language: "html"}];
-
 const JS_LANGUAGES: vscode.DocumentSelector = [
 	{language: "javascript"},
 	{language: "typescript"},
@@ -46,7 +52,7 @@ const JS_LANGUAGES: vscode.DocumentSelector = [
 ];
 
 // -------------------------------------------------------------------------------------------------
-const fnRegisterProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const registerProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
 	context.subscriptions.push(
 		vscode.languages.registerCompletionItemProvider(SUPPORTED_LANGUAGES, cssSupport, ".", "#", "\"", "'", "`", " "),
 		vscode.languages.registerDefinitionProvider(SUPPORTED_LANGUAGES, cssSupport),
@@ -56,7 +62,7 @@ const fnRegisterProviders = (context: vscode.ExtensionContext, cssSupport: CssSu
 };
 
 // -------------------------------------------------------------------------------------------------
-const fnRegisterEventHandlers = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const registerEventHandlers = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
 	context.subscriptions.push(
 		vscode.workspace.onDidSaveTextDocument(async (savedDoc: vscode.TextDocument) => await updateDiagnostics(cssSupport, savedDoc, AutoValidationMode.SAVE)),
 		vscode.workspace.onDidOpenTextDocument(async (openedDoc: vscode.TextDocument) => await updateDiagnostics(cssSupport, openedDoc, AutoValidationMode.ALWAYS)),
@@ -66,7 +72,7 @@ const fnRegisterEventHandlers = (context: vscode.ExtensionContext, cssSupport: C
 };
 
 // -------------------------------------------------------------------------------------------------
-const fnRegisterCommands = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const registerCommands = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
 	context.subscriptions.push(
 		vscode.commands.registerCommand("Html-Js-Css-Analyzer.validate", async (mode?: AutoValidationMode) => {
 			const editor = vscode.window.activeTextEditor;

@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.7.8",
+  "version": "2.7.9",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -156,7 +156,7 @@
     "compile": "bun .node/swc.cjs --bun --compile",
     "reset": "bun .node/reset.cjs --bun --reset",
     "fix": "bun .node/fix.cjs --bun --fix",
-    "gcloud": "bun .node/gcloud.cjs --bun --deploy",
+    "git": "bun .node/git.cjs --bun --push",
     "vsce": "bun .node/vsce.cjs --bun --package"
   },
   "engines": {
@@ -189,7 +189,7 @@
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
     "mocha": "^11.7.5",
-    "rimraf": "^6.1.0",
+    "rimraf": "^6.1.2",
     "ts-morph": "^27.0.2",
     "ts-prune": "^0.10.3",
     "tsc-alias": "^1.8.16",

@@ -12,7 +12,7 @@ export const notify = (
 	key: string,
 	value: string,
 ): void => {
-	const text = `[Html-Js-Css] [${key}] ${value}`;
+	const text = `[Html-Js-Css-Analyzer] [${key}] ${value}`;
 	const AUTO_CLOSE_MS = 1000;
 	if (type === `debug` || type === `info`) {
 		void vscode.window.withProgress({

@@ -27,7 +27,9 @@ const isCssLikeDoc = (doc: vscode.TextDocument) => {
 const isJsLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
-	return ["javascript", "typescript", "javascriptreact", "typescriptreact"].includes(id) || [".js", ".jsx", ".ts", ".tsx", ".mjs"].some(ext => f.endsWith(ext));
+	const validLanguages = ["javascript", "typescript", "javascriptreact", "typescriptreact"];
+	const validExtensions = [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
+	return validLanguages.includes(id) || validExtensions.some(ext => f.endsWith(ext));
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -281,7 +283,7 @@ const scanDocumentUsages = (
 
 // -------------------------------------------------------------------------------------------------
 // CSS 본문 추출 (성능 최적화 및 메모리 효율 개선)
-const fnExtractCssBodies = (fullText: string): string => {
+const extractCssBodies = (fullText: string): string => {
 	let depth = 0;
 	let start = -1;
 	let inBlockComment = false;
@@ -352,11 +354,11 @@ const fnExtractCssBodies = (fullText: string): string => {
 	return bodies.join('\n');
 };
 
-// scanLocalUnused (성능 최적화) -----------------------------------------------------------------
+// scanLocalUnused -----------------------------------------------------------------------
 const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike, fullText: string) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const sels = await support.getLocalDoc(doc);
-	const bodyOnly = fnExtractCssBodies(fullText);
+	const bodyOnly = extractCssBodies(fullText);
 	const usedClasses = new Set<string>();
 	const usedIds = new Set<string>();
 	let m: RegExpExecArray | null;
@@ -383,7 +385,7 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 	return diagnostics;
 };
 
-// scanEmbeddedUnused (성능 최적화) --------------------------------------------------------------
+// scanEmbeddedUnused -----------------------------------------------------------------------
 const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportLike, usedClassesFromMarkup: Set<string>, usedIdsFromMarkup: Set<string>) => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const localDefs = await support.getLocalDoc(doc);
@@ -431,13 +433,19 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 		);
 
 		isJsLikeDoc(doc) && (() => {
-			const isTypeScript = doc.fileName.endsWith('.ts') || doc.fileName.endsWith('.tsx');
+			const fileName = doc.fileName.toLowerCase();
+			const isTypeScript = (
+				fileName.endsWith('.ts') ||
+				fileName.endsWith('.tsx') ||
+				doc.languageId === "typescript" ||
+				doc.languageId === "typescriptreact"
+			);
 			const shouldLint = isTypeScript ? isTsHintEnabled(doc.uri) : isJsHintEnabled(doc.uri);
 
 			shouldLint && (() => {
 				try {
-					const jsHintDiagnostics = runJSHint(doc);
-					lintDiagnostics.push(...jsHintDiagnostics);
+					const jsDiagnostics = runJSHint(doc);
+					lintDiagnostics.push(...jsDiagnostics);
 				}
 				catch (e: any) {
 					logger(`error`, `JSHint`, `merge error: ${e?.message || e} in ${doc.fileName}`);

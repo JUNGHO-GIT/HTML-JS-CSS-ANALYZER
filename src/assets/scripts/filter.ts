@@ -38,12 +38,24 @@ const getFileExtension = (fileName: string): string | null => {
 
 // -------------------------------------------------------------------------------------------------
 export const isAnalyzable = (document: vscode.TextDocument): boolean => {
-	const isSchemeSupported = isValidScheme(document.uri.scheme);
-	const isPathExcluded = isExcludedPath(document.fileName);
-	const fileExtension = getFileExtension(document.fileName);
-	const analyzableExtensions = getAnalyzableExtensions(document.uri);
-	const isExtensionSupported = fileExtension && analyzableExtensions.includes(fileExtension);
-	const excludePatterns = getCssExcludePatterns(document.uri);
+	if (!isValidScheme(document.uri.scheme)) {
+		return false;
+	}
 
-	return !(!isSchemeSupported || isPathExcluded || !fileExtension || !isExtensionSupported || isUriExcludedByGlob(document.uri, excludePatterns));
+	if (isExcludedPath(document.fileName)) {
+		return false;
+	}
+
+	const fileExtension = getFileExtension(document.fileName);
+	if (!fileExtension) {
+		return false;
+	}
+
+	const analyzableExtensions = getAnalyzableExtensions(document.uri);
+	if (!analyzableExtensions.includes(fileExtension)) {
+		return false;
+	}
+
+	const excludePatterns = getCssExcludePatterns(document.uri);
+	return !isUriExcludedByGlob(document.uri, excludePatterns);
 };

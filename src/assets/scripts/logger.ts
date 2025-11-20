@@ -8,7 +8,7 @@ let outputChannel: vscode.OutputChannel | null = null;
 
 // -----------------------------------------------------------------------------------------
 const getLogLevel = (): number => {
-	const config = vscode.workspace.getConfiguration(`Html-Js-Css`);
+	const config = vscode.workspace.getConfiguration(`Html-Js-Css-Analyzer`);
 	const level = config.get<string>(`logLevel`, `info`);
 	return logLevelMap[level as keyof typeof logLevelMap] || 2;
 };
@@ -16,7 +16,7 @@ const getLogLevel = (): number => {
 // -----------------------------------------------------------------------------------------
 export const initLogger = (): void => {
 	(!outputChannel) ? (
-		outputChannel = vscode.window.createOutputChannel(`Html-Js-Css`)
+		outputChannel = vscode.window.createOutputChannel(`Html-Js-Css-Analyzer`)
 	) : (
 		void 0
 	);
@@ -39,10 +39,10 @@ export const logger = (
 		void 0
 	) : (
 		initLogger(),
-		type === `debug` && console.debug(`[Html-Js-Css] [${key}] ${value}`),
-		type === `info` && console.info(`[Html-Js-Css] [${key}] ${value}`),
-		type === `warn` && console.warn(`[Html-Js-Css] [${key}] ${value}`),
-		type === `error` && console.error(`[Html-Js-Css] [${key}] ${value}`),
+		type === `debug` && console.debug(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
+		type === `info` && console.info(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
+		type === `warn` && console.warn(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
+		type === `error` && console.error(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
 		outputChannel?.appendLine(`[${type.toUpperCase()}] [${key}] ${value}`)
 	);
 };

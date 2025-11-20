@@ -17,12 +17,57 @@ export {
 
 // 2. Html -----------------------------------------------------------------------
 export {
-	HtmlHintCodeActionProvider,
-	runHtmlHint
-} from "@langs/html/htmlHint";
+	HtmlHintCodeActionProvider
+} from "@langs/html/htmlHintCodeActions";
+
+export {
+	runHtmlHint,
+	getRuleId,
+	getDocumentLine,
+	getHeadMatch,
+	makeQuickFix
+} from "@langs/html/htmlHintRunner";
+
+export type {
+	HtmlHintRule,
+	HtmlHintError,
+	HtmlHintInstance,
+	FixFactory
+} from "@langs/html/htmlHintTypes";
+
+export {
+	loadHtmlHint,
+	loadConfig,
+	clamp,
+	HEAD_TAG_REGEX
+} from "@langs/html/htmlHintConfig";
 
 // 3. Js -------------------------------------------------------------------------
 export {
 	JSHintCodeActionProvider,
 	runJSHint
 } from "@langs/js/jsHint";
+
+export type {
+	JSHintError,
+	JSHintResult,
+	JSHintInstance,
+	SourceAnalysis,
+	FunctionInfo,
+	VariableInfo,
+	ImportInfo,
+	ExportInfo,
+	ComplexityIssue,
+	PotentialBug,
+	AnalyzeResult
+} from "@langs/js/jsHintTypes";
+
+export {
+	loadJSHint,
+	loadJSHintConfig,
+	DEFAULT_JSHINT_CONFIG
+} from "@langs/js/jsHintConfig";
+
+export {
+	analyzeSourceCode
+} from "@langs/js/jsHintAnalyzer";

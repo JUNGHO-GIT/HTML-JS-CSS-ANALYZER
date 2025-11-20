@@ -21,7 +21,7 @@ class DiagnosticManager {
 	private cssSupportInstance: CssSupport | null = null;
 
 	constructor() {
-		this.collection = vscode.languages.createDiagnosticCollection();
+		this.collection = vscode.languages.createDiagnosticCollection("Html-Js-Css-Analyzer");
 		this.debounceTimers = new Map();
 		this.lastValidatedVersions = new Map();
 		this.changeCounters = new Map();
@@ -35,52 +35,65 @@ class DiagnosticManager {
 
 	// -------------------------------------------------------------------------------------------------
 	scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void {
-		!isAnalyzable(document) || (() => {
-			const documentKey = document.uri.toString();
-			const now = Date.now();
-			const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
-			const changeCount = this.changeCounters.get(documentKey) || 0;
-			const isRapidChange = (now - lastChange) < 1000;
-			const newChangeCount = isRapidChange ? changeCount + 1 : 1;
+		if (!isAnalyzable(document)) {
+			return;
+		}
 
-			this.changeCounters.set(documentKey, newChangeCount);
-			this.lastChangeTimestamps.set(documentKey, now);
+		const documentKey = document.uri.toString();
+		const now = Date.now();
+		const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
+		const changeCount = this.changeCounters.get(documentKey) || 0;
+		const isRapidChange = (now - lastChange) < 1000;
+		const newChangeCount = isRapidChange ? changeCount + 1 : 1;
 
-			const existingTimer = this.debounceTimers.get(documentKey);
-			existingTimer && clearTimeout(existingTimer);
+		this.changeCounters.set(documentKey, newChangeCount);
+		this.lastChangeTimestamps.set(documentKey, now);
 
-			const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS) : BASE_VALIDATION_DELAY_MS;
+		const existingTimer = this.debounceTimers.get(documentKey);
+		if (existingTimer) {
+			clearTimeout(existingTimer);
+		}
 
-			const fnUpdateDiagnostics = async () => {
-				this.debounceTimers.delete(documentKey);
-				this.changeCounters.delete(documentKey);
-				await this.updateDiagnostics(cssSupport, document, triggerMode);
-			};
+		const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? (
+			Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS)
+		) : (
+			BASE_VALIDATION_DELAY_MS
+		);
 
-			this.debounceTimers.set(documentKey, setTimeout(fnUpdateDiagnostics, delay));
-		})();
+		const updateDiagnostics = async () => {
+			this.debounceTimers.delete(documentKey);
+			this.changeCounters.delete(documentKey);
+			await this.updateDiagnostics(cssSupport, document, triggerMode);
+		};
+
+		this.debounceTimers.set(documentKey, setTimeout(updateDiagnostics, delay));
 	}
 
 	// -------------------------------------------------------------------------------------------------
 	async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> {
-		!isAnalyzable(document) ? this.collection.delete(document.uri) : await (async () => {
-			try {
-				const isForceMode = triggerMode === AutoValidationMode.FORCE;
-				const documentKey = document.uri.toString();
-				const lastVersion = this.lastValidatedVersions.get(documentKey);
+		if (!isAnalyzable(document)) {
+			this.collection.delete(document.uri);
+			return;
+		}
 
-				(!isForceMode && lastVersion === document.version) ? void 0 : await (async () => {
-					const diagnostics = await cssSupport.validate(document);
-					this.collection.set(document.uri, diagnostics);
-					this.lastValidatedVersions.set(documentKey, document.version);
-					logger(`debug`, `Diagnostics`, `${document.fileName} -> ${diagnostics.length} items`);
-				})();
+		try {
+			const isForceMode = triggerMode === AutoValidationMode.FORCE;
+			const documentKey = document.uri.toString();
+			const lastVersion = this.lastValidatedVersions.get(documentKey);
+
+			if (!isForceMode && lastVersion === document.version) {
+				return;
 			}
-			catch (error: any) {
-				const errorMessage = error?.stack || error?.message || String(error);
-				logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
-			}
-		})();
+
+			const diagnostics = await cssSupport.validate(document);
+			this.collection.set(document.uri, diagnostics);
+			this.lastValidatedVersions.set(documentKey, document.version);
+			logger(`debug`, `Diagnostics`, `${document.fileName} -> ${diagnostics.length} items`);
+		}
+		catch (error: any) {
+			const errorMessage = error?.stack || error?.message || String(error);
+			logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
+		}
 	}
 
 	// -------------------------------------------------------------------------------------------------
@@ -88,7 +101,10 @@ class DiagnosticManager {
 		const documentKey = document.uri.toString();
 
 		const timer = this.debounceTimers.get(documentKey);
-		timer && (clearTimeout(timer), this.debounceTimers.delete(documentKey));
+		if (timer) {
+			clearTimeout(timer);
+			this.debounceTimers.delete(documentKey);
+		}
 
 		this.collection.delete(document.uri);
 		cacheDelete(documentKey);
