@@ -1,4 +1,7 @@
-// src/extension.ts
+/**
+ * @file extension.ts
+ * @since 2025-11-22
+ */
 
 import { vscode } from "@exportLibs";
 import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
@@ -6,18 +9,13 @@ import { AutoValidationMode } from "@exportTypes";
 import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
 import { initLogger, logger } from "@exportScripts";
 
-// 0. deactivate ---------------------------------------------------------------------------------
-export const deactivate = (
-): void => {
-	logger(`debug`, `deactivate`, ``);
-};
+// -------------------------------------------------------------------------------------------------
+export const deactivate = () => {};
+export const activate = (context: vscode.ExtensionContext) => {
 
-// 1. activate ---------------------------------------------------------------------------------
-export const activate = (
-	context: vscode.ExtensionContext
-): void => {
+	// 0. Initialize Logger ------------------------------------------------------------------------
 	initLogger();
-	logger(`debug`, `activate`, ``);
+	logger("info", "activation", `Html-Js-Css-Analyzer is now active!`);
 	const cssSupport = new CssSupport();
 	bindCssSupport(cssSupport);
 

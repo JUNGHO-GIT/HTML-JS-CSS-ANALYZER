@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.7.9",
+  "version": "2.8.0",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -126,27 +126,21 @@
         },
         "Html-Js-Css-Analyzer.htmlHint.enabled": {
           "type": "boolean",
-          "scope": "window",
+          "scope": "resource",
           "default": true,
           "description": "[Html-Js-Css-Analyzer] Enable/disable HTML analysis and hints"
         },
         "Html-Js-Css-Analyzer.cssHint.enabled": {
           "type": "boolean",
-          "scope": "window",
+          "scope": "resource",
           "default": true,
           "description": "[Html-Js-Css-Analyzer] Enable/disable CSS analysis and hints"
         },
         "Html-Js-Css-Analyzer.jsHint.enabled": {
           "type": "boolean",
-          "scope": "window",
+          "scope": "resource",
           "default": true,
           "description": "[Html-Js-Css-Analyzer] Enable/disable JavaScript analysis and hints"
-        },
-        "Html-Js-Css-Analyzer.tsHint.enabled": {
-          "type": "boolean",
-          "scope": "window",
-          "default": true,
-          "description": "[Html-Js-Css-Analyzer] Enable/disable TypeScript analysis and hints"
         }
       }
     }
@@ -168,28 +162,22 @@
   "dependencies": {
     "htmlhint": "^1.7.1",
     "jshint": "^2.13.6",
-    "minimatch": "^10.1.1",
-    "terser": "^5.44.1"
+    "minimatch": "^10.1.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.5",
+    "@eslint/js": "^9.39.1",
     "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.2",
-    "@swc/helpers": "^0.5.17",
+    "@swc/core": "^1.15.3",
     "@types/htmlhint": "^1.1.5",
     "@types/jshint": "^2.12.4",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.1",
     "@types/vscode": "^1.106.1",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
-    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.0",
-    "concurrently": "^9.2.1",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
-    "mocha": "^11.7.5",
-    "rimraf": "^6.1.2",
+    "globals": "^16.5.0",
     "ts-morph": "^27.0.2",
     "ts-prune": "^0.10.3",
     "tsc-alias": "^1.8.16",

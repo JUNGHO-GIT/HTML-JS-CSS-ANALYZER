@@ -1,6 +1,11 @@
+/**
+ * @file htmlTypes.ts
+ * @since 2025-11-22
+ */
+
 import type { vscode, Diagnostic, CodeAction } from "@exportLibs";
 
-// HTMLHint 타입 정의 ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 export interface HtmlHintRule {
   id: string;
   description?: string;

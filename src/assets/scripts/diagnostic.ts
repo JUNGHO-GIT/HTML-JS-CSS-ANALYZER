@@ -1,4 +1,7 @@
-// src/utils/diagnostic.ts
+/**
+ * @file diagnostic.ts
+ * @since 2025-11-21
+ */
 
 import { vscode } from "@exportLibs";
 import { AutoValidationMode } from "@exportTypes";
@@ -13,7 +16,9 @@ const RAPID_CHANGE_THRESHOLD = 5;
 
 // -------------------------------------------------------------------------------------------------
 class DiagnosticManager {
-	private readonly collection: vscode.DiagnosticCollection;
+	private readonly cssCollection: vscode.DiagnosticCollection;
+	private readonly htmlHintCollection: vscode.DiagnosticCollection;
+	private readonly jsHintCollection: vscode.DiagnosticCollection;
 	private readonly debounceTimers: Map<string, NodeJS.Timeout>;
 	private readonly lastValidatedVersions: Map<string, number>;
 	private readonly changeCounters: Map<string, number>;
@@ -21,7 +26,9 @@ class DiagnosticManager {
 	private cssSupportInstance: CssSupport | null = null;
 
 	constructor() {
-		this.collection = vscode.languages.createDiagnosticCollection("Html-Js-Css-Analyzer");
+		this.cssCollection = vscode.languages.createDiagnosticCollection(`CSS-Analyzer`);
+		this.htmlHintCollection = vscode.languages.createDiagnosticCollection(`HTMLHint`);
+		this.jsHintCollection = vscode.languages.createDiagnosticCollection(`JSHint`);
 		this.debounceTimers = new Map();
 		this.lastValidatedVersions = new Map();
 		this.changeCounters = new Map();
@@ -35,78 +42,85 @@ class DiagnosticManager {
 
 	// -------------------------------------------------------------------------------------------------
 	scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void {
-		if (!isAnalyzable(document)) {
-			return;
-		}
+		!isAnalyzable(document) ? (
+			void 0
+		) : (() => {
+			const documentKey = document.uri.toString();
+			const now = Date.now();
+			const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
+			const changeCount = this.changeCounters.get(documentKey) || 0;
+			const isRapidChange = (now - lastChange) < 1000;
+			const newChangeCount = isRapidChange ? changeCount + 1 : 1;
 
-		const documentKey = document.uri.toString();
-		const now = Date.now();
-		const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
-		const changeCount = this.changeCounters.get(documentKey) || 0;
-		const isRapidChange = (now - lastChange) < 1000;
-		const newChangeCount = isRapidChange ? changeCount + 1 : 1;
+			this.changeCounters.set(documentKey, newChangeCount);
+			this.lastChangeTimestamps.set(documentKey, now);
 
-		this.changeCounters.set(documentKey, newChangeCount);
-		this.lastChangeTimestamps.set(documentKey, now);
+			const existingTimer = this.debounceTimers.get(documentKey);
+			existingTimer && clearTimeout(existingTimer);
 
-		const existingTimer = this.debounceTimers.get(documentKey);
-		if (existingTimer) {
-			clearTimeout(existingTimer);
-		}
+			const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? (
+				Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS)
+			) : (
+				BASE_VALIDATION_DELAY_MS
+			);
 
-		const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? (
-			Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS)
-		) : (
-			BASE_VALIDATION_DELAY_MS
-		);
+			const fnUpdate = async () => {
+				this.debounceTimers.delete(documentKey);
+				this.changeCounters.delete(documentKey);
+				await this.updateDiagnostics(cssSupport, document, triggerMode);
+			};
 
-		const updateDiagnostics = async () => {
-			this.debounceTimers.delete(documentKey);
-			this.changeCounters.delete(documentKey);
-			await this.updateDiagnostics(cssSupport, document, triggerMode);
-		};
-
-		this.debounceTimers.set(documentKey, setTimeout(updateDiagnostics, delay));
+			this.debounceTimers.set(documentKey, setTimeout(fnUpdate, delay));
+		})();
 	}
 
 	// -------------------------------------------------------------------------------------------------
 	async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> {
-		if (!isAnalyzable(document)) {
-			this.collection.delete(document.uri);
-			return;
-		}
-
-		try {
-			const isForceMode = triggerMode === AutoValidationMode.FORCE;
-			const documentKey = document.uri.toString();
-			const lastVersion = this.lastValidatedVersions.get(documentKey);
-
-			if (!isForceMode && lastVersion === document.version) {
-				return;
-			}
-
-			const diagnostics = await cssSupport.validate(document);
-			this.collection.set(document.uri, diagnostics);
-			this.lastValidatedVersions.set(documentKey, document.version);
-			logger(`debug`, `Diagnostics`, `${document.fileName} -> ${diagnostics.length} items`);
-		}
-		catch (error: any) {
-			const errorMessage = error?.stack || error?.message || String(error);
-			logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
-		}
+		!isAnalyzable(document) ? (
+			this.cssCollection.delete(document.uri),
+			this.htmlHintCollection.delete(document.uri),
+			this.jsHintCollection.delete(document.uri)
+		) : (
+			await (async () => {
+				try {
+					const isForceMode = triggerMode === AutoValidationMode.FORCE;
+					const documentKey = document.uri.toString();
+					const lastVersion = this.lastValidatedVersions.get(documentKey);
+					!isForceMode && lastVersion === document.version ? (
+						void 0
+					) : (
+						await (async () => {
+							const result = await cssSupport.validate(document);
+							const cssDiagnostics = result.filter(d => d.source === `CSS-Analyzer`);
+							const htmlHintDiagnostics = result.filter(d => d.source === `HTMLHint`);
+							const jsHintDiagnostics = result.filter(d => d.source === `JSHint`);
+							this.cssCollection.set(document.uri, cssDiagnostics);
+							this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
+							this.jsHintCollection.set(document.uri, jsHintDiagnostics);
+							this.lastValidatedVersions.set(documentKey, document.version);
+							logger(`debug`, `Diagnostics`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
+						})()
+					);
+				}
+				catch (error: any) {
+					const errorMessage = error?.stack || error?.message || String(error);
+					logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
+				}
+			})()
+		);
 	}
 
 	// -------------------------------------------------------------------------------------------------
 	handleDocumentClosed(document: vscode.TextDocument): void {
 		const documentKey = document.uri.toString();
-
 		const timer = this.debounceTimers.get(documentKey);
-		if (timer) {
-			clearTimeout(timer);
-			this.debounceTimers.delete(documentKey);
-		}
-
-		this.collection.delete(document.uri);
+		timer && (
+			clearTimeout(timer),
+			this.debounceTimers.delete(documentKey)
+		);
+		this.cssCollection.delete(document.uri);
+		this.htmlHintCollection.delete(document.uri);
+		this.jsHintCollection.delete(document.uri);
 		cacheDelete(documentKey);
 		this.lastValidatedVersions.delete(documentKey);
 		this.changeCounters.delete(documentKey);

@@ -1,4 +1,7 @@
-// src/langs/css/cssCache.ts
+/**
+ * @file cssCache.ts
+ * @since 2025-11-22
+ */
 
 import { type SelectorPos } from "@exportTypes";
 
@@ -10,6 +13,7 @@ type CacheVal = {
 	accessCount: number;
 };
 
+// -------------------------------------------------------------------------------------------------
 const styleCache: Map<string, CacheVal> = new Map();
 const MAX_CACHE = 300; // Increased for better performance
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes TTL
@@ -40,7 +44,7 @@ const cleanExpired = (): void => {
 	const now = Date.now();
 	const expiredKeys: string[] = [];
 
-	for (const [key, val] of styleCache.entries()) {
+	for (const [ key, val ] of styleCache.entries()) {
 		if ((now - val.timestamp) > CACHE_TTL_MS) {
 			expiredKeys.push(key);
 		}
@@ -90,13 +94,13 @@ export const cacheGet = (key: string): CacheVal | undefined => {
 };
 
 // -------------------------------------------------------------------------------------------------
-export const cacheSet = (key: string, value: Omit<CacheVal, 'timestamp' | 'accessCount'>): void => {
+export const cacheSet = (key: string, value: Omit<CacheVal, `timestamp` | `accessCount`>): void => {
 	ensureLimit();
 
 	const enrichedValue: CacheVal = {
 		...value,
 		timestamp: Date.now(),
-		accessCount: 1
+		accessCount: 1,
 	};
 
 	styleCache.set(key, enrichedValue);
@@ -122,6 +126,6 @@ export const cacheStats = (): {size: number; maxSize: number; ttlMs: number} => 
 	return {
 		size: styleCache.size,
 		maxSize: MAX_CACHE,
-		ttlMs: CACHE_TTL_MS
+		ttlMs: CACHE_TTL_MS,
 	};
 };

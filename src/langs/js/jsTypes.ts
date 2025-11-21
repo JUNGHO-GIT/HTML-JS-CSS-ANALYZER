@@ -1,4 +1,7 @@
-// src/langs/js/jsHintTypes.ts
+/**
+ * @file jsTypes.ts
+ * @since 2025-11-22
+ */
 
 // -------------------------------------------------------------------------------------------------
 export interface JSHintError {
@@ -47,7 +50,7 @@ export interface FunctionInfo {
 // -------------------------------------------------------------------------------------------------
 export interface VariableInfo {
 	name: string;
-	type: 'let' | 'const' | 'var';
+	type: `let` | `const` | `var`;
 	line: number;
 }
 
@@ -65,14 +68,14 @@ export interface ExportInfo {
 
 // -------------------------------------------------------------------------------------------------
 export interface ComplexityIssue {
-	type: 'deep-nesting' | 'long-line' | 'complex-regex';
+	type: `deep-nesting` | `long-line` | `complex-regex`;
 	line: number;
 	message: string;
 }
 
 // -------------------------------------------------------------------------------------------------
 export interface PotentialBug {
-	type: 'assignment-in-condition' | 'potential-null-reference' | 'empty-catch' | 'console-usage' | 'eval-usage' | 'with-statement';
+	type: `assignment-in-condition` | `potential-null-reference` | `empty-catch` | `console-usage` | `eval-usage` | `with-statement`;
 	line: number;
 	message: string;
 }

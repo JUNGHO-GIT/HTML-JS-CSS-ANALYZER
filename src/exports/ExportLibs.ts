@@ -1,6 +1,9 @@
-// exports/ExportLibs.ts
+/**
+ * @file ExportLibs.ts
+ * @since 2025-11-22
+ */
 
-// 1. import --------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 import _vscode from "vscode";
 import _fs from "fs";
 import _path from "path";
@@ -9,7 +12,7 @@ import _https from "https";
 import { createRequire as _createRequire } from "module";
 import { Minimatch as _Minimatch } from "minimatch";
 import { TextEncoder as _TextEncoder, TextDecoder as _TextDecoder } from "util";
-import { CodeAction as _CodeAction, CodeActionKind as _CodeActionKind, Diagnostic as _Diagnostic, Position as _Position, Range as _Range } from "vscode";
+import { CodeAction as _CodeAction, CodeActionKind as _CodeActionKind, Diagnostic as _Diagnostic, Position as _Position, Range as _Range, DiagnosticSeverity as _DiagnosticSeverity } from "vscode";
 
 // 2. export --------------------------------------------------------------------------------
 export { _vscode as vscode };
@@ -26,3 +29,4 @@ export { _CodeActionKind as CodeActionKind };
 export { _Diagnostic as Diagnostic };
 export { _Position as Position };
 export { _Range as Range };
+export { _DiagnosticSeverity as DiagnosticSeverity };

@@ -1,15 +1,15 @@
-// src/utils/filter.ts
+// filter.ts
 
 import { vscode } from "@exportLibs";
 import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
 import { isUriExcludedByGlob } from "@exportScripts";
 
 // -------------------------------------------------------------------------------------------------
-const SUPPORTED_SCHEMES = ["file", "vscode-file", "vscode-remote"] as const;
+const SUPPORTED_SCHEMES = [ `file`, `vscode-file`, `vscode-remote` ] as const;
 const EXCLUDED_PATH_PATTERNS = [
-	"/appdata/roaming/code/user/",
-	"settings.json",
-	"mcp.json"
+	`/appdata/roaming/code/user/`,
+	`settings.json`,
+	`mcp.json`,
 ] as const;
 
 // -------------------------------------------------------------------------------------------------
@@ -19,17 +19,16 @@ const isValidScheme = (scheme: string): boolean => {
 
 // -------------------------------------------------------------------------------------------------
 const isExcludedPath = (fileName: string): boolean => {
-	const normalizedPath = fileName.replace(/\\/g, "/").toLowerCase();
+	const normalizedPath = fileName.replace(/\\/g, `/`).toLowerCase();
 
-	return EXCLUDED_PATH_PATTERNS.some(pattern =>
-		pattern.startsWith("/") ? normalizedPath.includes(pattern) : normalizedPath.endsWith(pattern)
+	return EXCLUDED_PATH_PATTERNS.some(pattern => pattern.startsWith(`/`) ? normalizedPath.includes(pattern) : normalizedPath.endsWith(pattern)
 	);
 };
 
 // -------------------------------------------------------------------------------------------------
 const getFileExtension = (fileName: string): string | null => {
-	const normalizedPath = fileName.replace(/\\/g, "/").toLowerCase();
-	const lastDotIndex = normalizedPath.lastIndexOf('.');
+	const normalizedPath = fileName.replace(/\\/g, `/`).toLowerCase();
+	const lastDotIndex = normalizedPath.lastIndexOf(`.`);
 
 	return lastDotIndex > 0 && lastDotIndex < normalizedPath.length - 1
 		? normalizedPath.slice(lastDotIndex + 1)

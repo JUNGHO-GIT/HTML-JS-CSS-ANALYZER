@@ -1,9 +1,12 @@
-// assets/scripts/logger.ts
+/**
+ * @file logger.ts
+ * @since 2025-11-21
+ */
 
 import { vscode } from "@exportLibs";
 
-// -----------------------------------------------------------------------------------------
-let logLevelMap = { "off": 0, "debug": 1, "info": 2, "warn": 3, "error": 4 };
+// -------------------------------------------------------------------------------------------------
+const logLevelMap = { off: 0, debug: 1, info: 2, warn: 3, error: 4 };
 let outputChannel: vscode.OutputChannel | null = null;
 
 // -----------------------------------------------------------------------------------------
@@ -24,25 +27,18 @@ export const initLogger = (): void => {
 
 // -----------------------------------------------------------------------------------------
 export const logger = (
-	type:
-	`debug` |
-	`info` |
-	`warn` |
-	`error`,
+	type: `debug` | `info` | `warn` | `error`,
 	key: string,
-	value: string,
+	value: string
 ): void => {
 	const currentLevel = getLogLevel();
 	const messageLevel = logLevelMap[type];
-
+	const msg = `[Html-Js-Css-Analyzer] [${key}] ${value}`;
 	currentLevel === 0 || messageLevel < currentLevel ? (
 		void 0
 	) : (
 		initLogger(),
-		type === `debug` && console.debug(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
-		type === `info` && console.info(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
-		type === `warn` && console.warn(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
-		type === `error` && console.error(`[Html-Js-Css-Analyzer] [${key}] ${value}`),
+		type === `debug` ? console.debug(msg) : type === `info` ? console.info(msg) : type === `warn` ? console.warn(msg) : console.error(msg),
 		outputChannel?.appendLine(`[${type.toUpperCase()}] [${key}] ${value}`)
 	);
 };

@@ -1,6 +1,9 @@
-// exports/ExportTypes.ts
+/**
+ * @file ExportTypes.ts
+ * @since 2025-11-22
+ */
 
-// 0. Performance ----------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 export type PerformanceMetricsType = {
 	startTime: number;
 	operationName: string;
@@ -10,10 +13,10 @@ export type PerformanceMetricsType = {
 export {
 	AutoValidationMode,
 	SelectorType,
-	type SelectorPos
+	type SelectorPos,
 } from "@langs/types/common";
 
 // 2. Line Index -----------------------------------------------------------------
 export type {
-	LineIndex
+	LineIndex,
 } from "@scripts/lineIndex";

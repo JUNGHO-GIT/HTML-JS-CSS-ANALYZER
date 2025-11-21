@@ -1,4 +1,7 @@
-// assets/scripts/performance.ts
+/**
+ * @file performance.ts
+ * @since 2025-11-22
+ */
 
 import { logger } from "@exportScripts";
 import type { PerformanceMetricsType } from "@exportTypes";
@@ -6,7 +9,7 @@ import type { PerformanceMetricsType } from "@exportTypes";
 // -------------------------------------------------------------------------------------------------
 let __pmInstance: {metrics: Map<string, PerformanceMetricsType>; start: (operationName: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void;} | null = null;
 export const performanceMonitor = () => {
-	if (!__pmInstance) {
+	!__pmInstance && (
 		__pmInstance = {
 			metrics: new Map<string, PerformanceMetricsType>(),
 			start(operationName: string): string {
@@ -16,36 +19,33 @@ export const performanceMonitor = () => {
 			},
 			end(key: string): number {
 				const metric = this.metrics.get(key);
-				if (!metric) {
-					return -1;
-				}
-				const duration = performance.now() - metric.startTime;
-				const formattedDuration = Math.round(duration * 100) / 100;
-				if (duration > 500) {
-					  logger(`debug`, `Performance`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`);
-				}
-				else if (duration > 100) {
-					  logger(`debug`, `Performance`, `Timing: ${metric.operationName} took ${formattedDuration}ms`);
-				}
-				this.metrics.delete(key);
-				return duration;
+				const rs = !metric ? -1 : (() => {
+					const duration = performance.now() - metric.startTime;
+					const formattedDuration = Math.round(duration * 100) / 100;
+					duration > 500 ? (
+						logger(`debug`, `Performance`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`)
+					) : duration > 100 ? (
+						logger(`debug`, `Performance`, `Timing: ${metric.operationName} took ${formattedDuration}ms`)
+					) : (
+						void 0
+					);
+					this.metrics.delete(key);
+					return duration;
+				})();
+				return rs;
 			},
 			checkMemoryUsage(): void {
-				if ((global as any).gc && typeof (global as any).gc === 'function') {
-					(global as any).gc();
-				}
+				(global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
 				const usage = process.memoryUsage();
 				const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100;
 				const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100;
-				if (heapUsedMB > 100) {
-					  logger(`debug`, `Performance`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
-				}
+				heapUsedMB > 100 && logger(`debug`, `Performance`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
 			},
 			cleanup(): void {
 				this.metrics.clear();
-			}
-		};
-	}
+			},
+		}
+	);
 	return __pmInstance;
 };
 
@@ -95,14 +95,14 @@ export const debounce = <T extends (...args: any[]) => any>(
 type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void; };
 let __rlInstance: ResourceLimiterType | null = null;
 export const resourceLimiter = () => {
-	if (!__rlInstance) {
+	!__rlInstance && (
 		__rlInstance = {
 			MAX_CONCURRENT_OPERATIONS: 5,
 			activeOperations: 0,
 			queue: [] as (() => void)[],
 			async execute<T>(operation: () => Promise<T>): Promise<T> {
 				return new Promise<T>((resolve, reject) => {
-					const executeOperation = async () => {
+					const fnExecute = async () => {
 						this.activeOperations++;
 						try {
 							const result = await operation();
@@ -116,21 +116,20 @@ export const resourceLimiter = () => {
 							this.processQueue();
 						}
 					};
-					if (this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
-						executeOperation();
-					}
-					else {
-						this.queue.push(executeOperation);
-					}
+					this.activeOperations < this.MAX_CONCURRENT_OPERATIONS ? (
+						fnExecute()
+					) : (
+						this.queue.push(fnExecute)
+					);
 				});
 			},
 			processQueue(): void {
-				if (this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
+				this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS && (() => {
 					const operation = this.queue.shift();
 					operation && operation();
-				}
-			}
-		};
-	}
+				})();
+			},
+		}
+	);
 	return __rlInstance;
 };

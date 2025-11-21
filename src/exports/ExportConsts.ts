@@ -1,6 +1,9 @@
-// exports/ExportConsts.ts
+/**
+ * @file ExportConsts.ts
+ * @since 2025-11-22
+ */
 
-// 0. Config ----------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 export {
 	type LogLevel,
 	type UnusedSeverity,
@@ -12,5 +15,4 @@ export {
 	isCssHintEnabled,
 	isHtmlHintEnabled,
 	isJsHintEnabled,
-	isTsHintEnabled
 } from "@consts/ConstsConfig";

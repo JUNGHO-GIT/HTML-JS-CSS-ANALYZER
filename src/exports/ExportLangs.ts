@@ -1,52 +1,50 @@
-// exports/ExportLangs.ts
+/**
+ * @file ExportLangs.ts
+ * @since 2025-11-22
+ */
 
-// 1. Css ------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+// 1. CSS ------------------------------------------------------------------------
 export {
-	CssSupport
-} from "@langs/css/cssSupport";
-export {
-	parseSelectors
-} from "@langs/css/cssParser";
-export {
+	CssSupport,
+	parseSelectors,
 	cacheGet,
 	cacheSet,
 	cacheDelete,
 	cacheClear,
-	cacheSize
-} from "@langs/css/cssCache";
+	cacheSize,
+	cacheStats,
+} from "@langs/css/css";
 
-// 2. Html -----------------------------------------------------------------------
+// 2. HTML -----------------------------------------------------------------------
 export {
-	HtmlHintCodeActionProvider
-} from "@langs/html/htmlHintCodeActions";
-
-export {
+	HtmlHintCodeActionProvider,
 	runHtmlHint,
 	getRuleId,
 	getDocumentLine,
 	getHeadMatch,
-	makeQuickFix
-} from "@langs/html/htmlHintRunner";
+	makeQuickFix,
+	loadHtmlHint,
+	loadConfig,
+	clamp,
+	HEAD_TAG_REGEX,
+} from "@langs/html/html";
 
 export type {
 	HtmlHintRule,
 	HtmlHintError,
 	HtmlHintInstance,
-	FixFactory
-} from "@langs/html/htmlHintTypes";
+	FixFactory,
+} from "@langs/html/html";
 
-export {
-	loadHtmlHint,
-	loadConfig,
-	clamp,
-	HEAD_TAG_REGEX
-} from "@langs/html/htmlHintConfig";
-
-// 3. Js -------------------------------------------------------------------------
+// 3. JS -------------------------------------------------------------------------
 export {
 	JSHintCodeActionProvider,
-	runJSHint
-} from "@langs/js/jsHint";
+	runJSHint,
+	analyzeSourceCode,
+	loadJSHint,
+	loadJSHintConfig,
+} from "@langs/js/js";
 
 export type {
 	JSHintError,
@@ -59,15 +57,5 @@ export type {
 	ExportInfo,
 	ComplexityIssue,
 	PotentialBug,
-	AnalyzeResult
-} from "@langs/js/jsHintTypes";
-
-export {
-	loadJSHint,
-	loadJSHintConfig,
-	DEFAULT_JSHINT_CONFIG
-} from "@langs/js/jsHintConfig";
-
-export {
-	analyzeSourceCode
-} from "@langs/js/jsHintAnalyzer";
+	AnalyzeResult,
+} from "@langs/js/js";

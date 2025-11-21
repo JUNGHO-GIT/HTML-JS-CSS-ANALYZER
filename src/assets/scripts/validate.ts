@@ -1,11 +1,14 @@
-// src/configs/validate.ts
+/**
+ * @file validate.ts
+ * @since 2025-11-22
+ */
 
 import { vscode } from "@exportLibs";
 import { SelectorType, type SelectorPos } from "@exportTypes";
 import { logger } from "@exportScripts";
 import { runHtmlHint, runJSHint } from "@exportLangs";
 import { isAnalyzable } from "@exportScripts";
-import { isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled, isTsHintEnabled } from "@exportConsts";
+import { isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled } from "@exportConsts";
 
 // -------------------------------------------------------------------------------------------------
 export interface CssSupportLike {
@@ -14,21 +17,21 @@ export interface CssSupportLike {
 }
 
 // isHtmlDoc -------------------------------------------------------------------------------------
-const isHtmlDoc = (doc: vscode.TextDocument) => /\.html?$/i.test(doc.fileName) || doc.languageId === "html";
+const isHtmlDoc = (doc: vscode.TextDocument) => /\.html?$/i.test(doc.fileName) || doc.languageId === `html`;
 
 // isCssLikeDoc ----------------------------------------------------------------------------------
 const isCssLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
-	return ["css", "scss", "less", "sass"].includes(id) || [".css", ".scss", ".less", ".sass"].some(ext => f.endsWith(ext));
+	return [ `css`, `scss`, `less`, `sass` ].includes(id) || [ `.css`, `.scss`, `.less`, `.sass` ].some(ext => f.endsWith(ext));
 };
 
 // isJsLikeDoc -----------------------------------------------------------------------------------
 const isJsLikeDoc = (doc: vscode.TextDocument) => {
 	const id = doc.languageId;
 	const f = doc.fileName.toLowerCase();
-	const validLanguages = ["javascript", "typescript", "javascriptreact", "typescriptreact"];
-	const validExtensions = [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
+	const validLanguages = [ `javascript`, `typescript`, `javascriptreact`, `typescriptreact` ];
+	const validExtensions = [ `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` ];
 	return validLanguages.includes(id) || validExtensions.some(ext => f.endsWith(ext));
 };
 
@@ -36,12 +39,12 @@ const isJsLikeDoc = (doc: vscode.TextDocument) => {
 // 최적화된 정규표현식 (성능 개선 및 백트래킹 방지)
 const TEMPLATE_LITERAL_REGEX = /\$\{[^}]*\}/g;
 const VALID_CSS_IDENTIFIER_REGEX = /^[_a-zA-Z][-_a-zA-Z0-9]*$/;
-const QUOTE_CHARS = ["'", '"', '`'] as const;
+const QUOTE_CHARS = [ `'`, `"`, `\`` ] as const;
 const BACKSLASH_REGEX = /\\/g;
 
 // -------------------------------------------------------------------------------------------------
 const normalizeToken = (token: string): string => {
-	const normalized = !token ? "" : token.replace(TEMPLATE_LITERAL_REGEX, " ");
+	const normalized = !token ? `` : token.replace(TEMPLATE_LITERAL_REGEX, ` `);
 	const isQuoted = normalized && QUOTE_CHARS.some(quote => normalized.startsWith(quote) && normalized.endsWith(quote));
 	return isQuoted ? normalized.slice(1, -1) : normalized;
 };
@@ -56,7 +59,7 @@ const makeRange = (doc: vscode.TextDocument, startIdx: number, length: number) =
 const collectKnownSelectors = (all: Map<string, SelectorPos[]>) => {
 	const knownClasses = new Set<string>();
 	const knownIds = new Set<string>();
-	[...all.values()].forEach(arr => arr.forEach(s => (s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector)));
+	[ ...all.values() ].forEach(arr => arr.forEach(s => (s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector)));
 	return {knownClasses, knownIds};
 };
 
@@ -106,7 +109,10 @@ const processClassAttribute = (
 			usedClasses.add(normalizedValue);
 		}
 		else {
-			diagnostics.push(new vscode.Diagnostic(makeRange(document, highlightStart, highlightLen), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
+			const d = new vscode.Diagnostic(makeRange(document, highlightStart, highlightLen), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning);
+			d.source = `CSS-Analyzer`;
+			d.code = `CSS001`;
+			diagnostics.push(d);
 		}
 
 		searchOffset = relativeIdx + token.length;
@@ -139,7 +145,10 @@ const processClassListCall = (
 		const baseOffset = match.index! + match[0].indexOf(literalMatch[0]);
 		const innerIdx = literalMatch[0].indexOf(literalMatch[2]);
 		const tokenStart = baseOffset + (innerIdx >= 0 ? innerIdx : 0);
-		diagnostics.push(new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[2].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning));
+		const d = new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[2].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning);
+		d.source = `CSS-Analyzer`;
+		d.code = `CSS001`;
+		diagnostics.push(d);
 	}
 };
 
@@ -207,13 +216,16 @@ const scanDocumentUsages = (
 			classes.forEach(className => {
 				const normalized = normalizeToken(className).trim();
 				normalized && VALID_CSS_IDENTIFIER_REGEX.test(normalized) && (
-					knownClasses.has(normalized) ? usedClassesFromMarkup.add(normalized) : diagnostics.push(
-						new vscode.Diagnostic(
-							makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(className), className.length),
-							`CSS class '${normalized}' not found`,
-							vscode.DiagnosticSeverity.Warning
-						)
-					)
+				knownClasses.has(normalized) ? usedClassesFromMarkup.add(normalized) : (() => {
+					const d = new vscode.Diagnostic(
+						makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(className), className.length),
+						`CSS class '${normalized}' not found`,
+						vscode.DiagnosticSeverity.Warning
+					);
+					d.source = `CSS-Analyzer`;
+					d.code = `CSS001`;
+					diagnostics.push(d);
+				})()
 				);
 			});
 		}
@@ -225,13 +237,16 @@ const scanDocumentUsages = (
 			const matchCopy = idMatch;
 			const idValue = normalizeToken(matchCopy[2]).trim();
 			idValue && VALID_CSS_IDENTIFIER_REGEX.test(idValue) && (
-				knownIds.has(idValue) ? usedIdsFromMarkup.add(idValue) : diagnostics.push(
-					new vscode.Diagnostic(
-						makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(idValue), idValue.length),
-						`CSS id '#${idValue}' not found`,
-						vscode.DiagnosticSeverity.Warning
-					)
-				)
+				knownIds.has(idValue) ? usedIdsFromMarkup.add(idValue) : (() => {
+					const d = new vscode.Diagnostic(
+					makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(idValue), idValue.length),
+					`CSS id '#${idValue}' not found`,
+					vscode.DiagnosticSeverity.Warning
+				);
+				d.source = `CSS-Analyzer`;
+				d.code = `CSS002`;
+				diagnostics.push(d);
+				})()
 			);
 		}
 	});
@@ -245,21 +260,27 @@ const scanDocumentUsages = (
 		const idTok = /(^|[^\\])#((?:\\.|[-_a-zA-Z0-9])+)/g;
 		let m: RegExpExecArray | null;
 		while ((m = clsTok.exec(q))) {
-			const val = m[2].replace(BACKSLASH_REGEX, "");
+			const val = m[2].replace(BACKSLASH_REGEX, ``);
 			val && (
-				knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
-					const start = base + m.index + (m[1] ? 1 : 0) + 1;
-					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				})()
+			knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
+				const start = base + m.index + (m[1] ? 1 : 0) + 1;
+				const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
+				d.source = `CSS-Analyzer`;
+				d.code = `CSS001`;
+				diagnostics.push(d);
+			})()
 			);
 		}
 		while ((m = idTok.exec(q))) {
-			const val = m[2].replace(BACKSLASH_REGEX, "");
+			const val = m[2].replace(BACKSLASH_REGEX, ``);
 			val && (
-				knownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
-					const start = base + m.index + (m[1] ? 1 : 0) + 1;
-					diagnostics.push(new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning));
-				})()
+			knownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
+				const start = base + m.index + (m[1] ? 1 : 0) + 1;
+				const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
+				d.source = `CSS-Analyzer`;
+				d.code = `CSS002`;
+				diagnostics.push(d);
+			})()
 			);
 		}
 	}
@@ -270,10 +291,13 @@ const scanDocumentUsages = (
 		const id = gebi[2];
 		id && (
 			knownIds.has(id) ? usedIdsFromMarkup.add(id) : (() => {
-				const m = gebi[0].match(/(["'])((?:(?!\1)[^"'`])+)\1/);
-				const litLen = m ? m[0].length : id.length + 2;
-				const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
-				diagnostics.push(new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning));
+			const m = gebi[0].match(/(["\''])((?:(?!\1)[^"\'`])+)\1/);
+			const litLen = m ? m[0].length : id.length + 2;
+			const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
+			const d = new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning);
+			d.source = `CSS-Analyzer`;
+			d.code = `CSS002`;
+			diagnostics.push(d);
 			})()
 		);
 	}
@@ -289,59 +313,58 @@ const extractCssBodies = (fullText: string): string => {
 	let inBlockComment = false;
 	let inLineComment = false;
 	let inString = false;
-	let stringChar = '';
+	let stringChar = ``;
 	const bodies: string[] = [];
 
 	for (let i = 0; i < fullText.length; i++) {
 		const ch = fullText[i];
-		const prev = i > 0 ? fullText[i - 1] : '';
-		const next = fullText[i + 1] || '';
+		const prev = i > 0 ? fullText[i - 1] : ``;
 
 		if (inBlockComment) {
-			if (prev === '*' && ch === '/') {
+			if (prev === `*` && ch === `/`) {
 				inBlockComment = false;
 			}
 			continue;
 		}
 
 		if (inLineComment) {
-			if (ch === '\n') {
+			if (ch === `\n`) {
 				inLineComment = false;
 			}
 			continue;
 		}
 
 		if (inString) {
-			if (ch === stringChar && prev !== '\\') {
+			if (ch === stringChar && prev !== `\\`) {
 				inString = false;
 			}
 			continue;
 		}
 
-		if (prev === '/' && ch === '*') {
+		if (prev === `/` && ch === `*`) {
 			inBlockComment = true;
 			continue;
 		}
 
-		if (prev === '/' && ch === '/') {
+		if (prev === `/` && ch === `/`) {
 			inLineComment = true;
 			continue;
 		}
 
-		if (ch === '"' || ch === "'" || ch === '`') {
+		if (ch === `"` || ch === `'` || ch === `\``) {
 			inString = true;
 			stringChar = ch;
 			continue;
 		}
 
 		if (!inBlockComment && !inString && !inLineComment) {
-			if (ch === '{') {
+			if (ch === `{`) {
 				if (depth === 0) {
 					start = i + 1;
 				}
 				depth++;
 			}
-			else if (ch === '}') {
+			else if (ch === `}`) {
 				depth--;
 				if (depth === 0 && start >= 0) {
 					bodies.push(fullText.slice(start, i));
@@ -351,7 +374,7 @@ const extractCssBodies = (fullText: string): string => {
 		}
 	}
 
-	return bodies.join('\n');
+	return bodies.join(`\n`);
 };
 
 // scanLocalUnused -----------------------------------------------------------------------
@@ -364,11 +387,11 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 	let m: RegExpExecArray | null;
 	const clsUse = /(^|[^\\])\.((?:\\.|[-_a-zA-Z0-9])+)/g;
 	while ((m = clsUse.exec(bodyOnly))) {
-		usedClasses.add(m[2].replace(BACKSLASH_REGEX, ""));
+		usedClasses.add(m[2].replace(BACKSLASH_REGEX, ``));
 	}
 	const idUse = /(^|[^\\])#((?:\\.|[-_a-zA-Z0-9])+)/g;
 	while ((m = idUse.exec(bodyOnly))) {
-		usedIds.add(m[2].replace(BACKSLASH_REGEX, ""));
+		usedIds.add(m[2].replace(BACKSLASH_REGEX, ``));
 	}
 	for (const s of sels) {
 		const used = s.type === SelectorType.CLASS ? usedClasses.has(s.selector) : usedIds.has(s.selector);
@@ -377,8 +400,10 @@ const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupportLike
 			const base = doc.positionAt(s.index);
 			const start = base.translate(0, symbolOffset);
 			const end = start.translate(0, s.selector.length);
-			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? "." : "#") + s.selector}'`, vscode.DiagnosticSeverity.Warning);
-			d.tags = [vscode.DiagnosticTag.Unnecessary];
+			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? `.` : `#`) + s.selector}'`, vscode.DiagnosticSeverity.Warning);
+			d.source = `CSS-Analyzer`;
+			d.code = `CSS003`;
+			d.tags = [ vscode.DiagnosticTag.Unnecessary ];
 			diagnostics.push(d);
 		})();
 	}
@@ -396,8 +421,10 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 			const base = doc.positionAt(s.index);
 			const start = base.translate(0, symbolOffset);
 			const end = start.translate(0, s.selector.length);
-			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? "." : "#") + s.selector}'`, vscode.DiagnosticSeverity.Warning);
-			d.tags = [vscode.DiagnosticTag.Unnecessary];
+			const d = new vscode.Diagnostic(new vscode.Range(start, end), `Unused CSS selector '${(s.type === SelectorType.CLASS ? `.` : `#`) + s.selector}'`, vscode.DiagnosticSeverity.Warning);
+			d.source = `CSS-Analyzer`;
+			d.code = `CSS003`;
+			d.tags = [ vscode.DiagnosticTag.Unnecessary ];
 			diagnostics.push(d);
 		})();
 	}
@@ -413,9 +440,10 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 		const fullText = doc.getText();
 		const isHtml = isHtmlDoc(doc);
 
-		const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = scanDocumentUsages(fullText, doc, knownClasses, knownIds);
+	const shouldCheckCssUsage = isCssHintEnabled(doc.uri);
+	const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = shouldCheckCssUsage ? scanDocumentUsages(fullText, doc, knownClasses, knownIds) : {diagnostics: [], usedClassesFromMarkup: new Set<string>(), usedIdsFromMarkup: new Set<string>()};
 		let unusedDiagnostics: vscode.Diagnostic[] = [];
-		let lintDiagnostics: vscode.Diagnostic[] = [];
+		const lintDiagnostics: vscode.Diagnostic[] = [];
 
 		isCssLikeDoc(doc) && isCssHintEnabled(doc.uri) && (unusedDiagnostics = await scanLocalUnused(doc, support, fullText));
 
@@ -433,14 +461,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 		);
 
 		isJsLikeDoc(doc) && (() => {
-			const fileName = doc.fileName.toLowerCase();
-			const isTypeScript = (
-				fileName.endsWith('.ts') ||
-				fileName.endsWith('.tsx') ||
-				doc.languageId === "typescript" ||
-				doc.languageId === "typescriptreact"
-			);
-			const shouldLint = isTypeScript ? isTsHintEnabled(doc.uri) : isJsHintEnabled(doc.uri);
+			const shouldLint = isJsHintEnabled(doc.uri);
 
 			shouldLint && (() => {
 				try {
@@ -453,6 +474,6 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 			})();
 		})();
 
-		return [...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics];
+		return [ ...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics ];
 	})();
 };
