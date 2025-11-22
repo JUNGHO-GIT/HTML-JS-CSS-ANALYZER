@@ -9,7 +9,7 @@ import { vscode } from "@exportLibs";
 const AUTO_CLOSE_MS = 1000;
 
 // -------------------------------------------------------------------------------------------------
-const fnShowProgress = async (text: string): Promise<void> => {
+const showProgress = async (text: string): Promise<void> => {
 	await vscode.window.withProgress({
 		location: vscode.ProgressLocation.Notification,
 		title: text,
@@ -22,20 +22,46 @@ const fnShowProgress = async (text: string): Promise<void> => {
 
 // -------------------------------------------------------------------------------------------------
 export const notify = (
-	type: `debug` | `info` | `warn` | `error`,
-	key: string,
+	type: `debug` | `info` | `hint` | `warn` | `error`,
 	value: string
 ): void => {
-	const text = `[Html-Js-Css-Analyzer] [${key}] ${value}`;
-	type === `debug` || type === `info` ? (
-		void fnShowProgress(text)
-	) : type === `warn` ? (
+	const config = {
+		title: {
+			str: `[Html-Js-Css-Analyzer]`,
+		},
+		debug: {
+			str: `[DEBUG]`,
+		},
+		info: {
+			str: `[INFO]`,
+		},
+		hint: {
+			str: `[HINT]`,
+		},
+		warn: {
+			str: `[WARN]`,
+		},
+		error: {
+			str: `[ERROR]`,
+		},
+	};
+	const text = `${config.title.str} ${config[type].str} ${value}`;
+
+	type === `debug` && (
+		void showProgress(text)
+	);
+	type === `info` && (
+		void showProgress(text)
+	);
+	type === `hint` && (
+		void showProgress(text)
+	);
+	type === `warn` && (
 		vscode.window.showWarningMessage(text, { modal: false }),
-		void fnShowProgress(text)
-	) : type === `error` ? (
+		void showProgress(text)
+	);
+	type === `error` && (
 		vscode.window.showErrorMessage(text, { modal: false }),
-		void fnShowProgress(text)
-	) : (
-		void 0
+		void showProgress(text)
 	);
 };

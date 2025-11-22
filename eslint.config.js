@@ -1,9 +1,9 @@
-// @ts-nocheck
 /**
  * @file eslint.config.js
  * @since 2025-11-22
  */
 
+// @ts-nocheck
 import { defineConfig } from "eslint/config";
 import js from "@eslint/js";
 import tseslint from "@typescript-eslint/eslint-plugin";
@@ -1288,6 +1288,218 @@ const BASE_RULES = {
 	]
 };
 
+// TS 전용: @typescript-eslint 규칙 --------------------------------------------------
+// TypeScript 전용/타입 기반 검사 및 스타일 규칙 세트
+const TS_RULES = {
+	"@typescript-eslint/adjacent-overload-signatures": [
+		"error"
+	],
+	"@typescript-eslint/array-type": [
+		"warn"
+	],
+	"@typescript-eslint/await-thenable": [
+		"error"
+	],
+	"@typescript-eslint/ban-ts-comment": [
+		"error"
+	],
+	"@typescript-eslint/ban-tslint-comment": [
+		"warn"
+	],
+	"@typescript-eslint/class-literal-property-style": [
+		"off"
+	],
+	"@typescript-eslint/consistent-generic-constructors": [
+		"off"
+	],
+	"@typescript-eslint/consistent-indexed-object-style": [
+		"warn"
+	],
+	"@typescript-eslint/consistent-type-assertions": [
+		"error"
+	],
+	"@typescript-eslint/consistent-type-definitions": [
+		"warn"
+	],
+	"@typescript-eslint/consistent-type-exports": [
+		"off"
+	],
+	"@typescript-eslint/consistent-type-imports": [
+		"error"
+	],
+	"@typescript-eslint/explicit-function-return-type": [
+		"off"
+	],
+	"@typescript-eslint/explicit-member-accessibility": [
+		"off"
+	],
+	"@typescript-eslint/member-ordering": [
+		"off"
+	],
+	"@typescript-eslint/method-signature-style": [
+		"warn"
+	],
+	"@typescript-eslint/naming-convention": [
+		"off"
+	],
+	"@typescript-eslint/no-array-constructor": [
+		"error"
+	],
+	"@typescript-eslint/no-confusing-non-null-assertion": [
+		"error"
+	],
+	"@typescript-eslint/no-confusing-void-expression": [
+		"error"
+	],
+	"@typescript-eslint/no-duplicate-enum-values": [
+		"error"
+	],
+	"@typescript-eslint/no-duplicate-type-constituents": [
+		"error"
+	],
+	"@typescript-eslint/no-explicit-any": [
+		"warn"
+	],
+	"@typescript-eslint/no-extra-non-null-assertion": [
+		"error"
+	],
+	"@typescript-eslint/no-floating-promises": [
+		"error"
+	],
+	"@typescript-eslint/no-for-in-array": [
+		"error"
+	],
+	"@typescript-eslint/no-inferrable-types": [
+		"off"
+	],
+	"@typescript-eslint/no-invalid-this": [
+		"error"
+	],
+	"@typescript-eslint/no-misused-new": [
+		"error"
+	],
+	"@typescript-eslint/no-misused-promises": [
+		"error"
+	],
+	"@typescript-eslint/no-namespace": [
+		"error"
+	],
+	"@typescript-eslint/no-non-null-asserted-nullish-coalescing": [
+		"error"
+	],
+	"@typescript-eslint/no-non-null-asserted-optional-chain": [
+		"error"
+	],
+	"@typescript-eslint/no-non-null-assertion": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-boolean-literal-compare": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-condition": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-parameter-property-assignment": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-qualifier": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-template-expression": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-type-assertion": [
+		"warn"
+	],
+	"@typescript-eslint/no-unnecessary-type-constraint": [
+		"warn"
+	],
+	"@typescript-eslint/no-unsafe-argument": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-assignment": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-call": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-declaration-merging": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-enum-comparison": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-function-type": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-member-access": [
+		"error"
+	],
+	"@typescript-eslint/no-unsafe-return": [
+		"error"
+	],
+	"@typescript-eslint/no-unused-expressions": [
+		"off"
+	],
+	"@typescript-eslint/non-nullable-type-assertion-style": [
+		"off"
+	],
+	"@typescript-eslint/prefer-as-const": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-enum-initializers": [
+		"off"
+	],
+	"@typescript-eslint/prefer-for-of": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-includes": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-nullish-coalescing": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-optional-chain": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-reduce-type-parameter": [
+		"warn"
+	],
+	"@typescript-eslint/prefer-regexp-exec": [
+		"off"
+	],
+	"@typescript-eslint/prefer-return-this-type": [
+		"off"
+	],
+	"@typescript-eslint/prefer-string-starts-ends-with": [
+		"off"
+	],
+	"@typescript-eslint/promise-function-async": [
+		"off"
+	],
+	"@typescript-eslint/require-await": [
+		"off"
+	],
+	"@typescript-eslint/restrict-plus-operands": [
+		"error"
+	],
+	"@typescript-eslint/restrict-template-expressions": [
+		"warn"
+	],
+	"@typescript-eslint/strict-boolean-expressions": [
+		"warn"
+	],
+	"@typescript-eslint/switch-exhaustiveness-check": [
+		"error"
+	],
+	"@typescript-eslint/unbound-method": [
+		"error"
+	],
+	"@typescript-eslint/unified-signatures": [
+		"warn"
+	]
+};
+
 // 최종 export: 프로젝트 전체 설정 --------------------------------------------------
 export default defineConfig([
 	// 0. global ------------------------------------------------------------------
@@ -1340,64 +1552,10 @@ export default defineConfig([
 		},
 		"rules": {
 			...BASE_RULES,
-			...tseslint.configs.recommended.rules
+			...tseslint.configs.recommended.rules,
+			...TS_RULES
 		},
 		// 플러그인별 커스텀 설정 자리
 		"settings": {}
-	},
-
-	// 2. node-scripts ------------------------------------------------------------
-	{
-		// 설정 블록 이름
-		"name": "node-scripts",
-		// 대상 파일: Node 전용 스크립트
-		"files": [
-			"**/*.cjs",
-			"scripts/**/*.{js,cjs,mjs}"
-		],
-		// Node 용 언어 옵션 (CommonJS + Node globals)
-		"languageOptions": {
-			"ecmaVersion": "latest",
-			"sourceType": "commonjs",
-			"globals": {
-				...globals.node
-			}
-		},
-		// Node 스크립트 전용 규칙 오버라이드
-		"rules": {
-			"no-console": [
-				"off"
-			],
-			"no-process-exit": [
-				"off"
-			]
-		}
-	},
-
-	// 3. test-files --------------------------------------------------------------
-	{
-		// 테스트 코드 전용 설정
-		"name": "test-files",
-		"files": [
-			"**/*.{test,spec}.{js,jsx,ts,tsx}",
-			"**/__tests__/**/*.{js,jsx,ts,tsx}"
-		],
-		"languageOptions": {
-			...COMMON_LANGUAGE_OPTIONS_ESM,
-			"globals": {
-				...COMMON_LANGUAGE_OPTIONS_ESM.globals,
-				...globals.jest
-			}
-		},
-		"rules": {
-			// 테스트에서는 console 허용
-			"no-console": [
-				"off"
-			],
-			// expect(...) 식 사용 허용
-			"no-unused-expressions": [
-				"off"
-			]
-		}
 	}
 ]);

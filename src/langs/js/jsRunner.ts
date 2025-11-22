@@ -219,11 +219,11 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 	const jsHint = getJSHint();
 
 	return !jsHint ? (
-		logger(`warn`, `JSHint`, `module not loaded - JSHint is optional`),
+		logger(`warn`, `module not loaded - JSHint is optional`),
 		[]
 	) : (() => {
 		try {
-			logger(`debug`, `JSHint`, `starting analysis for: ${document.fileName} (languageId: ${document.languageId})`);
+			logger(`debug`, `starting analysis for: ${document.fileName} (languageId: ${document.languageId})`);
 
 			const config = { ...loadJSHintConfig(document.uri.fsPath) };
 			const fileName = document.fileName.toLowerCase();
@@ -257,21 +257,21 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 				config.esversion = Math.max(config.esversion || 6, 6)
 			);
 
-			const { processedCode, analysis } = analyzeSourceCode(sourceText, document);
+			const {processedCode, analysis} = analyzeSourceCode(sourceText, document);
 
-			logger(`debug`, `JSHint`, `analysis started: ${document.fileName}`);
+			logger(`debug`, `analysis started: ${document.fileName}`);
 
 			const isValid = jsHint.JSHINT(processedCode, config);
 
 			return isValid ? (
-				logger(`debug`, `JSHint`, `analysis completed: no errors (${document.fileName})`),
+				logger(`debug`, `analysis completed: no errors (${document.fileName})`),
 				[]
 			) : (() => {
 				const dataMethod = (jsHint as any).data || (jsHint.JSHINT as any)?.data;
 				const hasDataMethod = typeof dataMethod === `function`;
 
 				return !hasDataMethod ? (
-					logger(`error`, `JSHint`, `data() method not available in JSHint instance`),
+					logger(`error`, `data() method not available in JSHint instance`),
 					[]
 				) : (() => {
 					const result = dataMethod.call(jsHint.JSHINT || jsHint);
@@ -314,17 +314,15 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 							);
 						}
 
-						logger(`debug`, `JSHint`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
-					}
-
-					const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
+						logger(`debug`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
+					}					const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
 					diagnostics.push(...additionalDiagnostics);
 
 					const totalIssues = diagnostics.length;
 					const additionalIssues = additionalDiagnostics.length;
 
-					additionalIssues > 0 && logger(`debug`, `Additional`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
-					logger(`debug`, `Complete`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
+					additionalIssues > 0 && logger(`debug`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
+					logger(`debug`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
 
 					return diagnostics;
 				})();
@@ -333,8 +331,8 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 		catch (error: any) {
 			const errorMessage = error?.message || String(error);
 			const errorStack = error?.stack || ``;
-			logger(`error`, `JSHint`, `execution error: ${errorMessage} (${document.fileName})`);
-			errorStack && logger(`debug`, `JSHint`, `stack trace: ${errorStack}`);
+			logger(`error`, `execution error: ${errorMessage} (${document.fileName})`);
+			errorStack && logger(`debug`, `stack trace: ${errorStack}`);
 			return [];
 		}
 	})();

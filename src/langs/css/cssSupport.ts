@@ -14,8 +14,6 @@ import { isUriExcludedByGlob, isAnalyzable, logger, validateDocument, withPerfor
 const ZERO_POSITION = new vscode.Position(0, 0);
 const REMOTE_URL_REGEX = /^https?:\/\//i;
 const WORD_RANGE_REGEX = /[_a-zA-Z0-9-]+/;
-
-// 성능 최적화된 정규식 (비탐욕적 매칭, 백트래킹 방지)
 const COMPLETION_CONTEXT_REGEX = /(?:(?:id|class|className|[.#])\s*[=:]?\s*["'`]?[^\n]*|classList\.(?:add|remove|toggle|contains|replace)\s*\([^)]*|querySelector(?:All)?\s*\(\s*["'`][^)]*|getElementById\s*\(\s*["'][^)]*)$/i;
 const LINK_STYLESHEET_REGEX = /<link\s+[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>/gi;
 const HREF_ATTRIBUTE_REGEX = /\bhref\s*=\s*(["'])([^"']+)\1/i;
@@ -25,7 +23,7 @@ interface FetchResponse {
 	ok: boolean;
 	status?: number;
 	statusText?: string;
-	text(): Promise<string>;
+	text: () => Promise<string>;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -42,7 +40,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	private fnFetchWithNativeFetch = async (url: string): Promise<string> => {
 		const response = await (globalThis as any).fetch(url) as FetchResponse;
 
-		if (!response?.ok) {
+		if (!response.ok) {
 			const statusInfo = response?.statusText || `HTTP ${response?.status || `unknown`}`;
 			throw new Error(statusInfo);
 		}
@@ -60,8 +58,8 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				const status = response.statusCode || 0;
 
 				// follow redirects
-				if (status >= 300 && status < 400 && response.headers && response.headers.location) {
-					const location = response.headers.location as string;
+				if (status >= 300 && status < 400 && response.headers?.location) {
+					const location = response.headers.location;
 					if (redirectsRemaining > 0) {
 						try {
 							// resolve relative locations against original url
@@ -94,7 +92,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				});
 			});
 
-			request.on(`error`, (err: Error) => reject(err));
+			request.on(`error`, (err: Error) => { reject(err); });
 			request.setTimeout && request.setTimeout(REQUEST_TIMEOUT_MS, () => {
 				try {
 					request.abort();
@@ -120,7 +118,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (error: any) {
 			const errorMessage = error?.message || String(error);
-			logger(`error`, `CSS`, `file fetch failed (${url}): ${errorMessage}`);
+			logger(`error`, `file fetch failed (${url}): ${errorMessage}`);
 			return ``;
 		}
 	};
@@ -142,7 +140,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		const key = doc.uri.toString();
 		const ver = doc.version;
 		const cached = cacheGet(key);
-		return (cached && cached.version === ver) ? cached.data : (async () => {
+		return (cached?.version === ver) ? cached.data : (async () => {
 			const txt = doc.getText();
 			let data: SelectorPos[] = [];
 			const isHtml = /\.html?$/i.test(doc.fileName) || doc.languageId === `html`;
@@ -175,7 +173,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 					}
 				}
 
-				logger(`debug`, `Embedded`, `style selectors: ${data.length} found`);
+				logger(`debug`, `style selectors: ${data.length} found`);
 			}
 			else {
 				data = parseSelectors(txt);
@@ -232,16 +230,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 							map.set(vscode.Uri.file(targetPath).toString(), sels);
 						}
 						catch (e: any) {
-							logger(`error`, `Linked stylesheet`, `read failed: ${href} -> ${e?.message || e}`);
+							logger(`error`, `read failed: ${href} -> ${e?.message || e}`);
 						}
 					}
 				}
 			}
 			catch (e: any) {
-				logger(`error`, `Linked stylesheet`, `parsing error: ${href} -> ${e?.message || e}`);
+				logger(`error`, `parsing error: ${href} -> ${e?.message || e}`);
 			}
 		}
-		logger(`debug`, `Linked stylesheet`, `parsing: ${map.size} entries found for ${doc.fileName}`);
+		logger(`debug`, `parsing: ${map.size} entries found for ${doc.fileName}`);
 		return map;
 	};
 
@@ -278,7 +276,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 				}
 			}
 
-			logger(`debug`, `Styles`, `collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
+			logger(`debug`, `collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
 
 			return styleMap;
 		})();
@@ -302,13 +300,13 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			return (cached && cached.version === stat.mtimeMs) ? cached.data : (async () => {
 				const MAX_FILE_SIZE = 2 * 1024 * 1024;
 				return stat.size > MAX_FILE_SIZE ? (
-					logger(`debug`, `Large CSS`, `file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
+					logger(`debug`, `file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
 					[]
 				) : (async () => {
 					const content = await fs.promises.readFile(fsPath, `utf8`);
 					const MAX_CONTENT_LENGTH = 500000;
 					return content.length > MAX_CONTENT_LENGTH ? (
-						logger(`debug`, `Large CSS`, `content sampled: ${fsPath}`),
+						logger(`debug`, `content sampled: ${fsPath}`),
 						(() => {
 							const parsed = parseSelectors(content.substring(0, MAX_CONTENT_LENGTH));
 							cacheSet(key, {version: stat.mtimeMs, data: parsed});
@@ -324,10 +322,10 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		}
 		catch (e: any) {
 			return (e?.code === `ENOMEM` || e?.message?.includes(`out of memory`)) ? (
-				logger(`error`, `Memory`, `limit reached processing: ${fsPath}`),
+				logger(`error`, `limit reached processing: ${fsPath}`),
 				[]
 			) : (
-				logger(`error`, `Selector`, `read from file failed: ${fsPath} -> ${e?.message || e}`),
+				logger(`error`, `read from file failed: ${fsPath} -> ${e?.message || e}`),
 				[]
 			);
 		}
@@ -357,7 +355,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 					!styleMap.has(k) && styleMap.set(k, await this.fnReadSelectorsFromFsPath(filePath));
 				}
 				catch (e: any) {
-					logger(`error`, `CSS file`, `read failed: ${filePath} -> ${e?.message || e}`);
+					logger(`error`, `read failed: ${filePath} -> ${e?.message || e}`);
 				}
 			}
 		);
@@ -435,7 +433,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						locations.push(location);
 					}
 					catch (e: any) {
-						logger(`error`, `Definition`, `location parse failed: ${uriString} -> ${e?.message || e}`);
+						logger(`error`, `location parse failed: ${uriString} -> ${e?.message || e}`);
 					}
 				}
 			}
@@ -474,7 +472,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			const patterns = unique.map(e => `**/*.${e}`);
 			for (const glob of patterns) {
 				if (collected.length >= MAX) {
-					logger(`debug`, `Workspace CSS`, `file limit reached (${MAX} files), remaining files ignored`);
+					logger(`debug`, `file limit reached (${MAX} files), remaining files ignored`);
 					break;
 				}
 				const include = new vscode.RelativePattern(folder, glob);
@@ -487,16 +485,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						collected.push(uri.fsPath);
 					}
 					if (collected.length >= MAX) {
-						logger(`debug`, `Workspace CSS`, `file limit reached (${MAX} files), remaining files ignored`);
+						logger(`debug`, `file limit reached (${MAX} files), remaining files ignored`);
 						break;
 					}
 				}
 			}
 		}
 		catch (e: any) {
-			logger(`error`, `Workspace CSS`, `file check error: ${e?.message || e}`);
+			logger(`error`, `file check error: ${e?.message || e}`);
 		}
-		logger(`debug`, `Workspace CSS`, `files collected: ${collected.length} items`);
+		logger(`debug`, `files collected: ${collected.length} items`);
 		workspaceCssFiles = collected;
 	};
 }

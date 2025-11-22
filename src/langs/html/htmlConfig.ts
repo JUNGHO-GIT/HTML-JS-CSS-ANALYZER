@@ -24,7 +24,7 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
 	}
 	catch (error: any) {
 		const msg = error?.message || String(error);
-		logger(`debug`, `HTMLHint`, `module not loaded (optional): ${msg}`);
+		logger(`debug`, `module not loaded (optional): ${msg}`);
 		result = null;
 	}
 
@@ -46,8 +46,8 @@ export const loadConfig = (filePath: string): any => {
 						const json = fs.readFileSync(fullpath, `utf8`);
 						return JSON.parse(json);
 					}
-					catch (e: any) {
-						logger(`error`, `HTMLHint config`, `file parsing error: ${fullpath} -> ${e?.message || e}`);
+				catch (e: any) {
+					logger(`error`, `file parsing error: ${fullpath} -> ${e?.message || e}`);
 						return {};
 					}
 				}

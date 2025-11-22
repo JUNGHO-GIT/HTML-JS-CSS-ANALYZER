@@ -1,9 +1,12 @@
-// git.cjs
+/**
+ * @file git.cjs
+ * @since 2025-11-22
+ */
 
 const os = require('os');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const { logger } = require(`./bundle.cjs`);
+const { logger } = require(`./utils.cjs`);
 
 // 인자 파싱 ------------------------------------------------------------------------------------
 const TITLE = `git.cjs`;

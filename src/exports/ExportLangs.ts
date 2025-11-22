@@ -3,10 +3,8 @@
  * @since 2025-11-22
  */
 
-// -------------------------------------------------------------------------------------------------
 // 1. CSS ------------------------------------------------------------------------
 export {
-	CssSupport,
 	parseSelectors,
 	cacheGet,
 	cacheSet,
@@ -16,9 +14,12 @@ export {
 	cacheStats,
 } from "@langs/css/css";
 
+export {
+	CssSupport,
+} from "@langs/css/css";
+
 // 2. HTML -----------------------------------------------------------------------
 export {
-	HtmlHintCodeActionProvider,
 	runHtmlHint,
 	getRuleId,
 	getDocumentLine,
@@ -30,6 +31,10 @@ export {
 	HEAD_TAG_REGEX,
 } from "@langs/html/html";
 
+export {
+	HtmlHintCodeActionProvider,
+} from "@langs/html/html";
+
 export type {
 	HtmlHintRule,
 	HtmlHintError,
@@ -39,11 +44,14 @@ export type {
 
 // 3. JS -------------------------------------------------------------------------
 export {
-	JSHintCodeActionProvider,
 	runJSHint,
 	analyzeSourceCode,
 	loadJSHint,
 	loadJSHintConfig,
+} from "@langs/js/js";
+
+export {
+	JSHintCodeActionProvider,
 } from "@langs/js/js";
 
 export type {

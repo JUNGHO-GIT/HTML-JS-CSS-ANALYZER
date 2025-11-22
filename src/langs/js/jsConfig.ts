@@ -3,7 +3,7 @@
  * @since 2025-11-22
  */
 
-import { path, fs, createRequire } from "@exportLibs";
+import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { JSHintInstance } from "@exportLangs";
 
@@ -116,29 +116,65 @@ export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
 export const loadJSHint = (): JSHintInstance | null => {
 	let result: JSHintInstance | null = null;
 
-	try {
-		const requireFn = createRequire(FALLBACK_META_URL);
-		const jsHinthintModule = requireFn(`jshint`);
-
+	const fnValidate = (mod: any): JSHintInstance | null => {
 		const isValid = (
-			jsHinthintModule &&
-			jsHinthintModule.JSHINT &&
-			typeof jsHinthintModule.JSHINT === `function` &&
-			typeof jsHinthintModule.JSHINT.data === `function`
+			mod?.JSHINT &&
+			typeof mod.JSHINT === `function` &&
+			typeof mod.JSHINT.data === `function`
 		);
+		return isValid ? mod : null;
+	};
 
-		isValid ? (
-			logger(`debug`, `JSHint`, `module loaded successfully`)
-		) : (
-			logger(`warn`, `JSHint`, `module loaded but JSHINT.data not available`)
-		);
-
-		result = isValid ? jsHinthintModule : null;
+	try {
+		const primaryReq = createRequire(FALLBACK_META_URL);
+		result = fnValidate(primaryReq(`jshint`));
+		if (result) {
+			logger(`debug`, `module loaded successfully (primary)`);
+		}
+		else {
+			logger(`warn`, `primary load succeeded but validation failed`);
+		}
 	}
-	catch (error: any) {
-		const errorMessage = error?.message || String(error);
-		logger(`debug`, `JSHint`, `not loaded (optional): ${errorMessage}`);
-		result = null;
+	catch (e: any) {
+		logger(`debug`, `primary load failed: ${e?.message || e}`);
+	}
+
+	if (!result) {
+		const candidates: string[] = [];
+		try {
+			const extDir = path.resolve(__dirname, `..`, `..`);
+			candidates.push(extDir);
+		}
+		catch {}
+		candidates.push(process.cwd());
+		if (vscode.workspace.workspaceFolders) {
+			for (const f of vscode.workspace.workspaceFolders) {
+				candidates.push(f.uri.fsPath);
+			}
+		}
+		for (const base of candidates) {
+			if (result) {
+				break;
+			}
+			try {
+				const req = createRequire(path.join(base, `index.js`));
+				const mod = fnValidate(req(`jshint`));
+				if (mod) {
+					result = mod;
+					logger(`debug`, `module loaded successfully (fallback: ${base})`);
+				}
+				else {
+					logger(`warn`, `fallback validation failed: ${base}`);
+				}
+			}
+			catch (e: any) {
+				logger(`debug`, `fallback load failed: ${base} -> ${e?.message || e}`);
+			}
+		}
+	}
+
+	if (!result) {
+		logger(`warn`, `module not loaded - JSHint is optional; install with 'npm install jshint' or ensure packaging includes dependency`);
 	}
 
 	return result;
@@ -171,7 +207,7 @@ const parseConfigValue = (value: string): any => {
 									}
 								})() :
 										(trimmed.startsWith(`"`) && trimmed.endsWith(`"`)) ||
-	(trimmed.startsWith(`'`) && trimmed.endsWith(`'`)) ? trimmed.slice(1, -1) :
+										(trimmed.startsWith(`'`) && trimmed.endsWith(`'`)) ? trimmed.slice(1, -1) :
 											trimmed;
 
 	return trimmed;
@@ -198,7 +234,7 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
 					config = JSON.parse(moduleExportsMatch[1]);
 				}
 				catch {
-					logger(`error`, `JSHint`, `JS config parsing failed - module.exports format`);
+					logger(`error`, `JS config parsing failed - module.exports format`);
 				}
 			}
 		})();
@@ -216,7 +252,7 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
 		return { ...DEFAULT_JSHINT_CONFIG, ...config };
 	}
 	catch (error: any) {
-		logger(`error`, `JSHint`, `JS config file parsing failed: ${error?.message || error}`);
+		logger(`error`, `JS config file parsing failed: ${error?.message || error}`);
 		return DEFAULT_JSHINT_CONFIG;
 	}
 };
@@ -252,7 +288,7 @@ const parseJSHintConfigGeneric = (configContent: string): Record<string, any> =>
 		return { ...DEFAULT_JSHINT_CONFIG, ...config };
 	}
 	catch (error: any) {
-		logger(`error`, `Generic config`, `file parsing failed: ${error?.message || error}`);
+		logger(`error`, `file parsing failed: ${error?.message || error}`);
 		return DEFAULT_JSHINT_CONFIG;
 	}
 };
@@ -287,7 +323,7 @@ export const loadJSHintConfig = (filePath: string): Record<string, any> => {
 						);
 					}
 					catch (parseError: any) {
-						logger(`error`, `JSHint config`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
+						logger(`error`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
 						return DEFAULT_JSHINT_CONFIG;
 					}
 				})();
@@ -306,7 +342,7 @@ export const loadJSHintConfig = (filePath: string): Record<string, any> => {
 		}
 	}
 	catch (error: any) {
-		logger(`debug`, `JSHint config`, `search error: ${error?.message || error}`);
+		logger(`debug`, `search error: ${error?.message || error}`);
 	}
 
 	return DEFAULT_JSHINT_CONFIG;

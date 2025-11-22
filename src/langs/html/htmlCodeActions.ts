@@ -524,7 +524,7 @@ export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
 					act && list.push(act);
 				}
 				catch (e: any) {
-					logger(`error`, `HTMLHint`, `code action error: ${e?.message || e}`);
+					logger(`error`, `code action error: ${e?.message || e}`);
 				}
 			}
 		}

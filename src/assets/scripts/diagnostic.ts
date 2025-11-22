@@ -5,7 +5,8 @@
 
 import { vscode } from "@exportLibs";
 import { AutoValidationMode } from "@exportTypes";
-import { CssSupport, cacheClear, cacheDelete, cacheSize } from "@exportLangs";
+import { cacheClear, cacheDelete, cacheSize } from "@exportLangs";
+import { CssSupport } from "@exportLangs";
 import { isAnalyzable } from "@exportScripts";
 import { logger } from "@exportScripts";
 
@@ -95,16 +96,16 @@ class DiagnosticManager {
 							const htmlHintDiagnostics = result.filter(d => d.source === `HTMLHint`);
 							const jsHintDiagnostics = result.filter(d => d.source === `JSHint`);
 							this.cssCollection.set(document.uri, cssDiagnostics);
-							this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
-							this.jsHintCollection.set(document.uri, jsHintDiagnostics);
-							this.lastValidatedVersions.set(documentKey, document.version);
-							logger(`debug`, `Diagnostics`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
+					this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
+					this.jsHintCollection.set(document.uri, jsHintDiagnostics);
+					this.lastValidatedVersions.set(documentKey, document.version);
+					logger(`debug`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
 						})()
 					);
 				}
-				catch (error: any) {
-					const errorMessage = error?.stack || error?.message || String(error);
-					logger(`error`, `Diagnostic`, `update error: ${errorMessage}`);
+			catch (error: any) {
+				const errorMessage = error?.stack || error?.message || String(error);
+				logger(`error`, `update error: ${errorMessage}`);
 				}
 			})()
 		);

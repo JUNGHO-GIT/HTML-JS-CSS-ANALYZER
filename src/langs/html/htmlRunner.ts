@@ -101,7 +101,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 			return diags;
 		}
 		catch (e: any) {
-			logger(`error`, `HTMLHint`, `execution error: ${e?.message || e}`);
+			logger(`error`, `execution error: ${e?.message || e}`);
 			return [];
 		}
 	})();

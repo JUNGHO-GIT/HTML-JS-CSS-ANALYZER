@@ -434,7 +434,7 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 // validateDocument (성능 최적화 및 메모리 효율 개선) -------------------------------------------
 export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
 	return !isAnalyzable(doc) ? [] : (async () => {
-		logger(`debug`, `Validation`, `started: ${doc.fileName}`);
+		logger(`debug`, `started: ${doc.fileName}`);
 		const allStyles = await support.getStyles(doc);
 		const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
 		const fullText = doc.getText();
@@ -455,7 +455,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 					lintDiagnostics.push(...htmlHintDiagnostics);
 				}
 				catch (e: any) {
-					logger(`error`, `HTMLHint`, `merge error: ${e?.message || e} in ${doc.fileName}`);
+					logger(`error`, `merge error: ${e?.message || e} in ${doc.fileName}`);
 				}
 			})()
 		);
@@ -469,7 +469,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 					lintDiagnostics.push(...jsDiagnostics);
 				}
 				catch (e: any) {
-					logger(`error`, `JSHint`, `merge error: ${e?.message || e} in ${doc.fileName}`);
+					logger(`error`, `merge error: ${e?.message || e} in ${doc.fileName}`);
 				}
 			})();
 		})();

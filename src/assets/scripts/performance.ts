@@ -21,12 +21,12 @@ export const performanceMonitor = () => {
 				const metric = this.metrics.get(key);
 				const rs = !metric ? -1 : (() => {
 					const duration = performance.now() - metric.startTime;
-					const formattedDuration = Math.round(duration * 100) / 100;
-					duration > 500 ? (
-						logger(`debug`, `Performance`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`)
-					) : duration > 100 ? (
-						logger(`debug`, `Performance`, `Timing: ${metric.operationName} took ${formattedDuration}ms`)
-					) : (
+				const formattedDuration = Math.round(duration * 100) / 100;
+				duration > 500 ? (
+					logger(`debug`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`)
+				) : duration > 100 ? (
+					logger(`debug`, `Timing: ${metric.operationName} took ${formattedDuration}ms`)
+				) : (
 						void 0
 					);
 					this.metrics.delete(key);
@@ -35,11 +35,11 @@ export const performanceMonitor = () => {
 				return rs;
 			},
 			checkMemoryUsage(): void {
-				(global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
-				const usage = process.memoryUsage();
-				const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100;
-				const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100;
-				heapUsedMB > 100 && logger(`debug`, `Performance`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
+			(global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
+			const usage = process.memoryUsage();
+			const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100;
+			const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100;
+			heapUsedMB > 100 && logger(`debug`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
 			},
 			cleanup(): void {
 				this.metrics.clear();
