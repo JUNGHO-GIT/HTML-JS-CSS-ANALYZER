@@ -14,5 +14,5 @@ export {
 	getLogLevel,
 	isCssHintEnabled,
 	isHtmlHintEnabled,
-	isJsHintEnabled,
+	// isJsHintEnabled,
 } from "@consts/ConstsConfig";

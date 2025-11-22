@@ -24,14 +24,20 @@ const COMMON_IGNORES = [
 	"**/out/**",
 	"**/*.min.js",
 	"**/*.bundle.js",
-	"**/vendor/**"
+	"**/vendor/**",
+	"**/.node/**"
 ];
 
 // 공통: JS/TS 파일 매칭 패턴 -------------------------------------------------------
 // 모든 JS/TS 소스(선언 파일 제외)에 적용
 const COMMON_JS_TS_FILES = [
-	"**/*.{js,cjs,mjs,jsx,ts,tsx}",
+	"**/*.{js,mjs,jsx,ts,tsx}",
 	"!**/*.d.ts"
+];
+
+// CJS 전용: Node 런타임용 CJS 스크립트 -------------------------------------------
+const COMMON_CJS_FILES = [
+	"**/*.cjs"
 ];
 
 // 공통: 언어 옵션 (ESM 기반 JS/TS) -------------------------------------------------
@@ -1342,7 +1348,7 @@ const TS_RULES = {
 	"@typescript-eslint/naming-convention": [
 		"off"
 	],
-	"@typescript-eslint/no-array-constructor": [
+  	"@typescript-eslint/no-array-constructor": [
 		"error"
 	],
 	"@typescript-eslint/no-confusing-non-null-assertion": [
@@ -1556,6 +1562,38 @@ export default defineConfig([
 			...TS_RULES
 		},
 		// 플러그인별 커스텀 설정 자리
+		"settings": {}
+	},
+
+	// 2. node-cjs --------------------------------------------------------------
+	{
+		// 설정 블록 이름
+		"name": "node-cjs",
+		// CJS 전용 파일
+		"files": [
+			...COMMON_CJS_FILES
+		],
+		// CJS는 TS project 기반 타입 검사 대상에서 분리
+		"languageOptions": {
+			"ecmaVersion": "latest",
+			"sourceType": "script",
+			"parserOptions": {
+				"ecmaVersion": "latest",
+				"sourceType": "script"
+			},
+			"globals": {
+				...globals.es2024,
+				...globals.node
+			}
+		},
+		// @ts-ignore
+		"linterOptions": {
+			...COMMON_LINTER_OPTIONS
+		},
+		"plugins": {},
+		"rules": {
+			...BASE_RULES
+		},
 		"settings": {}
 	}
 ]);

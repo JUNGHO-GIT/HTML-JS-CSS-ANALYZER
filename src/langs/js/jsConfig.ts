@@ -8,12 +8,6 @@ import { logger } from "@exportScripts";
 import type { JSHintInstance } from "@exportLangs";
 
 // -------------------------------------------------------------------------------------------------
-const FALLBACK_META_URL =
-	typeof __filename === `string`
-		? __filename
-		: path.join(process.cwd(), `index.js`);
-
-// -------------------------------------------------------------------------------------------------
 export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
 	esversion: 2022,
 	moz: false,
@@ -125,57 +119,61 @@ export const loadJSHint = (): JSHintInstance | null => {
 		return isValid ? mod : null;
 	};
 
-	try {
-		const primaryReq = createRequire(FALLBACK_META_URL);
-		result = fnValidate(primaryReq(`jshint`));
-		if (result) {
-			logger(`debug`, `module loaded successfully (primary)`);
-		}
-		else {
-			logger(`warn`, `primary load succeeded but validation failed`);
-		}
-	}
-	catch (e: any) {
-		logger(`debug`, `primary load failed: ${e?.message || e}`);
-	}
+	const candidates: string[] = [];
 
-	if (!result) {
-		const candidates: string[] = [];
-		try {
-			const extDir = path.resolve(__dirname, `..`, `..`);
-			candidates.push(extDir);
+	try {
+		typeof __dirname === `string` ? (
+			candidates.push(__dirname),
+			candidates.push(path.resolve(__dirname, `..`)),
+			candidates.push(path.resolve(__dirname, `..`, `..`))
+		) : (
+			void 0
+		);
+	}
+	catch {}
+
+	try {
+		const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+		const extPath = extContext?.extensionPath;
+		extPath && extPath.length > 0 ? candidates.push(extPath) : void 0;
+	}
+	catch {}
+
+	candidates.push(process.cwd());
+
+	vscode.workspace.workspaceFolders && (() => {
+		for (const f of vscode.workspace.workspaceFolders) {
+			candidates.push(f.uri.fsPath);
 		}
-		catch {}
-		candidates.push(process.cwd());
-		if (vscode.workspace.workspaceFolders) {
-			for (const f of vscode.workspace.workspaceFolders) {
-				candidates.push(f.uri.fsPath);
-			}
-		}
-		for (const base of candidates) {
-			if (result) {
-				break;
-			}
+	})();
+
+	for (const base of candidates) {
+		result ? (
+			void 0
+		) : (() => {
 			try {
 				const req = createRequire(path.join(base, `index.js`));
 				const mod = fnValidate(req(`jshint`));
-				if (mod) {
-					result = mod;
-					logger(`debug`, `module loaded successfully (fallback: ${base})`);
-				}
-				else {
-					logger(`warn`, `fallback validation failed: ${base}`);
-				}
+
+				mod ? (
+					result = mod
+				) : (
+					void 0
+				);
+
+				result ? logger(`debug`, `module loaded: ${base}`) : void 0;
 			}
-			catch (e: any) {
-				logger(`debug`, `fallback load failed: ${base} -> ${e?.message || e}`);
+			catch {
+				logger(`debug`, `load attempt failed: ${base}`);
 			}
-		}
+		})();
 	}
 
-	if (!result) {
-		logger(`warn`, `module not loaded - JSHint is optional; install with 'npm install jshint' or ensure packaging includes dependency`);
-	}
+	result ? (
+		void 0
+	) : (
+		logger(`warn`, `module not loaded - JSHint is optional`)
+	);
 
 	return result;
 };

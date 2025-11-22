@@ -3,14 +3,11 @@
  * @since 2025-11-22
  */
 
-import { path, fs, createRequire } from "@exportLibs";
+import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { HtmlHintInstance } from "@exportLangs";
 
 // -------------------------------------------------------------------------------------------------
-const FALLBACK_META_URL = typeof __filename === `string` ? __filename : path.join(process.cwd(), `index.js`);
-
-// HTML head 태그 추출 정규식 (비탐욕적 매칭 최적화)
 export const HEAD_TAG_REGEX = /<head(?:\s[^>]*)?>([\s\S]*?)<\/head>/i;
 
 // -------------------------------------------------------------------------------------------------
@@ -24,31 +21,55 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
 	};
 
 	try {
-		const primaryReq = createRequire(FALLBACK_META_URL);
-		result = fnValidate(primaryReq(`htmlhint`));
-		if (result) {
-			logger(`debug`, `module loaded successfully (primary)`);
+		const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+		const extPath = extContext?.extensionPath ?? ``;
+		const primaryUrl = extPath.length > 0 ? (
+			path.join(extPath, `out`, `index.js`)
+		) : typeof __dirname === `string` ? (
+			path.join(__dirname, `..`, `..`, `index.js`)
+		) : (
+			path.join(process.cwd(), `index.js`)
+		);
+		const primaryReq = createRequire(primaryUrl);
+		const primaryMod = fnValidate(primaryReq(`htmlhint`));
+		if (primaryMod) {
+			result = primaryMod;
+			logger(`debug`, `module loaded successfully (primary: ${extPath})`);
 		}
 		else {
-			logger(`warn`, `primary load succeeded but validation failed`);
+			logger(`warn`, `primary validation failed`);
 		}
 	}
 	catch (e: unknown) {
 		const msg = e instanceof Error ? e.message : String(e);
-		logger(`debug`, `primary load failed: ${msg}`);
+		logger(`debug`, `primary load failed -> ${msg}`);
 	}
 
-	if (!result) {
-		const dirs: string[] = (() => {
-			const arr: string[] = [];
-			try {
-				arr.push(path.resolve(__dirname, `..`, `..`));
+	!result ? (() => {
+		const arr: string[] = [];
+		try {
+			typeof __dirname === `string` ? (
+				arr.push(__dirname),
+				arr.push(path.resolve(__dirname, `..`)),
+				arr.push(path.resolve(__dirname, `..`, `..`))
+			) : void 0;
+		}
+		catch {}
+		try {
+			const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+			const extPath = extContext?.extensionPath ?? ``;
+			extPath.length > 0 ? arr.push(extPath) : void 0;
+		}
+		catch {}
+		arr.push(process.cwd());
+		const folders = vscode.workspace.workspaceFolders;
+		folders ? (() => {
+			for (const f of folders) {
+				arr.push(f.uri.fsPath);
 			}
-			catch {}
-			arr.push(process.cwd());
-			return arr;
-		})();
-		for (const base of dirs) {
+		})() : void 0;
+
+		for (const base of arr) {
 			if (result) {
 				break;
 			}
@@ -68,7 +89,7 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
 				logger(`debug`, `fallback load failed: ${base} -> ${msg}`);
 			}
 		}
-	}
+	})() : void 0;
 
 	if (!result) {
 		logger(`warn`, `module not loaded - HTMLHint is optional; install with 'npm install htmlhint' or ensure packaging includes dependency`);

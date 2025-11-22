@@ -23,8 +23,8 @@ export interface JSHintResult {
 
 // -------------------------------------------------------------------------------------------------
 export interface JSHintInstance {
-	JSHINT(source: string, options?: Record<string, any>, globals?: Record<string, any>): boolean;
-	data(): JSHintResult;
+	JSHINT: (source: string, options?: Record<string, any>, globals?: Record<string, any>) => boolean;
+	data: () => JSHintResult;
 }
 
 // -------------------------------------------------------------------------------------------------

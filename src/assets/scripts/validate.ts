@@ -6,9 +6,9 @@
 import { vscode } from "@exportLibs";
 import { SelectorType, type SelectorPos } from "@exportTypes";
 import { logger } from "@exportScripts";
-import { runHtmlHint, runJSHint } from "@exportLangs";
+import { runHtmlHint } from "@exportLangs";
 import { isAnalyzable } from "@exportScripts";
-import { isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled } from "@exportConsts";
+import { isHtmlHintEnabled, isCssHintEnabled } from "@exportConsts";
 
 // -------------------------------------------------------------------------------------------------
 export interface CssSupportLike {
@@ -431,7 +431,7 @@ const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportL
 	return diagnostics;
 };
 
-// validateDocument (성능 최적화 및 메모리 효율 개선) -------------------------------------------
+// validateDocument --------------------------------------------------------------------------
 export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
 	return !isAnalyzable(doc) ? [] : (async () => {
 		logger(`debug`, `started: ${doc.fileName}`);
@@ -460,7 +460,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 			})()
 		);
 
-		isJsLikeDoc(doc) && (() => {
+		/* isJsLikeDoc(doc) && (() => {
 			const shouldLint = isJsHintEnabled(doc.uri);
 
 			shouldLint && (() => {
@@ -472,7 +472,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 					logger(`error`, `merge error: ${e?.message || e} in ${doc.fileName}`);
 				}
 			})();
-		})();
+		})(); */
 
 		return [ ...usageDiagnostics, ...unusedDiagnostics, ...lintDiagnostics ];
 	})();
