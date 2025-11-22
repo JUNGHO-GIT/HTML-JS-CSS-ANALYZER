@@ -1563,37 +1563,5 @@ export default defineConfig([
 		},
 		// 플러그인별 커스텀 설정 자리
 		"settings": {}
-	},
-
-	// 2. node-cjs --------------------------------------------------------------
-	{
-		// 설정 블록 이름
-		"name": "node-cjs",
-		// CJS 전용 파일
-		"files": [
-			...COMMON_CJS_FILES
-		],
-		// CJS는 TS project 기반 타입 검사 대상에서 분리
-		"languageOptions": {
-			"ecmaVersion": "latest",
-			"sourceType": "script",
-			"parserOptions": {
-				"ecmaVersion": "latest",
-				"sourceType": "script"
-			},
-			"globals": {
-				...globals.es2024,
-				...globals.node
-			}
-		},
-		// @ts-ignore
-		"linterOptions": {
-			...COMMON_LINTER_OPTIONS
-		},
-		"plugins": {},
-		"rules": {
-			...BASE_RULES
-		},
-		"settings": {}
 	}
 ]);
