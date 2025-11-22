@@ -315,7 +315,8 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 						}
 
 						logger(`debug`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
-					}					const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
+					}
+					const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
 					diagnostics.push(...additionalDiagnostics);
 
 					const totalIssues = diagnostics.length;

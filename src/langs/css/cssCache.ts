@@ -6,12 +6,12 @@
 import { type SelectorPos } from "@exportTypes";
 
 // -------------------------------------------------------------------------------------------------
-type CacheVal = {
+interface CacheVal {
 	version: number;
 	data: SelectorPos[];
 	timestamp: number;
 	accessCount: number;
-};
+}
 
 // -------------------------------------------------------------------------------------------------
 const styleCache: Map<string, CacheVal> = new Map();

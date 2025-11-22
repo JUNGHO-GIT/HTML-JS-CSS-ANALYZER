@@ -8,9 +8,10 @@ import { logger } from "@exportScripts";
 import type { HtmlHintError, HtmlHintInstance } from "@exportLangs";
 import { loadHtmlHint, loadConfig, clamp } from "@exportLangs";
 
-// HTMLHint Lazy Instance -----------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 let htmlhintCache: HtmlHintInstance | null | undefined;
 
+// -------------------------------------------------------------------------------------------------
 const getHtmlHint = (): HtmlHintInstance | null => {
 	let result: HtmlHintInstance | null;
 
