@@ -6,6 +6,7 @@
 import { vscode } from "@exportLibs";
 
 // -------------------------------------------------------------------------------------------------
+const MAIN = `Html-Js-Css-Analyzer`;
 const AUTO_CLOSE_MS = 1000;
 
 // -------------------------------------------------------------------------------------------------
@@ -27,7 +28,7 @@ export const notify = (
 ): void => {
 	const config = {
 		title: {
-			str: `[Html-Js-Css-Analyzer]`,
+			str: `[${MAIN}]`,
 		},
 		debug: {
 			str: `[DEBUG]`,
@@ -48,12 +49,15 @@ export const notify = (
 	const text = `${config.title.str} ${config[type].str} ${value}`;
 
 	type === `debug` && (
+		vscode.window.showInformationMessage(text, { modal: false }),
 		void showProgress(text)
 	);
 	type === `info` && (
+		vscode.window.showInformationMessage(text, { modal: false }),
 		void showProgress(text)
 	);
 	type === `hint` && (
+		vscode.window.showInformationMessage(text, { modal: false }),
 		void showProgress(text)
 	);
 	type === `warn` && (

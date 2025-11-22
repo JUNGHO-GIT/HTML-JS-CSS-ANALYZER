@@ -6,14 +6,14 @@
 import { vscode } from "@exportLibs";
 
 // -------------------------------------------------------------------------------------------------
-const main = `Html-Js-Css-Analyzer`;
+const MAIN = `Html-Js-Css-Analyzer`;
 const logLevelMap = { off: 0, debug: 1, info: 2, hint: 3, warn: 4, error: 5 };
 let outputChannel: vscode.OutputChannel | null = null;
 
 // -------------------------------------------------------------------------------------------------
 export const initLogger = (): void => {
 	!outputChannel ? (
-		outputChannel = vscode.window.createOutputChannel(main)
+		outputChannel = vscode.window.createOutputChannel(MAIN)
 	) : (
 		void 0
 	);
@@ -21,7 +21,7 @@ export const initLogger = (): void => {
 
 // -------------------------------------------------------------------------------------------------
 const getLogLevel = (): number => {
-	const config = vscode.workspace.getConfiguration(main);
+	const config = vscode.workspace.getConfiguration(MAIN);
 	const level = config.get<string>(`logLevel`, `info`);
 	const rs = logLevelMap[level as keyof typeof logLevelMap] || 2;
 	return rs;
@@ -48,7 +48,7 @@ export const logger = (
 			color: `\u001b[38;2;255;162;0m`,
 		},
 		title: {
-			str: `[${main}]`,
+			str: `[${MAIN}]`,
 			color: `\u001b[38;2;78;201;176m`,
 		},
 		debug: {
