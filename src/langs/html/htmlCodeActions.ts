@@ -3,11 +3,13 @@
  * @since 2025-11-22
  */
 
-import { vscode, CodeAction, CodeActionKind, Diagnostic, Position, Range } from "@exportLibs";
+import { vscode, Position, Range, CodeAction, CodeActionKind, Diagnostic } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { FixFactory } from "@exportLangs";
 import { getRuleId, getDocumentLine, getHeadMatch, makeQuickFix } from "@exportLangs";
 
+// -------------------------------------------------------------------------------------------------
+// CONSTANTS
 // -------------------------------------------------------------------------------------------------
 const VOID_TAGS = new Set([
 	`br`, `hr`, `img`, `meta`, `link`, `input`, `source`, `embed`, `param`, `track`, `area`, `col`, `base`,
@@ -15,6 +17,24 @@ const VOID_TAGS = new Set([
 const OBSOLETE_TAGS = [
 	`center`, `font`, `big`, `strike`, `tt`, `acronym`, `applet`, `basefont`, `bgsound`, `blink`, `marquee`,
 ];
+
+// REGEX PATTERNS
+const HTML_TAG_PATTERN = /<html(\s[^>]*)?>/i;
+const HEAD_TITLE_PATTERN = /<title(\s[^>]*)?>/i;
+const DOCTYPE_PATTERN = /<!doctype/i;
+const SINGLE_QUOTE_ATTR_PATTERN = /(\w[\w:-]*)='([^']*)'/g;
+const UPPERCASE_TAG_PATTERN = /<\/?([A-Z][A-Za-z0-9]*)\b/g;
+const UPPERCASE_ATTR_PATTERN = /\s([A-Z][A-Za-z0-9-_]*)\s*=/g;
+const META_CHARSET_PATTERN = /<meta\s+charset\s*=\s*["'][^"']*["'][^>]*>/i;
+const META_VIEWPORT_PATTERN = /<meta\s+name\s*=\s*["']viewport["'][^>]*>/i;
+const META_DESCRIPTION_PATTERN = /<meta\s+name\s*=\s*["']description["'][^>]*>/i;
+const IMG_AREA_TAG_PATTERN = /<(img|area)([^>]*)>/gi;
+const BUTTON_TAG_PATTERN = /<button([^>]*)>/gi;
+const ATTR_WHITESPACE_PATTERN = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
+const ATTR_SPACING_PATTERN = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
+const VOID_TAG_OPEN_PATTERN = /<([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g;
+const BAD_CLOSE_PATTERN = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
+const ALL_TAG_PATTERN = /<\/?.+?>/g;
 
 // -------------------------------------------------------------------------------------------------
 const createLangFix: FixFactory = (doc, diagnostic) => {

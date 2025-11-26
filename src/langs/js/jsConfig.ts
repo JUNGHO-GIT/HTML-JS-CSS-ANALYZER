@@ -5,7 +5,7 @@
 
 import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import type { JSHintInstance } from "@exportLangs";
+import type { JSHintInstance } from "@langs/js/jsType";
 
 // -------------------------------------------------------------------------------------------------
 export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {

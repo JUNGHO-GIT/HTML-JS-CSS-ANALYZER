@@ -12,7 +12,12 @@ import _https from "https";
 import { createRequire as _createRequire } from "module";
 import { Minimatch as _Minimatch } from "minimatch";
 import { TextEncoder as _TextEncoder, TextDecoder as _TextDecoder } from "util";
-import { CodeAction as _CodeAction, CodeActionKind as _CodeActionKind, Diagnostic as _Diagnostic, Position as _Position, Range as _Range, DiagnosticSeverity as _DiagnosticSeverity } from "vscode";
+import { CodeAction as _CodeAction } from "vscode";
+import { CodeActionKind as _CodeActionKind } from "vscode";
+import { Diagnostic as _Diagnostic } from "vscode";
+import { Position as _Position } from "vscode";
+import { Range as _Range } from "vscode";
+import { DiagnosticSeverity as _DiagnosticSeverity } from "vscode";
 
 // 2. export --------------------------------------------------------------------------------
 export { _vscode as vscode };

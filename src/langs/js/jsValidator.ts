@@ -1,6 +1,7 @@
 /**
- * @file jsRunner.ts
- * @since 2025-11-22
+ * @file jsValidator.ts
+ * @since 2025-11-26
+ * @description JSHint 검증 및 진단 생성
  */
 
 import { vscode, Position } from "@exportLibs";
@@ -15,12 +16,25 @@ import type {
 	VariableInfo,
 } from "@exportLangs";
 import { loadJSHint, loadJSHintConfig, analyzeSourceCode } from "@exportLangs";
+import { calculateErrorRange, calculateSeverity } from "@langs/js/jsUtils";
 
+// -------------------------------------------------------------------------------------------------
+// CONSTANTS
+// -------------------------------------------------------------------------------------------------
+const ERROR_SEVERITY_TYPES = [ `eval-usage`, `with-statement`, `assignment-in-condition` ];
+const WARNING_SEVERITY_TYPES = [ `empty-catch` ];
+const MAX_FUNCTION_PARAMS = 6;
+const TS_EXTENSIONS = [ `.ts`, `.tsx` ];
+const MODULE_EXTENSIONS = [ `.mjs`, `.cjs` ];
+const TS_LANGUAGE_IDS = [ `typescript`, `typescriptreact` ];
+
+// -------------------------------------------------------------------------------------------------
+// MODULE STATE
 // -------------------------------------------------------------------------------------------------
 let jsHintCache: JSHintInstance | null | undefined;
 
 // -------------------------------------------------------------------------------------------------
-const getJSHint = (): JSHintInstance | null => {
+export const getJSHint = (): JSHintInstance | null => {
 	let result: JSHintInstance | null;
 
 	jsHintCache === undefined ? (
@@ -34,72 +48,7 @@ const getJSHint = (): JSHintInstance | null => {
 };
 
 // -------------------------------------------------------------------------------------------------
-const clamp = (value: number, min: number, max: number): number => {
-	return value < min ? min : value > max ? max : value;
-};
-
-// -------------------------------------------------------------------------------------------------
-const calculateErrorRange = (document: vscode.TextDocument, error: JSHintError): vscode.Range => {
-	const lineNumber = Math.max((error.line || 1) - 1, 0);
-	const columnNumber = Math.max((error.character || 1) - 1, 0);
-	const safeLineNumber = clamp(lineNumber, 0, document.lineCount - 1);
-	const lineText = document.lineAt(safeLineNumber).text;
-
-	let startColumn = columnNumber;
-	let endColumn = columnNumber + 1;
-
-	// 에러 코드별 최적화된 범위 계산
-	const ERROR_W033_CODES = [ `W033` ];
-	const ERROR_W116_W117_CODES = [ `W116`, `W117` ];
-	const ERROR_W030_CODES = [ `W030` ];
-
-	error.code && (() => {
-		const match = ERROR_W033_CODES.includes(error.code) ? (
-			endColumn = lineText.trimEnd().length,
-			startColumn = Math.max(endColumn - 1, 0),
-			null
-		) : ERROR_W116_W117_CODES.includes(error.code) ? (
-			/^(?:\w+|==|!=)/.exec(lineText.slice(columnNumber))
-		) : ERROR_W030_CODES.includes(error.code) ? (
-			/^[^;]+/.exec(lineText.slice(columnNumber))
-		) : (
-			/^\S+/.exec(lineText.slice(columnNumber))
-		);
-
-		match && (
-			startColumn = columnNumber,
-			endColumn = columnNumber + match[0].length
-		);
-	})();
-
-	startColumn = clamp(startColumn, 0, lineText.length);
-	endColumn = clamp(endColumn, startColumn + 1, lineText.length);
-
-	return new vscode.Range(
-		new Position(safeLineNumber, startColumn),
-		new Position(safeLineNumber, endColumn)
-	);
-};
-
-// -------------------------------------------------------------------------------------------------
-// JSHint 에러 심각도 매핑
-const ERROR_CODES = new Set([ `E001`, `E002`, `E003`, `E004`, `E005`, `E006`, `E007`, `E008`, `E009`, `E010` ]);
-const WARNING_CODES = new Set([ `W033`, `W116`, `W117`, `W098`, `W097` ]);
-
-const calculateSeverity = (error: JSHintError): vscode.DiagnosticSeverity => {
-	return !error.code ? (
-		vscode.DiagnosticSeverity.Warning
-	) : error.code.startsWith(`E`) && ERROR_CODES.has(error.code) ? (
-		vscode.DiagnosticSeverity.Error
-	) : WARNING_CODES.has(error.code) ? (
-		vscode.DiagnosticSeverity.Warning
-	) : (
-		vscode.DiagnosticSeverity.Information
-	);
-};
-
-// -------------------------------------------------------------------------------------------------
-const generateAdditionalDiagnostics = (document: vscode.TextDocument, analysis: SourceAnalysis): vscode.Diagnostic[] => {
+export const generateAdditionalDiagnostics = (document: vscode.TextDocument, analysis: SourceAnalysis): vscode.Diagnostic[] => {
 	const diagnostics: vscode.Diagnostic[] = [];
 
 	analysis.complexityIssues.forEach((issue: ComplexityIssue) => {
@@ -124,9 +73,9 @@ const generateAdditionalDiagnostics = (document: vscode.TextDocument, analysis: 
 		const line = Math.max(bug.line - 1, 0);
 		const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
 		const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
-		const severity = [ `eval-usage`, `with-statement`, `assignment-in-condition` ].includes(bug.type) ? (
+		const severity = ERROR_SEVERITY_TYPES.includes(bug.type) ? (
 			vscode.DiagnosticSeverity.Error
-		) : [ `empty-catch` ].includes(bug.type) ? (
+		) : WARNING_SEVERITY_TYPES.includes(bug.type) ? (
 			vscode.DiagnosticSeverity.Warning
 		) : (
 			vscode.DiagnosticSeverity.Information
@@ -145,7 +94,7 @@ const generateAdditionalDiagnostics = (document: vscode.TextDocument, analysis: 
 	});
 
 	analysis.functions.forEach((func: FunctionInfo) => {
-		func.parameters > 6 && (() => {
+		func.parameters > MAX_FUNCTION_PARAMS && (() => {
 			const line = Math.max(func.line - 1, 0);
 			const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
 			const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
@@ -231,15 +180,12 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 			const sourceText = document.getText();
 
 			const isTypeScript = (
-				fileName.endsWith(`.ts`) ||
-				fileName.endsWith(`.tsx`) ||
-				languageId === `typescript` ||
-				languageId === `typescriptreact`
+				TS_EXTENSIONS.some(ext => fileName.endsWith(ext)) ||
+				TS_LANGUAGE_IDS.includes(languageId)
 			);
 
 			const isModule = (
-				fileName.endsWith(`.mjs`) ||
-				fileName.endsWith(`.cjs`) ||
+				MODULE_EXTENSIONS.some(ext => fileName.endsWith(ext)) ||
 				sourceText.includes(`import `) ||
 				sourceText.includes(`export `) ||
 				isTypeScript

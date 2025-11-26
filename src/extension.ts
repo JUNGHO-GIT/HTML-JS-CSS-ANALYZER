@@ -42,12 +42,12 @@ const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
 	{language: `javascriptreact`},
 	{language: `typescriptreact`},
 ];
-/* const JS_LANGUAGES: vscode.DocumentSelector = [
+const JS_LANGUAGES: vscode.DocumentSelector = [
 	{language: `javascript`},
 	{language: `typescript`},
 	{language: `javascriptreact`},
 	{language: `typescriptreact`},
-]; */
+];
 
 // -------------------------------------------------------------------------------------------------
 const registerProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
@@ -55,7 +55,7 @@ const registerProviders = (context: vscode.ExtensionContext, cssSupport: CssSupp
 		vscode.languages.registerCompletionItemProvider(SUPPORTED_LANGUAGES, cssSupport, `.`, `#`, `"`, `'`, "`", ` `),
 		vscode.languages.registerDefinitionProvider(SUPPORTED_LANGUAGES, cssSupport),
 		vscode.languages.registerCodeActionsProvider(HTML_LANGUAGE, new HtmlHintCodeActionProvider(), {providedCodeActionKinds: HtmlHintCodeActionProvider.metadata.providedCodeActionKinds}),
-		/* vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JSHintCodeActionProvider(), {providedCodeActionKinds: JSHintCodeActionProvider.metadata.providedCodeActionKinds}) */
+		vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JSHintCodeActionProvider(), {providedCodeActionKinds: JSHintCodeActionProvider.metadata.providedCodeActionKinds})
 	);
 };
 

@@ -50,7 +50,7 @@ const cleanExpired = (): void => {
 		}
 	}
 
-	expiredKeys.forEach(key => styleCache.delete(key));
+	expiredKeys.forEach(key => {styleCache.delete(key)});
 };
 
 // -------------------------------------------------------------------------------------------------

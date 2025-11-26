@@ -1,13 +1,23 @@
 /**
- * @file htmlRunner.ts
- * @since 2025-11-22
+ * @file htmlValidator.ts
+ * @since 2025-11-26
+ * @description HTML 문서 유효성 검사 로직
  */
 
-import { vscode, CodeAction, CodeActionKind, Diagnostic, DiagnosticSeverity, Position } from "@exportLibs";
+import { vscode, Diagnostic, DiagnosticSeverity, Position } from "@exportLibs";
 import { logger } from "@exportScripts";
-import type { HtmlHintError, HtmlHintInstance } from "@exportLangs";
-import { loadHtmlHint, loadConfig, clamp } from "@exportLangs";
+import type { HtmlHintError, HtmlHintInstance } from "@langs/html/htmlType";
+import { loadHtmlHint, loadConfig } from "@langs/html/htmlConfig";
+import { clamp } from "@langs/html/htmlUtils";
 
+// -------------------------------------------------------------------------------------------------
+// CONSTANTS
+// -------------------------------------------------------------------------------------------------
+const HTML_FILE_REGEX = /\.html?$/i;
+const DIAGNOSTIC_SOURCE = `HTMLHint`;
+
+// -------------------------------------------------------------------------------------------------
+// MODULE STATE
 // -------------------------------------------------------------------------------------------------
 let htmlhintCache: HtmlHintInstance | null | undefined;
 
@@ -25,43 +35,7 @@ const getHtmlHint = (): HtmlHintInstance | null => {
 	return result;
 };
 
-// 유틸리티 함수 ---------------------------------------------------------------------------------
-export const getRuleId = (diagnostic: Diagnostic): string | undefined => {
-	try {
-		const diagnosticData = (diagnostic as any).data;
-		return diagnosticData?.ruleId ?? diagnostic.code?.toString();
-	}
-	catch {
-		return undefined;
-	}
-};
-
-export const getDocumentLine = (document: vscode.TextDocument, oneBasedLineNumber: number): string => {
-	return document.lineCount <= 0 ? `` : (() => {
-		const zeroBasedLineIndex = clamp(oneBasedLineNumber - 1, 0, document.lineCount - 1);
-		return document.lineAt(zeroBasedLineIndex).text;
-	})();
-};
-
-export const getHeadMatch = (htmlText: string): RegExpMatchArray | null => {
-	const HEAD_TAG_REGEX = /<head(?:\s[^>]*)?>([\s\S]*?)<\/head>/i;
-	return HEAD_TAG_REGEX.exec(htmlText);
-};
-
-export const makeQuickFix = (
-	title: string,
-	editBuilder: (we: vscode.WorkspaceEdit) => void,
-	diagnostic: Diagnostic
-) => {
-	const ca = new CodeAction(title, CodeActionKind.QuickFix);
-	const we = new vscode.WorkspaceEdit();
-	editBuilder(we);
-	ca.edit = we;
-	ca.diagnostics = [ diagnostic ];
-	return ca;
-};
-
-// HTMLHint 실행 --------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 	const htmlhint = getHtmlHint();
 
@@ -88,7 +62,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 					err.message,
 					DiagnosticSeverity.Warning
 				);
-				diagnostic.source = `HTMLHint`;
+				diagnostic.source = DIAGNOSTIC_SOURCE;
 				diagnostic.code = err.rule?.id;
 				(diagnostic as any).data = {
 					ruleId: err.rule?.id,
@@ -106,4 +80,9 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 			return [];
 		}
 	})();
+};
+
+// -------------------------------------------------------------------------------------------------
+export const isHtmlDocument = (doc: vscode.TextDocument): boolean => {
+	return HTML_FILE_REGEX.test(doc.fileName) || doc.languageId === `html`;
 };

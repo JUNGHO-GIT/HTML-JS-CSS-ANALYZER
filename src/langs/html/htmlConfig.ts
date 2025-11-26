@@ -1,14 +1,12 @@
 /**
  * @file htmlConfig.ts
  * @since 2025-11-22
+ * @description HTMLHint 모듈 로드 및 설정 파일 로드
  */
 
 import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import type { HtmlHintInstance } from "@exportLangs";
-
-// -------------------------------------------------------------------------------------------------
-export const HEAD_TAG_REGEX = /<head(?:\s[^>]*)?>([\s\S]*?)<\/head>/i;
+import type { HtmlHintInstance } from "@langs/html/htmlType";
 
 // -------------------------------------------------------------------------------------------------
 export const loadHtmlHint = (): HtmlHintInstance | null => {
@@ -139,9 +137,4 @@ export const loadConfig = (filePath: string): Record<string, unknown> => {
 	}
 
 	return {};
-};
-
-// -------------------------------------------------------------------------------------------------
-export const clamp = (value: number, min: number, max: number): number => {
-	return value < min ? min : value > max ? max : value;
 };

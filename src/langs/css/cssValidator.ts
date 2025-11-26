@@ -1,15 +1,18 @@
 /**
- * @file cssSupport.ts
+ * @file cssValidator.ts
  * @since 2025-11-22
+ * @description CSS 검증 및 Provider 클래스
  */
 
 import { vscode, https, http, path, fs } from "@exportLibs";
 import { type SelectorPos, SelectorType } from "@exportTypes";
-import { parseSelectors } from "@exportLangs";
-import { cacheGet, cacheSet } from "@exportLangs";
+import { parseSelectors, cacheGet, cacheSet } from "@exportLangs";
 import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
 import { isUriExcludedByGlob, isAnalyzable, logger, validateDocument, withPerformanceMonitoring, resourceLimiter } from "@exportScripts";
+import type { FetchResponse, CssSupportLike } from "@langs/css/cssType";
 
+// -------------------------------------------------------------------------------------------------
+// CONSTANTS
 // -------------------------------------------------------------------------------------------------
 const ZERO_POSITION = new vscode.Position(0, 0);
 const REMOTE_URL_REGEX = /^https?:\/\//i;
@@ -19,15 +22,9 @@ const LINK_STYLESHEET_REGEX = /<link\s+[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>
 const HREF_ATTRIBUTE_REGEX = /\bhref\s*=\s*(["'])([^"']+)\1/i;
 
 // -------------------------------------------------------------------------------------------------
-interface FetchResponse {
-	ok: boolean;
-	status?: number;
-	statusText?: string;
-	text: () => Promise<string>;
-}
-
+// CSS PROVIDER CLASS
 // -------------------------------------------------------------------------------------------------
-export class CssSupport implements vscode.CompletionItemProvider, vscode.DefinitionProvider {
+export class CssSupport implements vscode.CompletionItemProvider, vscode.DefinitionProvider, CssSupportLike {
 	// 정규식 패턴 접근자들
 	private get isRemoteUrl(): RegExp { return REMOTE_URL_REGEX; }
 	private get wordRange(): RegExp { return WORD_RANGE_REGEX; }

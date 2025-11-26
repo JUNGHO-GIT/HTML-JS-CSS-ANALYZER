@@ -4,6 +4,7 @@
 - Detailed, objective, professional rsponses
 - Capture core intent, not literal interpretation
 - Never fabricate; acknowledge errors immediately
+- When in 'Agent' mode, jsconfig or tsconfig errors are ignored.
 
 # 1-2. Coding Philosophy
 - PerformanceFirst: minimize memory waste/leaks
@@ -17,6 +18,7 @@
 - ALWAYS send `code format` for copy-paste
 - ALWAYS return `MODIFIED code` ONLY
 - ALWAYS exactly ONE SPACE around "=" or ":"
+- EXCEPTION NO SPACE in parameter default values (e.g., `function f(a=1)`, `(a=1) => {}`)
 - NEVER modify comments (prserve `// -----------`)
 - NEVER break line before semicolon
 - NEVER mid-function return; assign variable, return at end only

@@ -1,6 +1,10 @@
 // assets/types/alias.d.ts
 
 // -------------------------------------------------------------------------------
+declare module "@assets/*" {
+	const value: any;
+	export default value;
+}
 declare module "@scripts/*" {
 	const value: any;
 	export default value;
