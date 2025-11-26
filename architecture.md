@@ -159,7 +159,7 @@ import { logger } from "../assets/scripts/logger";
 
 | Provider | Language | Registration |
 |----------|----------|--------------|
-| CompletionItemProvider | HTML, CSS, SCSS, JS, TS | `CssSupport` |
-| DefinitionProvider | HTML, CSS, SCSS, JS, TS | `CssSupport` |
+| CompletionItemProvider | HTML, CSS, JS | `CssSupport` |
+| DefinitionProvider | HTML, CSS, JS | `CssSupport` |
 | CodeActionProvider | HTML | `HtmlHintCodeActionProvider` |
 | DiagnosticCollection | All | `DiagnosticManager` |

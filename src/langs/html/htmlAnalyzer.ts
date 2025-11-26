@@ -22,6 +22,14 @@ const DUPLICATE_ID_REGEX = /\bid\s*=\s*["']([^"']+)["']/gi;
 const ATTRIBUTE_REGEX = /([a-zA-Z][a-zA-Z0-9-_]*)\s*(?:=\s*["'][^"']*["'])?/g;
 
 // -------------------------------------------------------------------------------------------------
+// ACCESSIBILITY & BEST PRACTICES REGEX
+const IMG_WITHOUT_ALT_REGEX = /<img\b(?![^>]*\balt\s*=)[^>]*>/gi;
+const A_WITHOUT_HREF_REGEX = /<a\b(?![^>]*\bhref\s*=)[^>]*>/gi;
+const BUTTON_WITHOUT_TYPE_REGEX = /<button\b(?![^>]*\btype\s*=)[^>]*>/gi;
+const INPUT_WITHOUT_LABEL_REGEX = /<input\b[^>]*>/gi; // Requires more complex logic, simplified for now
+const TARGET_BLANK_REGEX = /target\s*=\s*["']_blank["'](?![^>]*\brel\s*=\s*["'](?:[^"']*\s)?noopener(?:[^"']*)?["'])/gi;
+
+// -------------------------------------------------------------------------------------------------
 // TYPE DEFINITIONS
 // -------------------------------------------------------------------------------------------------
 declare type HtmlAnalysisIssue = {
@@ -239,6 +247,64 @@ const countTags = (sourceCode: string): number => {
 };
 
 // -------------------------------------------------------------------------------------------------
+const analyzeAccessibility = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
+	const lines = sourceCode.split(`\n`);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const lineNum = i + 1;
+
+		// Image without alt
+		if (IMG_WITHOUT_ALT_REGEX.test(line)) {
+			issues.push({
+				type: `a11y-img-alt`,
+				line: lineNum,
+				message: `Image tag missing 'alt' attribute (accessibility)`,
+				severity: `warning`,
+			});
+		}
+
+		// Anchor without href
+		if (A_WITHOUT_HREF_REGEX.test(line)) {
+			issues.push({
+				type: `a11y-anchor-href`,
+				line: lineNum,
+				message: `Anchor tag missing 'href' attribute (accessibility)`,
+				severity: `warning`,
+			});
+		}
+
+		// Button without type
+		if (BUTTON_WITHOUT_TYPE_REGEX.test(line)) {
+			issues.push({
+				type: `best-practice-button-type`,
+				line: lineNum,
+				message: `Button tag missing 'type' attribute (default is 'submit')`,
+				severity: `info`,
+			});
+		}
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
+const analyzeSecurity = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
+	const lines = sourceCode.split(`\n`);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const lineNum = i + 1;
+
+		// target="_blank" security risk
+		if (TARGET_BLANK_REGEX.test(line)) {
+			issues.push({
+				type: `security-target-blank`,
+				line: lineNum,
+				message: `Using target="_blank" without rel="noopener noreferrer" is a security risk`,
+				severity: `warning`,
+			});
+		}
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
 // MAIN ANALYSIS FUNCTION
 // -------------------------------------------------------------------------------------------------
 export const analyzeHtmlCode = (sourceCode: string): HtmlAnalysisResult => {
@@ -251,6 +317,8 @@ export const analyzeHtmlCode = (sourceCode: string): HtmlAnalysisResult => {
 	analyzeDuplicateIds(sourceCode, issues);
 	analyzeLineLength(sourceCode, issues);
 	analyzeAttributeCount(sourceCode, issues);
+	analyzeAccessibility(sourceCode, issues);
+	analyzeSecurity(sourceCode, issues);
 
 	const structure = analyzeDocumentStructure(sourceCode);
 	const tagCount = countTags(sourceCode);

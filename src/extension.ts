@@ -34,19 +34,10 @@ const HTML_LANGUAGE: vscode.DocumentSelector = [
 const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
 	{language: `html`},
 	{language: `css`},
-	{language: `scss`},
-	{language: `less`},
-	{language: `sass`},
 	{language: `javascript`},
-	{language: `typescript`},
-	{language: `javascriptreact`},
-	{language: `typescriptreact`},
 ];
 const JS_LANGUAGES: vscode.DocumentSelector = [
 	{language: `javascript`},
-	{language: `typescript`},
-	{language: `javascriptreact`},
-	{language: `typescriptreact`},
 ];
 
 // -------------------------------------------------------------------------------------------------

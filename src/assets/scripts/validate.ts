@@ -6,7 +6,7 @@
 
 import { vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import { runHtmlHint, runJSHint } from "@exportLangs";
+import { runHtmlHint, runJSHint, analyzeCssCode, generateCssAnalysisDiagnostics } from "@exportLangs";
 import { isAnalyzable } from "@exportScripts";
 import { isHtmlHintEnabled, isCssHintEnabled, isJsHintEnabled } from "@exportConsts";
 import type { CssSupportLike } from "@langs/css/cssType";
@@ -21,10 +21,10 @@ import {
 // CONSTANTS
 // -------------------------------------------------------------------------------------------------
 const HTML_FILE_REGEX = /\.html?$/i;
-const CSS_LANGUAGES = [ `css`, `scss`, `less`, `sass` ];
-const CSS_EXTENSIONS = [ `.css`, `.scss`, `.less`, `.sass` ];
-const JS_LANGUAGES = [ `javascript`, `typescript`, `javascriptreact`, `typescriptreact` ];
-const JS_EXTENSIONS = [ `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` ];
+const CSS_LANGUAGES = [ `css` ];
+const CSS_EXTENSIONS = [ `.css` ];
+const JS_LANGUAGES = [ `javascript` ];
+const JS_EXTENSIONS = [ `.js`, `.mjs`, `.cjs` ];
 
 // -------------------------------------------------------------------------------------------------
 // DOCUMENT TYPE CHECKERS
@@ -58,11 +58,11 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	const {knownClasses, knownIds} = collectKnownSelectors(allStyles);
 	const fullText = doc.getText();
 	const isHtml = isHtmlDoc(doc);
-	const isJsTs = isJsLikeDoc(doc);
+	const isJs = isJsLikeDoc(doc);
 
 	const shouldCheckCssUsage = isCssHintEnabled(doc.uri);
 	const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = shouldCheckCssUsage ? (
-		scanDocumentUsages(fullText, doc, knownClasses, knownIds, isJsTs)
+		scanDocumentUsages(fullText, doc, knownClasses, knownIds, isJs)
 	) : (
 		{diagnostics: [], usedClassesFromMarkup: new Set<string>(), usedIdsFromMarkup: new Set<string>()}
 	);
@@ -71,7 +71,19 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	const lintDiagnostics: vscode.Diagnostic[] = [];
 
 	// CSS 파일 검사
-	isCssLikeDoc(doc) && isCssHintEnabled(doc.uri) && (unusedDiagnostics = await scanLocalUnused(doc, support, fullText));
+	if (isCssLikeDoc(doc) && isCssHintEnabled(doc.uri)) {
+		unusedDiagnostics = await scanLocalUnused(doc, support, fullText);
+
+		try {
+			const analysis = analyzeCssCode(fullText);
+			const analysisDiagnostics = generateCssAnalysisDiagnostics(doc, analysis);
+			lintDiagnostics.push(...analysisDiagnostics);
+		}
+		catch (e: unknown) {
+			const errMsg = e instanceof Error ? e.message : String(e);
+			logger(`error`, `CSS Analysis error: ${errMsg} in ${doc.fileName}`);
+		}
+	}
 
 	// HTML 파일 검사
 	if (isHtml) {
@@ -89,7 +101,7 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	}
 
 	// JS/TS 파일 검사
-	if (isJsTs && isJsHintEnabled(doc.uri)) {
+	if (isJs && isJsHintEnabled(doc.uri)) {
 		try {
 			const jsHintDiagnostics = runJSHint(doc);
 			lintDiagnostics.push(...jsHintDiagnostics);

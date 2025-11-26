@@ -103,37 +103,77 @@ const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): voi
 };
 
 // -------------------------------------------------------------------------------------------------
-const preprocessTypeScriptCode = (sourceCode: string): string => {
-	let result = sourceCode;
+const analyzeModernJs = (sourceCode: string, analysis: SourceAnalysis): void => {
+	const lines = sourceCode.split(`\n`);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const lineNum = i + 1;
 
-	// TypeScript 타입 어노테이션 제거 패턴
-	const patterns = [
-		[ /(\w+):\s*[\w\[\]<>|&.]+(?=\s*[,)])/g, `$1` ],
-		[ /\):\s*[\w\[\]<>|&.]+(?=\s*[{;=])/g, `)` ],
-		[ /(let|const|var)\s+(\w+):\s*[\w\[\]<>|&.]+/g, `$1 $2` ],
-		[ /<[\w\s,<>|&.]+>/g, `` ],
-		[ /\s+as\s+[\w\[\]<>|&.]+/g, `` ],
-		[ /\binterface\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, `` ],
-		[ /\btype\s+\w+\s*=\s*[^;]+;/g, `` ],
-		[ /\bdeclare\s+(?:const|let|var|function|class|interface|type|namespace)\s+[^;{]+[;{][^}]*\}?/g, `` ],
-		[ /\benum\s+\w+\s*\{[^}]*\}/g, `` ],
-		[ /\bnamespace\s+\w+\s*\{[^}]*\}/g, `` ],
-		[ /\bexport\s+type\s+[^;]+;/g, `` ],
-		[ /\bimport\s+type\s+[^;]+;/g, `` ],
-	] as const;
-
-	for (const [ pattern, replacement ] of patterns) {
-		result = result.replace(pattern, replacement);
+		if (/\bvar\s+/.test(line)) {
+			analysis.potentialBugs.push({
+				type: `var-usage`,
+				line: lineNum,
+				message: `Avoid using 'var', use 'let' or 'const' instead (Modern JS)`,
+			});
+		}
 	}
+};
 
-	return result;
+// -------------------------------------------------------------------------------------------------
+const analyzeSecurity = (sourceCode: string, analysis: SourceAnalysis): void => {
+	const lines = sourceCode.split(`\n`);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const lineNum = i + 1;
+
+		if (/\.innerHTML\s*=/.test(line)) {
+			analysis.potentialBugs.push({
+				type: `innerhtml-usage`,
+				line: lineNum,
+				message: `Assignment to innerHTML can be an XSS vulnerability`,
+			});
+		}
+
+		if (/document\.write\(/.test(line)) {
+			analysis.potentialBugs.push({
+				type: `document-write`,
+				line: lineNum,
+				message: `Avoid using document.write()`,
+			});
+		}
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
+const analyzePerformance = (sourceCode: string, analysis: SourceAnalysis): void => {
+	const lines = sourceCode.split(`\n`);
+	let loopDepth = 0;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const lineNum = i + 1;
+
+		if (/(for|while)\s*\(/.test(line) && !line.trim().startsWith(`//`)) {
+			loopDepth++;
+			if (loopDepth > 2) {
+				analysis.potentialBugs.push({
+					type: `large-loop`,
+					line: lineNum,
+					message: `Deeply nested loop detected (depth: ${loopDepth}). This might affect performance.`,
+				});
+			}
+		}
+
+		if (line.includes(`}`)) {
+			loopDepth > 0 && loopDepth--;
+		}
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocument): AnalyzeResult => {
 	const analysis: SourceAnalysis = {
 		isModule: false,
-		isTypeScript: false,
 		hasStrictMode: false,
 		functions: [],
 		variables: [],
@@ -143,7 +183,6 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
 		potentialBugs: [],
 	};
 
-	analysis.isTypeScript = document.fileName.endsWith(`.ts`) || document.fileName.endsWith(`.tsx`);
 	analysis.isModule = (
 		sourceCode.includes(`import `) ||
 		sourceCode.includes(`export `) ||
@@ -206,8 +245,11 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
 
 	analyzeComplexity(sourceCode, analysis);
 	analyzePotentialBugs(sourceCode, analysis);
+	analyzeModernJs(sourceCode, analysis);
+	analyzeSecurity(sourceCode, analysis);
+	analyzePerformance(sourceCode, analysis);
 
-	const processedCode = analysis.isTypeScript ? preprocessTypeScriptCode(sourceCode) : sourceCode;
+	const processedCode = sourceCode;
 
 	return { processedCode, analysis };
 };

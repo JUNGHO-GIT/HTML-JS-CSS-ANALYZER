@@ -190,7 +190,7 @@ export const ensureWorkspaceCssFiles = async (folder: vscode.WorkspaceFolder, ex
 	workspaceCssFiles && (void 0);
 	const collected: string[] = [];
 	try {
-		const styleExts = [ `css`, `scss`, `less`, `sass` ];
+		const styleExts = [ `css` ];
 		const configured = getAnalyzableExtensions(folder.uri).filter(e => styleExts.includes(e));
 		const unique = Array.from(new Set(configured.length ? configured : styleExts));
 		const patterns = unique.map(e => `**/*.${e}`);

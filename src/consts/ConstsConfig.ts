@@ -48,7 +48,7 @@ export type UnusedSeverity = never;
 
 // -------------------------------------------------------------------------------------------------
 const EXTENSION_CONFIG_SECTION = `Html-Js-Css-Analyzer`;
-const DEFAULT_ANALYZABLE_EXTENSIONS = [ `html`, `htm`, `js`, `jsx`, `ts`, `tsx`, `mjs`, `css`, `scss`, `less`, `sass` ];
+const DEFAULT_ANALYZABLE_EXTENSIONS = [ `html`, `htm`, `js`, `mjs`, `css` ];
 const EXTENSION_VALIDATION_REGEX = /^[a-z0-9_-]{1,16}$/;
 
 // -------------------------------------------------------------------------------------------------

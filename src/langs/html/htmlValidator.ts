@@ -9,6 +9,7 @@ import { logger } from "@exportScripts";
 import type { HtmlHintError, HtmlHintInstance } from "@langs/html/htmlType";
 import { loadHtmlHint, loadConfig } from "@langs/html/htmlConfig";
 import { clamp } from "@langs/html/htmlUtils";
+import { analyzeHtmlCode, generateHtmlAnalysisDiagnostics } from "@exportLangs";
 
 // -------------------------------------------------------------------------------------------------
 // CONSTANTS
@@ -72,6 +73,11 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 				};
 				diags.push(diagnostic);
 			}
+
+			// Add custom analysis diagnostics
+			const analysis = analyzeHtmlCode(text);
+			const analysisDiagnostics = generateHtmlAnalysisDiagnostics(doc, analysis);
+			diags.push(...analysisDiagnostics);
 
 			return diags;
 		}

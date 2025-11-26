@@ -46,6 +46,11 @@ export {
 	CssSupport,
 } from "@langs/css/cssValidator";
 
+export {
+	analyzeCssCode,
+	generateCssAnalysisDiagnostics,
+} from "@langs/css/cssAnalyzer";
+
 // =================================================================================================
 // 2. HTML
 // =================================================================================================

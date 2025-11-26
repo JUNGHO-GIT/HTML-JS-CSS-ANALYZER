@@ -15,8 +15,8 @@ const ERROR_W116_W117_CODES = [ `W116`, `W117` ];
 const ERROR_W030_CODES = [ `W030` ];
 const ERROR_CODES = new Set([ `E001`, `E002`, `E003`, `E004`, `E005`, `E006`, `E007`, `E008`, `E009`, `E010` ]);
 const WARNING_CODES = new Set([ `W033`, `W116`, `W117`, `W098`, `W097` ]);
-const JS_LANGUAGES = [ `javascript`, `typescript`, `javascriptreact`, `typescriptreact` ];
-const JS_EXTENSIONS = [ `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` ];
+const JS_LANGUAGES = [ `javascript` ];
+const JS_EXTENSIONS = [ `.js`, `.mjs`, `.cjs` ];
 
 // REGEX PATTERNS
 const W116_W117_REGEX = /^(?:\w+|==|!=)/;

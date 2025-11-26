@@ -6,9 +6,9 @@
 
 import { vscode, https, http, path, fs } from "@exportLibs";
 import { type SelectorPos, SelectorType } from "@exportTypes";
-import { parseSelectors, cacheGet, cacheSet } from "@exportLangs";
-import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
-import { isUriExcludedByGlob, isAnalyzable, logger, validateDocument, withPerformanceMonitoring, resourceLimiter } from "@exportScripts";
+import { parseSelectors, cacheGet, cacheSet, ensureWorkspaceCssFiles, getWorkspaceCssFiles, clearWorkspaceCssFilesCache, processCssFilesInBatches, readSelectorsFromFsPath } from "@exportLangs";
+import { getCssExcludePatterns } from "@exportConsts";
+import { isAnalyzable, logger, validateDocument, withPerformanceMonitoring } from "@exportScripts";
 import type { FetchResponse, CssSupportLike } from "@langs/css/cssType";
 
 // -------------------------------------------------------------------------------------------------
@@ -223,7 +223,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 					}
 					if (fs.existsSync(targetPath)) {
 						try {
-							const sels = await this.fnReadSelectorsFromFsPath(targetPath);
+							const sels = await readSelectorsFromFsPath(targetPath);
 							map.set(vscode.Uri.file(targetPath).toString(), sels);
 						}
 						catch (e: any) {
@@ -267,13 +267,14 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			}
 
 			if (workspaceFolder) {
-				await this.fnEnsureWorkspaceCssFiles(workspaceFolder, excludePatterns);
-				if (workspaceCssFiles) {
-					await this.fnProcessCssFilesInBatches(workspaceCssFiles, styleMap);
+				await ensureWorkspaceCssFiles(workspaceFolder, excludePatterns);
+				const files = getWorkspaceCssFiles();
+				if (files) {
+					await processCssFilesInBatches(files, styleMap);
 				}
 			}
 
-			logger(`debug`, `collected: ${styleMap.size} entries (workspace files: ${workspaceCssFiles ? workspaceCssFiles.length : 0}) for ${doc.fileName}`);
+			logger(`debug`, `collected: ${styleMap.size} entries (workspace files: ${getWorkspaceCssFiles()?.length ?? 0}) for ${doc.fileName}`);
 
 			return styleMap;
 		})();
@@ -285,77 +286,6 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 		finally {
 			this.pendingStyles.delete(key);
 		}
-	};
-
-	// -------------------------------------------------------------------------------------------------
-	// 파일 시스템에서 직접 읽어 파싱 (대용량 파일 최적화)
-	private fnReadSelectorsFromFsPath = async (fsPath: string): Promise<SelectorPos[]> => {
-		try {
-			const stat = await fs.promises.stat(fsPath);
-			const key = `fs://${fsPath}`;
-			const cached = cacheGet(key);
-			return (cached && cached.version === stat.mtimeMs) ? cached.data : (async () => {
-				const MAX_FILE_SIZE = 2 * 1024 * 1024;
-				return stat.size > MAX_FILE_SIZE ? (
-					logger(`debug`, `file skipped for performance: ${fsPath} (${Math.round(stat.size / 1024 / 1024 * 100) / 100}MB)`),
-					[]
-				) : (async () => {
-					const content = await fs.promises.readFile(fsPath, `utf8`);
-					const MAX_CONTENT_LENGTH = 500000;
-					return content.length > MAX_CONTENT_LENGTH ? (
-						logger(`debug`, `content sampled: ${fsPath}`),
-						(() => {
-							const parsed = parseSelectors(content.substring(0, MAX_CONTENT_LENGTH));
-							cacheSet(key, {version: stat.mtimeMs, data: parsed});
-							return parsed;
-						})()
-					) : (() => {
-						const parsed = parseSelectors(content);
-						cacheSet(key, {version: stat.mtimeMs, data: parsed});
-						return parsed;
-					})();
-				})();
-			})();
-		}
-		catch (e: any) {
-			return (e?.code === `ENOMEM` || e?.message?.includes(`out of memory`)) ? (
-				logger(`error`, `limit reached processing: ${fsPath}`),
-				[]
-			) : (
-				logger(`error`, `read from file failed: ${fsPath} -> ${e?.message || e}`),
-				[]
-			);
-		}
-	};	// -------------------------------------------------------------------------------------------------
-
-	// 배치 단위로 CSS 파일들을 병렬 처리
-	private fnProcessCssFilesInBatches = async (filePaths: string[], styleMap: Map<string, SelectorPos[]>): Promise<void> => {
-		const BATCH_SIZE = 10;
-		const uncachedFiles = filePaths.filter(filePath => !styleMap.has(vscode.Uri.file(filePath).toString()));
-
-		for (let i = 0; i < uncachedFiles.length; i += BATCH_SIZE) {
-			const batch = uncachedFiles.slice(i, i + BATCH_SIZE);
-			const batchPromises = batch.map(filePath => resourceLimiter().execute(async () => this.fnProcessSingleCssFile(filePath, styleMap)));
-			await Promise.allSettled(batchPromises);
-		}
-	};
-
-	// -------------------------------------------------------------------------------------------------
-	// 단일 CSS 파일 처리 (성능 모니터링 및 에러 핸들링 포함)
-	private fnProcessSingleCssFile = async (filePath: string, styleMap: Map<string, SelectorPos[]>): Promise<void> => {
-		return withPerformanceMonitoring(
-			`CSS file processing: ${path.basename(filePath)}`,
-			async () => {
-				try {
-					const uri = vscode.Uri.file(filePath);
-					const k = uri.toString();
-					!styleMap.has(k) && styleMap.set(k, await this.fnReadSelectorsFromFsPath(filePath));
-				}
-				catch (e: any) {
-					logger(`error`, `read failed: ${filePath} -> ${e?.message || e}`);
-				}
-			}
-		);
 	};
 
 	// -------------------------------------------------------------------------------------------------
@@ -451,50 +381,6 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	// -------------------------------------------------------------------------------------------------
 	// 워크스페이스 CSS 파일 목록 캐시 초기화
 	clearWorkspaceIndex = (): void => {
-		workspaceCssFiles = null;
-	};
-
-	// -------------------------------------------------------------------------------------------------
-	// 내부: 워크스페이스 CSS/SCSS 파일 목록 1회 수집
-	private fnEnsureWorkspaceCssFiles = async (folder: vscode.WorkspaceFolder, excludePatterns: string[]): Promise<void> => {
-		if (workspaceCssFiles) {
-			return;
-		}
-		const MAX = 500;
-		const collected: string[] = [];
-		try {
-			const styleExts = [ `css`, `scss`, `less`, `sass` ];
-			const configured = getAnalyzableExtensions(folder.uri).filter(e => styleExts.includes(e));
-			const unique = Array.from(new Set(configured.length ? configured : styleExts));
-			const patterns = unique.map(e => `**/*.${e}`);
-			for (const glob of patterns) {
-				if (collected.length >= MAX) {
-					logger(`debug`, `file limit reached (${MAX} files), remaining files ignored`);
-					break;
-				}
-				const include = new vscode.RelativePattern(folder, glob);
-				const uris = await vscode.workspace.findFiles(include);
-				for (const uri of uris) {
-					if (collected.length >= MAX) {
-						break;
-					}
-					if (!isUriExcludedByGlob(uri, excludePatterns)) {
-						collected.push(uri.fsPath);
-					}
-					if (collected.length >= MAX) {
-						logger(`debug`, `file limit reached (${MAX} files), remaining files ignored`);
-						break;
-					}
-				}
-			}
-		}
-		catch (e: any) {
-			logger(`error`, `file check error: ${e?.message || e}`);
-		}
-		logger(`debug`, `files collected: ${collected.length} items`);
-		workspaceCssFiles = collected;
+		clearWorkspaceCssFilesCache();
 	};
 }
-
-// 모듈 레벨 캐시 (파일 경로 목록)
-let workspaceCssFiles: string[] | null = null;

@@ -8,7 +8,6 @@ import { vscode, Position } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type {
 	JSHintInstance,
-	JSHintError,
 	SourceAnalysis,
 	ComplexityIssue,
 	PotentialBug,
@@ -21,12 +20,10 @@ import { calculateErrorRange, calculateSeverity } from "@langs/js/jsUtils";
 // -------------------------------------------------------------------------------------------------
 // CONSTANTS
 // -------------------------------------------------------------------------------------------------
-const ERROR_SEVERITY_TYPES = [ `eval-usage`, `with-statement`, `assignment-in-condition` ];
-const WARNING_SEVERITY_TYPES = [ `empty-catch` ];
+const ERROR_SEVERITY_TYPES = [ `eval-usage`, `with-statement`, `assignment-in-condition`, `innerhtml-usage`, `document-write` ];
+const WARNING_SEVERITY_TYPES = [ `empty-catch`, `var-usage` ];
 const MAX_FUNCTION_PARAMS = 6;
-const TS_EXTENSIONS = [ `.ts`, `.tsx` ];
 const MODULE_EXTENSIONS = [ `.mjs`, `.cjs` ];
-const TS_LANGUAGE_IDS = [ `typescript`, `typescriptreact` ];
 
 // -------------------------------------------------------------------------------------------------
 // MODULE STATE
@@ -176,26 +173,12 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
 
 			const config = { ...loadJSHintConfig(document.uri.fsPath) };
 			const fileName = document.fileName.toLowerCase();
-			const languageId = document.languageId;
 			const sourceText = document.getText();
-
-			const isTypeScript = (
-				TS_EXTENSIONS.some(ext => fileName.endsWith(ext)) ||
-				TS_LANGUAGE_IDS.includes(languageId)
-			);
 
 			const isModule = (
 				MODULE_EXTENSIONS.some(ext => fileName.endsWith(ext)) ||
 				sourceText.includes(`import `) ||
-				sourceText.includes(`export `) ||
-				isTypeScript
-			);
-
-			isTypeScript && (
-				config.esversion = 2022,
-				config.module = true,
-				config.undef = false,
-				config.predef = [ ...(config.predef || []), `TypeScript`, `namespace`, `interface`, `type`, `declare`, `enum` ]
+				sourceText.includes(`export `)
 			);
 
 			isModule && (

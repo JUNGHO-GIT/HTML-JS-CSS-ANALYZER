@@ -1,6 +1,6 @@
 # 🚀 Html-Js-Css-Analyzer
 
-Visual Studio Code extension that analyzes HTML, CSS files to detect undefined classes/ids, unused selectors, and provides code intelligence features.
+Visual Studio Code extension that analyzes HTML, CSS, and JavaScript files to detect undefined classes/ids, unused selectors, and provides code intelligence features.
 
 ## Features 🔎 🔎
 
@@ -8,6 +8,7 @@ Visual Studio Code extension that analyzes HTML, CSS files to detect undefined c
 - 🔍 Unused CSS selector highlighting
 - ✨ IntelliSense support (completion and go-to-definition)
 - 🛠️ HTMLHint integration with Quick Fixes
+- 🛠️ JSHint integration for JavaScript analysis
 - 🔗 Multi-file CSS analysis across workspace
 - 🗄️ Style cache management
 
@@ -18,7 +19,7 @@ Visual Studio Code extension that analyzes HTML, CSS files to detect undefined c
 
 ## Usage ▶️ ▶️
 
-- ▶️ Extension activates automatically when opening HTML, CSS files.
+- ▶️ Extension activates automatically when opening HTML, CSS, or JavaScript files.
 - 🛠️ Commands:
   - `Html-Js-Css-Analyzer: Validate Current Document`
   - `Html-Js-Css-Analyzer: Clear Style Cache`

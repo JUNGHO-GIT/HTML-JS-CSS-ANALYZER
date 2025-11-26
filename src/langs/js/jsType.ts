@@ -63,7 +63,7 @@ export declare type ComplexityIssue = {
 
 // -------------------------------------------------------------------------------------------------
 export declare type PotentialBug = {
-	type: `assignment-in-condition` | `potential-null-reference` | `empty-catch` | `console-usage` | `eval-usage` | `with-statement`;
+	type: `assignment-in-condition` | `potential-null-reference` | `empty-catch` | `console-usage` | `eval-usage` | `with-statement` | `var-usage` | `innerhtml-usage` | `document-write` | `large-loop`;
 	line: number;
 	message: string;
 };
@@ -71,7 +71,6 @@ export declare type PotentialBug = {
 // -------------------------------------------------------------------------------------------------
 export declare type SourceAnalysis = {
 	isModule: boolean;
-	isTypeScript: boolean;
 	hasStrictMode: boolean;
 	functions: FunctionInfo[];
 	variables: VariableInfo[];
