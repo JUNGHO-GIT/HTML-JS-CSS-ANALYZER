@@ -1,8 +1,5 @@
-# ==================================================================================================
-# auto-generated from .gitignore (all excluded from language statistics) ===========================
-# ==================================================================================================
+# .gitattributes
 
-# text settings
 * text eol=crlf
 * linguist-detectable=true
 
