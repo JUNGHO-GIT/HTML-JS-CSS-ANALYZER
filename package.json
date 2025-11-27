@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.9.4",
+  "version": "2.9.5",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -140,14 +140,16 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "watch": "bun .node/swc.cjs --bun --watch",
-    "reset": "bun .node/reset.cjs --bun --reset",
-    "fix": "bun .node/fix.cjs --bun --fix",
-    "compile-client": "bun .node/swc.cjs --bun --compile --client",
-    "compile-server": "bun .node/swc.cjs --bun --compile --server",
+    "start-client": "bun .node/swc.cjs --bun --start --client",
+    "start-server": "bun .node/swc.cjs --bun --start --server",
+    "build-client": "bun .node/swc.cjs --bun --build --client",
+    "build-server": "bun .node/swc.cjs --bun --build --server",
     "git-fetch": "bun .node/git.cjs --bun --fetch",
     "git-push": "bun .node/git.cjs --bun --push",
-    "vsce": "bun .node/vsce.cjs --bun --package"
+    "fix": "bun .node/fix.cjs --bun --fix",
+    "reset": "bun .node/reset.cjs --bun --reset",
+    "vsce": "bun .node/vsce.cjs --bun --package",
+    "gcloud": "bun .node/gcloud.cjs --bun --deploy"
   },
   "dependencies": {
     "htmlhint": "^1.8.0",

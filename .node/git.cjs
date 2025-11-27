@@ -15,31 +15,16 @@ const args1 = argv.find(arg => [`--npm`, `--pnpm`, `--yarn`, `--bun`].includes(a
 const args2 = argv.find(arg => [`--push`, `--fetch`].includes(arg))?.replace(`--`, ``) || ``;
 const winOrLinux = os.platform() === 'win32' ? `win` : `linux`;
 
-// 원격 기본 브랜치 감지 ------------------------------------------------------------------------
+// 원격 기본 브랜치 감지 (고정 규칙: public → public/public/main, private → private/private/main) --------
 const getRemoteDefaultBranch = (remoteName = ``) => {
-	try {
-		const fixedBranch = remoteName === `public` ? `public/main` : remoteName === `private` ? `private/main` : ``;
+	const fixedBranch = remoteName === `public` ? `public/main` : remoteName === `private` ? `private/main` : ``;
 
-		if (fixedBranch) {
-			logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치(고정): ${fixedBranch}`);
-			return fixedBranch;
-		}
+	!fixedBranch ? (
+		logger(`error`, `지원하지 않는 remote입니다: ${remoteName}`),
+		``
+	) : logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치(고정): ${fixedBranch}`);
 
-		const branches = execSync(`git ls-remote --heads ${remoteName}`, { encoding: 'utf8' }).trim();
-		const hasPublicMain = branches.includes(`refs/heads/public/main`);
-		const hasPrivateMain = branches.includes(`refs/heads/private/main`);
-		const hasMain = branches.includes(`refs/heads/main`);
-		const hasMaster = branches.includes(`refs/heads/master`);
-		const defaultBranch = hasPublicMain ? `public/main` : hasPrivateMain ? `private/main` : hasMain ? `main` : hasMaster ? `master` : ``;
-
-		logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치: ${defaultBranch}`);
-
-		return defaultBranch;
-	}
-	catch (e) {
-		logger(`error`, `원격 브랜치 감지 실패: ${remoteName}`);
-		return ``;
-	}
+	return fixedBranch;
 };
 
 // changelog 수정 -------------------------------------------------------------------------------
