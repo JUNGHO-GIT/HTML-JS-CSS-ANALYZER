@@ -18,10 +18,19 @@ const winOrLinux = os.platform() === 'win32' ? `win` : `linux`;
 // 원격 기본 브랜치 감지 ------------------------------------------------------------------------
 const getRemoteDefaultBranch = (remoteName = ``) => {
 	try {
+		const fixedBranch = remoteName === `origin` ? `public/main` : remoteName === `private` ? `private/main` : ``;
+
+		if (fixedBranch) {
+			logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치(고정): ${fixedBranch}`);
+			return fixedBranch;
+		}
+
 		const branches = execSync(`git ls-remote --heads ${remoteName}`, { encoding: 'utf8' }).trim();
+		const hasPublicMain = branches.includes(`refs/heads/public/main`);
+		const hasPrivateMain = branches.includes(`refs/heads/private/main`);
 		const hasMain = branches.includes(`refs/heads/main`);
 		const hasMaster = branches.includes(`refs/heads/master`);
-		const defaultBranch = hasMain ? `main` : hasMaster ? `master` : ``;
+		const defaultBranch = hasPublicMain ? `public/main` : hasPrivateMain ? `private/main` : hasMain ? `main` : hasMaster ? `master` : ``;
 
 		logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치: ${defaultBranch}`);
 

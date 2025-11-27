@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "2.9.0",
+  "version": "2.9.3",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -141,9 +141,10 @@
   },
   "scripts": {
     "watch": "bun .node/swc.cjs --bun --watch",
-    "compile-server": "bun .node/swc.cjs --bun --compile --server",
     "reset": "bun .node/reset.cjs --bun --reset",
     "fix": "bun .node/fix.cjs --bun --fix",
+    "compile-client": "bun .node/swc.cjs --bun --compile --client",
+    "compile-server": "bun .node/swc.cjs --bun --compile --server",
     "git-fetch": "bun .node/git.cjs --bun --fetch",
     "git-push": "bun .node/git.cjs --bun --push",
     "vsce": "bun .node/vsce.cjs --bun --package"
