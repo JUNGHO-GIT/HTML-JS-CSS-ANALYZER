@@ -1,0 +1,28 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "CommonJS",
+		"lib": ["ES2022"],
+		"strict": false,
+		"noImplicitAny": false,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"declaration": false,
+		"outDir": "./dist",
+		"rootDir": ".",
+		"baseUrl": ".",
+		"paths": {
+			"@exportLibs": ["tests/__mocks__/exportLibs.ts"],
+			"@exportScripts": ["tests/__mocks__/exportScripts.ts"],
+			"@exportConsts": ["tests/__mocks__/exportConsts.ts"],
+			"@exportTypes": ["src/assets/types/common.ts"],
+			"@exportLangs": ["tests/__mocks__/exportLangs.ts"],
+			"@scripts/*": ["src/assets/scripts/*"],
+			"@langs/*": ["src/langs/*"]
+		}
+	},
+	"include": ["src/**/*", "tests/**/*"],
+	"exclude": ["node_modules", "dist", "out"]
+}
