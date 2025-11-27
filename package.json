@@ -151,6 +151,27 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/tests"],
+    "testMatch": ["**/*.test.ts"],
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", {"tsconfig": "tsconfig.test.json"}]
+    },
+    "moduleNameMapper": {
+      "^@exportLibs$": "<rootDir>/tests/__mocks__/exportLibs",
+      "^@exportScripts$": "<rootDir>/tests/__mocks__/exportScripts",
+      "^@exportConsts$": "<rootDir>/tests/__mocks__/exportConsts",
+      "^@exportTypes$": "<rootDir>/src/assets/types/common",
+      "^@exportLangs$": "<rootDir>/tests/__mocks__/exportLangs",
+      "^@scripts/(.*)$": "<rootDir>/src/assets/scripts/$1",
+      "^@langs/(.*)$": "<rootDir>/src/langs/$1"
+    },
+    "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts", "!src/exports/**"],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov"]
+  },
   "dependencies": {
     "htmlhint": "^1.8.0",
     "jshint": "^2.13.6",

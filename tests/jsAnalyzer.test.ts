@@ -11,7 +11,7 @@ const MAX_REGEX_COMPLEXITY = 15;
 
 const INDENT_REGEX = /^\s*/;
 const REGEX_PATTERN = /\/(?![*/])(?:[^\\/\n]|\\.)+\/[gimsuvy]*/g;
-const COMPLEX_CHARS_REGEX = /[\](){}|*+?[]/g;
+const COMPLEX_CHARS_REGEX = /[\](){}|*+?\[]/g;
 const COMMENT_START_REGEX = /^\s*(?:\/\/|\/\*)/;
 const ASSIGNMENT_IN_IF_REGEX = /\bif\s*\([^)]*[^=!<>]=(?!=)[^=]/;
 const EMPTY_CATCH_REGEX = /\bcatch\s*\([^)]*\)\s*\{\s*\}/;
@@ -267,8 +267,8 @@ describe(`analyzeSourceCode - JavaScript 코드 분석`, () => {
 
 	describe(`복잡도 이슈 검사`, () => {
 		it(`과도한 중첩을 감지해야 함`, () => {
-			// 각 줄 앞에 20개의 공백(10레벨의 들여쓰기)을 추가하여 심층 중첩 시뮬레이션
-			const code = `                                        console.log('deeply nested');`;
+			// 20개의 공백(10레벨의 들여쓰기)을 사용하여 심층 중첩 시뮬레이션
+			const code = ` `.repeat(20) + `console.log('deeply nested');`;
 			const { analysis } = analyzeSourceCode(code, createDoc(code));
 
 			const deepNesting = analysis.complexityIssues.filter(i => i.type === `deep-nesting`);
