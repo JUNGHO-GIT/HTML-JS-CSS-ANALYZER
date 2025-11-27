@@ -18,7 +18,7 @@ const winOrLinux = os.platform() === 'win32' ? `win` : `linux`;
 // 원격 기본 브랜치 감지 ------------------------------------------------------------------------
 const getRemoteDefaultBranch = (remoteName = ``) => {
 	try {
-		const fixedBranch = remoteName === `origin` ? `public/main` : remoteName === `private` ? `private/main` : ``;
+		const fixedBranch = remoteName === `public` ? `public/main` : remoteName === `private` ? `private/main` : ``;
 
 		if (fixedBranch) {
 			logger(`info`, `원격 저장소 ${remoteName} 기본 브랜치(고정): ${fixedBranch}`);
@@ -122,17 +122,17 @@ const checkRemoteExists = (remoteName = ``) => {
 const gitFetch = () => {
 	try {
 		const privateExists = checkRemoteExists(`private`);
-		const originExists = checkRemoteExists(`origin`);
-		const targetRemote = privateExists ? `private` : `origin`;
+		const publicExists = checkRemoteExists(`public`);
+		const targetRemote = privateExists ? `private` : `public`;
 		const targetBranch = getRemoteDefaultBranch(targetRemote);
 
 		privateExists ? (
 			logger(`info`, `Private remote 감지 - private만 fetch 진행`)
 		) : (
-			logger(`info`, `Private remote 없음 - origin fetch 진행`)
+			logger(`info`, `Private remote 없음 - public fetch 진행`)
 		);
 
-		!privateExists && !originExists ? (
+		!privateExists && !publicExists ? (
 			logger(`error`, `사용 가능한 remote가 없습니다`)
 		) : !targetBranch ? (
 			logger(`error`, `원격 기본 브랜치를 찾을 수 없습니다`)
@@ -213,7 +213,7 @@ const gitPush = (remoteName = ``, ignoreFilePath = ``, winOrLinux = ``) => {
 
 		args2.includes(`push`) && (() => {
 			incrementVersion(modifyChangelog());
-			gitPush(`origin`, `.gitignore.public`, winOrLinux);
+			gitPush(`public`, `.gitignore.public`, winOrLinux);
 			gitPush(`private`, `.gitignore.private`, winOrLinux);
 			logger(`success`, `Git Push 완료`);
 		})();
