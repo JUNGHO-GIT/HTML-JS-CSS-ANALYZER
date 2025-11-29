@@ -60,9 +60,9 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	const isHtml = isHtmlDoc(doc);
 	const isJs = isJsLikeDoc(doc);
 
-	const shouldCheckCssUsage = isCssHintEnabled(doc.uri);
+	const shouldCheckCssUsage = isCssHintEnabled(doc.uri) && (isHtml || isCssLikeDoc(doc));
 	const {diagnostics: usageDiagnostics, usedClassesFromMarkup, usedIdsFromMarkup} = shouldCheckCssUsage ? (
-		scanDocumentUsages(fullText, doc, knownClasses, knownIds, isJs)
+		scanDocumentUsages(fullText, doc, knownClasses, knownIds)
 	) : (
 		{diagnostics: [], usedClassesFromMarkup: new Set<string>(), usedIdsFromMarkup: new Set<string>()}
 	);

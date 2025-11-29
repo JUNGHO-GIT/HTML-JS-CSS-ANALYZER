@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -110,7 +110,7 @@
           "scope": "resource",
           "default": [
             "html",
-            "htm",
+            "js",
             "css"
           ],
           "items": {
@@ -129,6 +129,12 @@
           "scope": "resource",
           "default": true,
           "description": "[Html-Js-Css-Analyzer] Enable/disable CSS analysis and hints"
+        },
+        "Html-Js-Css-Analyzer.jsHint.enabled": {
+          "type": "boolean",
+          "scope": "resource",
+          "default": false,
+          "description": "[Html-Js-Css-Analyzer] Enable/disable JavaScript analysis and hints"
         }
       }
     }
@@ -140,16 +146,13 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "start-client": "bun .node/swc.cjs --bun --start --client",
     "start-server": "bun .node/swc.cjs --bun --start --server",
-    "build-client": "bun .node/swc.cjs --bun --build --client",
     "build-server": "bun .node/swc.cjs --bun --build --server",
     "git-fetch": "bun .node/git.cjs --bun --fetch",
     "git-push": "bun .node/git.cjs --bun --push",
     "fix": "bun .node/fix.cjs --bun --fix",
     "reset": "bun .node/reset.cjs --bun --reset",
-    "vsce": "bun .node/vsce.cjs --bun --package",
-    "gcloud": "bun .node/gcloud.cjs --bun --deploy"
+    "vsce": "bun .node/vsce.cjs --bun --package"
   },
   "dependencies": {
     "htmlhint": "^1.8.0",

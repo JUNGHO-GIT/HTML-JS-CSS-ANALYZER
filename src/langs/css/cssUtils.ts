@@ -26,9 +26,6 @@ const BACKSLASH_REGEX = /\\/g;
 const CLASS_ATTRIBUTE_REGEX = /(?:class|className)\s*[=:]\s*(["'`])((?:(?!\1).)*?)\1/gis;
 const CLASSLIST_METHOD_REGEX = /classList\.(?:add|remove|toggle|contains)\s*\(([^)]+)\)/gis;
 const STRING_LITERAL_REGEX = /(['"`])((?:(?!\1).)*?)\1/g;
-const INNERHTML_REGEX = /\.(?:innerHTML|outerHTML)\s*[=:]\s*(["'`])((?:(?!\1)[\s\S])*?)\1/gis;
-const INSERTADJACENTHTML_REGEX = /\.insertAdjacentHTML\s*\(\s*["'`][^"'`]*["'`]\s*,\s*(["'`])((?:(?!\1)[\s\S])*?)\1\s*\)/gis;
-const TEMPLATE_LITERAL_HTML_REGEX = /(?:innerHTML|outerHTML)\s*[=:]\s*`((?:[^`\\]|\\.)*?)`/gis;
 const QUERYSELECTOR_REGEX = /querySelector(?:All)?\s*\(\s*(["'`])((?:(?!\1)[\s\S])*?)\1\s*\)/gis;
 const GETELEMENTBYID_REGEX = /getElementById\s*\(\s*(["'])((?:(?!\1)[^"'`])+)\1\s*\)/gis;
 const REMOTE_URL_REGEX = /^https?:\/\//i;
@@ -312,32 +309,6 @@ export const extractCssBodies = (fullText: string): string => {
 };
 
 // -------------------------------------------------------------------------------------------------
-export const extractHtmlFromInnerHtml = (fullText: string): Array<{ html: string; offset: number }> => {
-	const results: Array<{ html: string; offset: number }> = [];
-	let match: RegExpExecArray | null;
-
-	while ((match = INNERHTML_REGEX.exec(fullText))) {
-		const htmlContent = match[2];
-		const offset = match.index + match[0].indexOf(htmlContent);
-		results.push({ html: htmlContent, offset });
-	}
-
-	while ((match = INSERTADJACENTHTML_REGEX.exec(fullText))) {
-		const htmlContent = match[2];
-		const offset = match.index + match[0].lastIndexOf(htmlContent);
-		results.push({ html: htmlContent, offset });
-	}
-
-	while ((match = TEMPLATE_LITERAL_HTML_REGEX.exec(fullText))) {
-		const htmlContent = match[1];
-		const offset = match.index + match[0].indexOf(htmlContent);
-		results.push({ html: htmlContent, offset });
-	}
-
-	return results;
-};
-
-// -------------------------------------------------------------------------------------------------
 // REGEX EXPORTS (for use in validator)
 // -------------------------------------------------------------------------------------------------
 export {
@@ -434,8 +405,7 @@ export const scanDocumentUsages = (
 	fullText: string,
 	document: vscode.TextDocument,
 	knownClasses: Set<string>,
-	knownIds: Set<string>,
-	isJsLike: boolean
+	knownIds: Set<string>
 ): { diagnostics: vscode.Diagnostic[]; usedClassesFromMarkup: Set<string>; usedIdsFromMarkup: Set<string> } => {
 	const diagnostics: vscode.Diagnostic[] = [];
 	const usedClassesFromMarkup = new Set<string>();
@@ -458,50 +428,6 @@ export const scanDocumentUsages = (
 	while ((classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText))) {
 		processClassListCall(classListMatch, document, knownClasses, diagnostics, usedClassesFromMarkup);
 	}
-
-	// JS/TS 파일의 innerHTML 등에서 HTML 추출 및 처리
-	isJsLike && extractHtmlFromInnerHtml(fullText).forEach(({ html, offset }) => {
-		const classRegex = /class\s*=\s*(["'])([^"']*)\1/gis;
-		let classMatch: RegExpExecArray | null;
-		while ((classMatch = classRegex.exec(html))) {
-			const matchCopy = classMatch;
-			const classes = matchCopy[2].split(/\s+/).filter(c => c.trim());
-			classes.forEach(className => {
-				const normalized = normalizeToken(className).trim();
-				normalized && isValidCssIdentifier(normalized) && (
-					knownClasses.has(normalized) ? usedClassesFromMarkup.add(normalized) : (() => {
-						const d = new vscode.Diagnostic(
-							makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(className), className.length),
-							`CSS class '${normalized}' not found`,
-							vscode.DiagnosticSeverity.Warning
-						);
-						d.source = `CSS-Analyzer`;
-						d.code = `CSS001`;
-						diagnostics.push(d);
-					})()
-				);
-			});
-		}
-
-		const idRegex = /\bid\s*=\s*(["'])([^"']*)\1/gis;
-		let idMatch: RegExpExecArray | null;
-		while ((idMatch = idRegex.exec(html))) {
-			const matchCopy = idMatch;
-			const idValue = normalizeToken(matchCopy[2]).trim();
-			idValue && isValidCssIdentifier(idValue) && (
-				knownIds.has(idValue) ? usedIdsFromMarkup.add(idValue) : (() => {
-					const d = new vscode.Diagnostic(
-						makeRange(document, offset + matchCopy.index + matchCopy[0].indexOf(idValue), idValue.length),
-						`CSS id '#${idValue}' not found`,
-						vscode.DiagnosticSeverity.Warning
-					);
-					d.source = `CSS-Analyzer`;
-					d.code = `CSS002`;
-					diagnostics.push(d);
-				})()
-			);
-		}
-	});
 
 	// querySelector* selectors
 	let qsMatch: RegExpExecArray | null;

@@ -3,17 +3,20 @@
  * @since 2025-11-22
  */
 
-import { vscode } from "@exportLibs";
-import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
-import { AutoValidationMode } from "@exportTypes";
-import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
-import { initLogger, logger } from "@exportScripts";
+import {vscode} from "@exportLibs";
+import {CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider} from "@exportLangs";
+import {AutoValidationMode} from "@exportTypes";
+import {scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport} from "@exportScripts";
+import {initLogger, logger} from "@exportScripts";
+
+// -------------------------------------------------------------------------------------------------
+const HTML_LANGUAGE: vscode.DocumentSelector = [ {language: `html`} ];
+const JS_LANGUAGES: vscode.DocumentSelector = [ {language: `javascript`} ];
+const CSS_LANGUAGES: vscode.DocumentSelector = [ {language: `html`}, {language: `css`} ];
 
 // -------------------------------------------------------------------------------------------------
 export const deactivate = () => {};
 export const activate = (context: vscode.ExtensionContext) => {
-
-	// 0. Initialize Logger ------------------------------------------------------------------------
 	initLogger();
 	logger(`info`, `Html-Js-Css-Analyzer is now active!`);
 	const cssSupport = new CssSupport();
@@ -28,34 +31,22 @@ export const activate = (context: vscode.ExtensionContext) => {
 };
 
 // -------------------------------------------------------------------------------------------------
-const HTML_LANGUAGE: vscode.DocumentSelector = [
-	{language: `html`},
-];
-const SUPPORTED_LANGUAGES: vscode.DocumentSelector = [
-	{language: `html`},
-	{language: `css`},
-	{language: `javascript`},
-];
-const JS_LANGUAGES: vscode.DocumentSelector = [
-	{language: `javascript`},
-];
-
-// -------------------------------------------------------------------------------------------------
 const registerProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
-	context.subscriptions.push(
-		vscode.languages.registerCompletionItemProvider(SUPPORTED_LANGUAGES, cssSupport, `.`, `#`, `"`, `'`, "`", ` `),
-		vscode.languages.registerDefinitionProvider(SUPPORTED_LANGUAGES, cssSupport),
-		vscode.languages.registerCodeActionsProvider(HTML_LANGUAGE, new HtmlHintCodeActionProvider(), {providedCodeActionKinds: HtmlHintCodeActionProvider.metadata.providedCodeActionKinds}),
-		vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JSHintCodeActionProvider(), {providedCodeActionKinds: JSHintCodeActionProvider.metadata.providedCodeActionKinds})
-	);
+	context.subscriptions.push(vscode.languages.registerCompletionItemProvider(CSS_LANGUAGES, cssSupport, `.`, `#`, `"`, `'`, "`", ` `), vscode.languages.registerDefinitionProvider(CSS_LANGUAGES, cssSupport), vscode.languages.registerCodeActionsProvider(HTML_LANGUAGE, new HtmlHintCodeActionProvider(), {providedCodeActionKinds: HtmlHintCodeActionProvider.metadata.providedCodeActionKinds}), vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JSHintCodeActionProvider(), {providedCodeActionKinds: JSHintCodeActionProvider.metadata.providedCodeActionKinds}));
 };
 
 // -------------------------------------------------------------------------------------------------
 const registerEventHandlers = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
 	context.subscriptions.push(
-		vscode.workspace.onDidSaveTextDocument(async (savedDoc: vscode.TextDocument) => { await updateDiagnostics(cssSupport, savedDoc, AutoValidationMode.SAVE); }),
-		vscode.workspace.onDidOpenTextDocument(async (openedDoc: vscode.TextDocument) => { await updateDiagnostics(cssSupport, openedDoc, AutoValidationMode.ALWAYS); }),
-		vscode.workspace.onDidChangeTextDocument(async (changeEvent: vscode.TextDocumentChangeEvent) => { scheduleValidate(cssSupport, changeEvent.document, AutoValidationMode.ALWAYS); }),
+		vscode.workspace.onDidSaveTextDocument(async (savedDoc: vscode.TextDocument) => {
+			await updateDiagnostics(cssSupport, savedDoc, AutoValidationMode.SAVE);
+		}),
+		vscode.workspace.onDidOpenTextDocument(async (openedDoc: vscode.TextDocument) => {
+			await updateDiagnostics(cssSupport, openedDoc, AutoValidationMode.ALWAYS);
+		}),
+		vscode.workspace.onDidChangeTextDocument(async (changeEvent: vscode.TextDocumentChangeEvent) => {
+			scheduleValidate(cssSupport, changeEvent.document, AutoValidationMode.ALWAYS);
+		}),
 		vscode.workspace.onDidCloseTextDocument(onClosed)
 	);
 };
@@ -65,7 +56,7 @@ const registerCommands = (context: vscode.ExtensionContext, cssSupport: CssSuppo
 	context.subscriptions.push(
 		vscode.commands.registerCommand(`Html-Js-Css-Analyzer.validate`, async (mode?: AutoValidationMode) => {
 			const editor = vscode.window.activeTextEditor;
-			editor && await updateDiagnostics(cssSupport, editor.document, mode ?? AutoValidationMode.FORCE);
+			editor && (await updateDiagnostics(cssSupport, editor.document, mode ?? AutoValidationMode.FORCE));
 		}),
 		vscode.commands.registerCommand(`Html-Js-Css-Analyzer.clear`, clearAll)
 	);
