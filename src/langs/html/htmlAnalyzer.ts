@@ -13,7 +13,7 @@ const MAX_NESTING_LEVEL = 10;
 const MAX_LINE_LENGTH = 200;
 const MAX_ATTRIBUTES_PER_TAG = 15;
 
-// REGEX PATTERNS
+// REGEX PATTERNS (non-global for .test(), global for .exec() loops)
 const HTML_TAG_REGEX = /<([a-zA-Z][a-zA-Z0-9-]*)\s*([^>]*)>/g;
 const INLINE_STYLE_REGEX = /\bstyle\s*=\s*["'][^"']*["']/gi;
 const INLINE_EVENT_REGEX = /\bon[a-z]+\s*=\s*["'][^"']*["']/gi;
@@ -21,13 +21,14 @@ const DEPRECATED_TAGS_REGEX = /<(center|font|marquee|blink|strike|big|tt|framese
 const DUPLICATE_ID_REGEX = /\bid\s*=\s*["']([^"']+)["']/gi;
 const ATTRIBUTE_REGEX = /([a-zA-Z][a-zA-Z0-9-_]*)\s*(?:=\s*["'][^"']*["'])?/g;
 
-// -------------------------------------------------------------------------------------------------
-// ACCESSIBILITY & BEST PRACTICES REGEX
-const IMG_WITHOUT_ALT_REGEX = /<img\b(?![^>]*\balt\s*=)[^>]*>/gi;
-const A_WITHOUT_HREF_REGEX = /<a\b(?![^>]*\bhref\s*=)[^>]*>/gi;
-const BUTTON_WITHOUT_TYPE_REGEX = /<button\b(?![^>]*\btype\s*=)[^>]*>/gi;
-const INPUT_WITHOUT_LABEL_REGEX = /<input\b[^>]*>/gi; // Requires more complex logic, simplified for now
-const TARGET_BLANK_REGEX = /target\s*=\s*["']_blank["'](?![^>]*\brel\s*=\s*["'](?:[^"']*\s)?noopener(?:[^"']*)?["'])/gi;
+// Non-global versions for .test() (avoids lastIndex issues)
+const IMG_WITHOUT_ALT_TEST = /<img\b(?![^>]*\balt\s*=)[^>]*>/i;
+const A_WITHOUT_HREF_TEST = /<a\b(?![^>]*\bhref\s*=)[^>]*>/i;
+const BUTTON_WITHOUT_TYPE_TEST = /<button\b(?![^>]*\btype\s*=)[^>]*>/i;
+const TARGET_BLANK_TEST = /target\s*=\s*["']_blank["'](?![^>]*\brel\s*=\s*["'](?:[^"']*\s)?noopener(?:[^"']*)?["'])/i;
+
+// Script/Style content removal
+const SCRIPT_STYLE_CONTENT_REGEX = /<(script|style)[^>]*>[\s\S]*?<\/\1>/gi;
 
 // -------------------------------------------------------------------------------------------------
 // TYPE DEFINITIONS
@@ -55,7 +56,9 @@ declare type HtmlAnalysisResult = {
 // ANALYSIS FUNCTIONS
 // -------------------------------------------------------------------------------------------------
 const analyzeNesting = (sourceCode: string, issues: HtmlAnalysisIssue[]): number => {
-	const lines = sourceCode.split(`\n`);
+	// Remove script and style content to avoid false positives
+	const cleanedSource = sourceCode.replace(SCRIPT_STYLE_CONTENT_REGEX, (match, tag) => `<${tag}></${tag}>`);
+	const lines = cleanedSource.split(`\n`);
 	let currentNesting = 0;
 	let maxNesting = 0;
 	const selfClosingTags = new Set([
@@ -253,35 +256,29 @@ const analyzeAccessibility = (sourceCode: string, issues: HtmlAnalysisIssue[]): 
 		const line = lines[i];
 		const lineNum = i + 1;
 
-		// Image without alt
-		if (IMG_WITHOUT_ALT_REGEX.test(line)) {
-			issues.push({
-				type: `a11y-img-alt`,
-				line: lineNum,
-				message: `Image tag missing 'alt' attribute (accessibility)`,
-				severity: `warning`,
-			});
-		}
+		// Image without alt (using non-global regex)
+		IMG_WITHOUT_ALT_TEST.test(line) && issues.push({
+			type: `a11y-img-alt`,
+			line: lineNum,
+			message: `Image tag missing 'alt' attribute (accessibility)`,
+			severity: `warning`,
+		});
 
-		// Anchor without href
-		if (A_WITHOUT_HREF_REGEX.test(line)) {
-			issues.push({
-				type: `a11y-anchor-href`,
-				line: lineNum,
-				message: `Anchor tag missing 'href' attribute (accessibility)`,
-				severity: `warning`,
-			});
-		}
+		// Anchor without href (using non-global regex)
+		A_WITHOUT_HREF_TEST.test(line) && issues.push({
+			type: `a11y-anchor-href`,
+			line: lineNum,
+			message: `Anchor tag missing 'href' attribute (accessibility)`,
+			severity: `warning`,
+		});
 
-		// Button without type
-		if (BUTTON_WITHOUT_TYPE_REGEX.test(line)) {
-			issues.push({
-				type: `best-practice-button-type`,
-				line: lineNum,
-				message: `Button tag missing 'type' attribute (default is 'submit')`,
-				severity: `info`,
-			});
-		}
+		// Button without type (using non-global regex)
+		BUTTON_WITHOUT_TYPE_TEST.test(line) && issues.push({
+			type: `best-practice-button-type`,
+			line: lineNum,
+			message: `Button tag missing 'type' attribute (default is 'submit')`,
+			severity: `info`,
+		});
 	}
 };
 
@@ -292,15 +289,13 @@ const analyzeSecurity = (sourceCode: string, issues: HtmlAnalysisIssue[]): void 
 		const line = lines[i];
 		const lineNum = i + 1;
 
-		// target="_blank" security risk
-		if (TARGET_BLANK_REGEX.test(line)) {
-			issues.push({
-				type: `security-target-blank`,
-				line: lineNum,
-				message: `Using target="_blank" without rel="noopener noreferrer" is a security risk`,
-				severity: `warning`,
-			});
-		}
+		// target="_blank" security risk (using non-global regex)
+		TARGET_BLANK_TEST.test(line) && issues.push({
+			type: `security-target-blank`,
+			line: lineNum,
+			message: `Using target="_blank" without rel="noopener noreferrer" is a security risk`,
+			severity: `warning`,
+		});
 	}
 };
 

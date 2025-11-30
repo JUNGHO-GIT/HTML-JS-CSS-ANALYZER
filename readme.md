@@ -1,30 +1,33 @@
 # Html-Js-Css-Analyzer
 
-A lightweight VS Code extension for analyzing HTML, JavaScript, and CSS. It helps you find undefined classes, unused selectors, and provides intelligent code completion.
+A lightweight VS Code extension for analyzing HTML, JavaScript, and CSS.  
+Find undefined classes, unused selectors, and get intelligent code completion.
 
 ## Key Features
 
-* **HTML Analysis**: Detects undefined classes/IDs and integrates HTMLHint for validation.
-* **CSS Analysis**: Highlights unused selectors and validates syntax using advanced parsing.
-* **JavaScript Analysis**: Integrates JSHint for code quality and error detection.
-* **IntelliSense**: Provides auto-completion and "Go to Definition" for CSS classes and IDs across your workspace.
+| Feature | Description |
+| :--- | :--- |
+| **HTML Analysis** | Detects undefined classes/IDs, integrates HTMLHint for validation |
+| **CSS Analysis** | Highlights unused selectors, validates syntax using advanced parsing |
+| **JavaScript Analysis** | Integrates JSHint for code quality and error detection |
+| **IntelliSense** | Auto-completion and "Go to Definition" for CSS classes and IDs |
 
 ## Usage
 
-The extension activates automatically when you open supported files.
+| Command | Description |
+| :--- | :--- |
+| `Validate Current Document` | Validate the current file |
+| `Clear Style Cache` | Refresh the workspace analysis |
 
-* **Validate**: Open the Command Palette (`Ctrl+Shift+P`) and run `Html-Js-Css-Analyzer: Validate Current Document`.
-* **Clear Cache**: Run `Html-Js-Css-Analyzer: Clear Style Cache` to refresh the workspace analysis.
+## Settings
 
-## Configuration
-
-You can customize the extension in VS Code settings:
-
-* `Html-Js-Css-Analyzer.enable`: Enable or disable the extension.
-* `Html-Js-Css-Analyzer.exclude`: Glob patterns to exclude specific files or folders from analysis.
-* `Html-Js-Css-Analyzer.htmlHint.enabled`: Toggle HTML validation.
-* `Html-Js-Css-Analyzer.jsHint.enabled`: Toggle JavaScript validation.
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| `enable` | `true` | Enable or disable the extension |
+| `exclude` | `[]` | Glob patterns to exclude files or folders |
+| `htmlHint.enabled` | `true` | Toggle HTML validation |
+| `jsHint.enabled` | `true` | Toggle JavaScript validation |
 
 ## License
 
-Apache-2.0
+[Apache License 2.0](./license.md)

@@ -17,11 +17,18 @@ const MAX_REGEX_COMPLEXITY = 15;
 const INDENT_REGEX = /^\s*/;
 const REGEX_PATTERN = /\/(?![*/])(?:[^\\/\n]|\\.)+\/[gimsuvy]*/g;
 const COMPLEX_CHARS_REGEX = /[\](){}|*+?[]/g;
-const COMMENT_START_REGEX = /^\s*(?:\/\/|\/\*)/;
+const COMMENT_LINE_REGEX = /^\s*\/\//;
+const STRING_CONTENT_REGEX = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
 const ASSIGNMENT_IN_IF_REGEX = /\bif\s*\([^)]*[^=!<>]=(?!=)[^=]/;
 const EMPTY_CATCH_REGEX = /\bcatch\s*\([^)]*\)\s*\{\s*\}/;
 const EVAL_USAGE_REGEX = /\beval\s*\(/;
 const WITH_STATEMENT_REGEX = /\bwith\s*\(/;
+const LOOP_START_REGEX = /\b(for|while)\s*\(/;
+
+// Helper: Remove strings and comments from line for accurate analysis
+const stripStringsAndComments = (line: string): string => {
+	return line.replace(STRING_CONTENT_REGEX, `""`).replace(/\/\/.*$/, ``).replace(/\/\*.*?\*\//g, ``);
+};
 
 // -------------------------------------------------------------------------------------------------
 const analyzeComplexity = (sourceCode: string, analysis: SourceAnalysis): void => {
@@ -52,8 +59,8 @@ const analyzeComplexity = (sourceCode: string, analysis: SourceAnalysis): void =
 		});
 
 		const regexMatches = line.match(REGEX_PATTERN);
-		regexMatches && regexMatches.forEach(regex => {
-			const complexity = (regex.match(COMPLEX_CHARS_REGEX) || []).length;
+		regexMatches?.forEach(regex => {
+			const complexity = (regex.match(COMPLEX_CHARS_REGEX) ?? []).length;
 			(regex.length > MAX_REGEX_LENGTH || complexity > MAX_REGEX_COMPLEXITY) && analysis.complexityIssues.push({
 				type: `complex-regex`,
 				line: lineNum,
@@ -66,35 +73,48 @@ const analyzeComplexity = (sourceCode: string, analysis: SourceAnalysis): void =
 // -------------------------------------------------------------------------------------------------
 const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): void => {
 	const lines = sourceCode.split(`\n`);
+	let inBlockComment = false;
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		const lineNum = i + 1;
 		const trimmed = line.trim();
 
-		if (trimmed.length === 0 || COMMENT_START_REGEX.test(trimmed)) {
+		if (trimmed.length === 0) {
 			continue;
 		}
 
-		ASSIGNMENT_IN_IF_REGEX.test(line) && analysis.potentialBugs.push({
+		// Track block comments
+		line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
+		inBlockComment && line.includes(`*/`) && (inBlockComment = false);
+
+		// Skip comments
+		if (inBlockComment || COMMENT_LINE_REGEX.test(trimmed)) {
+			continue;
+		}
+
+		// Strip strings for accurate detection
+		const strippedLine = stripStringsAndComments(line);
+
+		ASSIGNMENT_IN_IF_REGEX.test(strippedLine) && analysis.potentialBugs.push({
 			type: `assignment-in-condition`,
 			line: lineNum,
 			message: `Assignment in condition: did you mean comparison operator (===)?`,
 		});
 
-		EMPTY_CATCH_REGEX.test(line) && analysis.potentialBugs.push({
+		EMPTY_CATCH_REGEX.test(strippedLine) && analysis.potentialBugs.push({
 			type: `empty-catch`,
 			line: lineNum,
 			message: `Empty catch block: error handling required`,
 		});
 
-		EVAL_USAGE_REGEX.test(line) && analysis.potentialBugs.push({
+		EVAL_USAGE_REGEX.test(strippedLine) && analysis.potentialBugs.push({
 			type: `eval-usage`,
 			line: lineNum,
 			message: `Use of eval: security risk`,
 		});
 
-		WITH_STATEMENT_REGEX.test(line) && analysis.potentialBugs.push({
+		WITH_STATEMENT_REGEX.test(strippedLine) && analysis.potentialBugs.push({
 			type: `with-statement`,
 			line: lineNum,
 			message: `Use of with statement: forbidden in strict mode and has performance issues`,
@@ -105,67 +125,104 @@ const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): voi
 // -------------------------------------------------------------------------------------------------
 const analyzeModernJs = (sourceCode: string, analysis: SourceAnalysis): void => {
 	const lines = sourceCode.split(`\n`);
+	let inBlockComment = false;
+
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		const lineNum = i + 1;
 
-		if (/\bvar\s+/.test(line)) {
-			analysis.potentialBugs.push({
-				type: `var-usage`,
-				line: lineNum,
-				message: `Avoid using 'var', use 'let' or 'const' instead (Modern JS)`,
-			});
+		// Track block comments
+		line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
+		inBlockComment && line.includes(`*/`) && (inBlockComment = false);
+
+		if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+			continue;
 		}
+
+		// Strip strings for accurate detection
+		const strippedLine = stripStringsAndComments(line);
+
+		/\bvar\s+/.test(strippedLine) && analysis.potentialBugs.push({
+			type: `var-usage`,
+			line: lineNum,
+			message: `Avoid using 'var', use 'let' or 'const' instead (Modern JS)`,
+		});
 	}
 };
 
 // -------------------------------------------------------------------------------------------------
 const analyzeSecurity = (sourceCode: string, analysis: SourceAnalysis): void => {
 	const lines = sourceCode.split(`\n`);
+	let inBlockComment = false;
+
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		const lineNum = i + 1;
 
-		if (/\.innerHTML\s*=/.test(line)) {
-			analysis.potentialBugs.push({
-				type: `innerhtml-usage`,
-				line: lineNum,
-				message: `Assignment to innerHTML can be an XSS vulnerability`,
-			});
+		// Track block comments
+		line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
+		inBlockComment && line.includes(`*/`) && (inBlockComment = false);
+
+		if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+			continue;
 		}
 
-		if (/document\.write\(/.test(line)) {
-			analysis.potentialBugs.push({
-				type: `document-write`,
-				line: lineNum,
-				message: `Avoid using document.write()`,
-			});
-		}
+		// Strip strings for accurate detection
+		const strippedLine = stripStringsAndComments(line);
+
+		strippedLine.includes(`.innerHTML`) && /\.innerHTML\s*=/.test(strippedLine) && analysis.potentialBugs.push({
+			type: `innerhtml-usage`,
+			line: lineNum,
+			message: `Assignment to innerHTML can be an XSS vulnerability`,
+		});
+
+		strippedLine.includes(`document.write(`) && analysis.potentialBugs.push({
+			type: `document-write`,
+			line: lineNum,
+			message: `Avoid using document.write()`,
+		});
 	}
 };
 
 // -------------------------------------------------------------------------------------------------
 const analyzePerformance = (sourceCode: string, analysis: SourceAnalysis): void => {
 	const lines = sourceCode.split(`\n`);
-	let loopDepth = 0;
+	const loopStack: number[] = []; // Stack of brace depths where loops started
+	let braceDepth = 0;
+	let inBlockComment = false;
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		const lineNum = i + 1;
 
-		if (/(for|while)\s*\(/.test(line) && !line.trim().startsWith(`//`)) {
-			loopDepth++;
-			if (loopDepth > 2) {
-				analysis.potentialBugs.push({
-					type: `large-loop`,
-					line: lineNum,
-					message: `Deeply nested loop detected (depth: ${loopDepth}). This might affect performance.`,
-				});
-			}
+		// Track block comments
+		line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
+		inBlockComment && line.includes(`*/`) && (inBlockComment = false);
+
+		if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+			continue;
 		}
 
-		if (line.includes(`}`)) {
-			loopDepth > 0 && loopDepth--;
+		const strippedLine = stripStringsAndComments(line);
+
+		// Detect loop start
+		LOOP_START_REGEX.test(strippedLine) && (() => {
+			loopStack.push(braceDepth);
+			loopStack.length > 2 && analysis.potentialBugs.push({
+				type: `large-loop`,
+				line: lineNum,
+				message: `Deeply nested loop detected (depth: ${loopStack.length}). This might affect performance.`,
+			});
+		})();
+
+		// Count braces
+		const openBraces = (strippedLine.match(/\{/g) ?? []).length;
+		const closeBraces = (strippedLine.match(/\}/g) ?? []).length;
+		braceDepth += openBraces - closeBraces;
+
+		// Pop loop stack when we exit a loop's brace level
+		while (loopStack.length > 0 && braceDepth <= loopStack[loopStack.length - 1]) {
+			loopStack.pop();
 		}
 	}
 };
@@ -196,7 +253,7 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
 	// 함수 선언 분석 (최적화된 정규식)
 	const functionMatches = sourceCode.matchAll(/\bfunction\s+(\w+)\s*\([^)]*\)\s*\{/g);
 	[ ...functionMatches ].forEach(match => {
-		const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] || ``;
+		const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] ?? ``;
 		analysis.functions.push({
 			name: match[1],
 			line: sourceCode.substring(0, match.index).split(`\n`).length,
@@ -207,7 +264,7 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
 	// 화살표 함수 분석
 	const arrowMatches = sourceCode.matchAll(/(\w+)\s*=\s*\([^)]*\)\s*=>/g);
 	[ ...arrowMatches ].forEach(match => {
-		const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] || ``;
+		const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] ?? ``;
 		analysis.functions.push({
 			name: match[1],
 			line: sourceCode.substring(0, match.index).split(`\n`).length,

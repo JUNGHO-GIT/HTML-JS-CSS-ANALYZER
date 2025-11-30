@@ -1,36 +1,54 @@
 /**
  * @file cssCache.ts
  * @since 2025-11-22
+ * @description LRU 기반 CSS 선택자 캐시 (TTL, 접근 빈도 기반 정리)
  */
 
 import { type SelectorPos } from "@exportTypes";
 
-// -------------------------------------------------------------------------------------------------
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 interface CacheVal {
 	version: number;
 	data: SelectorPos[];
 	timestamp: number;
 	accessCount: number;
+	size: number;
 }
 
-// -------------------------------------------------------------------------------------------------
-const styleCache: Map<string, CacheVal> = new Map();
-const MAX_CACHE = 300; // Increased for better performance
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes TTL
+interface CacheConfig {
+	maxEntries: number;
+	ttlMs: number;
+	maxMemoryMb: number;
+}
 
-// -------------------------------------------------------------------------------------------------
-const isExpired = (cacheVal: CacheVal): boolean => {
-	return (Date.now() - cacheVal.timestamp) > CACHE_TTL_MS;
+// CONSTANTS ---------------------------------------------------------------------------------------
+const DEFAULT_CONFIG: CacheConfig = {
+	maxEntries: 300,
+	ttlMs: 30 * 60 * 1000,
+	maxMemoryMb: 50,
 };
 
-// -------------------------------------------------------------------------------------------------
+// CACHE STATE -------------------------------------------------------------------------------------
+const styleCache: Map<string, CacheVal> = new Map();
+let config = { ...DEFAULT_CONFIG };
+let totalMemoryBytes = 0;
+
+// HELPER FUNCTIONS --------------------------------------------------------------------------------
+const estimateSize = (data: SelectorPos[]): number => {
+	// Rough estimation: each selector entry ~100 bytes
+	return data.length * 100 + 50;
+};
+
+const isExpired = (cacheVal: CacheVal): boolean => (Date.now() - cacheVal.timestamp) > config.ttlMs;
+
+const isMemoryExceeded = (): boolean => totalMemoryBytes > config.maxMemoryMb * 1024 * 1024;
+
 const touch = (key: string): void => {
 	const val = styleCache.get(key);
 	if (!val) {
 		return;
 	}
 
-	// Update access statistics
 	val.accessCount++;
 	val.timestamp = Date.now();
 
@@ -39,53 +57,55 @@ const touch = (key: string): void => {
 	styleCache.set(key, val);
 };
 
-// -------------------------------------------------------------------------------------------------
-const cleanExpired = (): void => {
-	const now = Date.now();
-	const expiredKeys: string[] = [];
-
-	for (const [ key, val ] of styleCache.entries()) {
-		if ((now - val.timestamp) > CACHE_TTL_MS) {
-			expiredKeys.push(key);
-		}
-	}
-
-	expiredKeys.forEach(key => {styleCache.delete(key)});
+const removeEntry = (key: string): void => {
+	const val = styleCache.get(key);
+	val && (totalMemoryBytes -= val.size);
+	styleCache.delete(key);
 };
 
-// -------------------------------------------------------------------------------------------------
+const cleanExpired = (): number => {
+	const now = Date.now();
+	let removed = 0;
+
+	for (const [ key, val ] of styleCache.entries()) {
+		(now - val.timestamp) > config.ttlMs && (removeEntry(key), removed++);
+	}
+
+	return removed;
+};
+
 const ensureLimit = (): void => {
-	// Clean expired entries first
 	cleanExpired();
 
-	if (styleCache.size <= MAX_CACHE) {
+	const needsEviction = styleCache.size > config.maxEntries || isMemoryExceeded();
+	if (!needsEviction) {
 		return;
 	}
 
-	// Remove LRU entries based on access patterns
-	const entries = Array.from(styleCache.entries());
-	entries.sort((a, b) => {
-		// Sort by access count (ascending) then by timestamp (ascending)
-		const accessDiff = a[1].accessCount - b[1].accessCount;
-		return accessDiff !== 0 ? accessDiff : a[1].timestamp - b[1].timestamp;
-	});
+	// Sort by priority: low access count + old timestamp = evict first
+	const entries = Array.from(styleCache.entries())
+		.sort((a, b) => {
+			const scoreDiff = a[1].accessCount - b[1].accessCount;
+			return scoreDiff !== 0 ? scoreDiff : a[1].timestamp - b[1].timestamp;
+		});
 
-	const toRemove = Math.ceil(styleCache.size * 0.2); // Remove 20% of cache
-	for (let i = 0; i < toRemove && styleCache.size > MAX_CACHE; i++) {
-		styleCache.delete(entries[i][0]);
+	// Remove until within limits
+	let i = 0;
+	while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
+		removeEntry(entries[i][0]);
+		i++;
 	}
 };
 
-// -------------------------------------------------------------------------------------------------
+// PUBLIC API --------------------------------------------------------------------------------------
 export const cacheGet = (key: string): CacheVal | undefined => {
 	const val = styleCache.get(key);
 	if (!val) {
 		return undefined;
 	}
 
-	// Check if expired
 	if (isExpired(val)) {
-		styleCache.delete(key);
+		removeEntry(key);
 		return undefined;
 	}
 
@@ -93,39 +113,55 @@ export const cacheGet = (key: string): CacheVal | undefined => {
 	return val;
 };
 
-// -------------------------------------------------------------------------------------------------
-export const cacheSet = (key: string, value: Omit<CacheVal, `timestamp` | `accessCount`>): void => {
+export const cacheSet = (key: string, value: Omit<CacheVal, `timestamp` | `accessCount` | `size`>): void => {
+	// Remove existing entry first if updating
+	styleCache.has(key) && removeEntry(key);
+
 	ensureLimit();
 
+	const size = estimateSize(value.data);
 	const enrichedValue: CacheVal = {
 		...value,
 		timestamp: Date.now(),
 		accessCount: 1,
+		size,
 	};
 
 	styleCache.set(key, enrichedValue);
+	totalMemoryBytes += size;
 };
 
-// -------------------------------------------------------------------------------------------------
 export const cacheDelete = (key: string): boolean => {
-	return styleCache.delete(key);
+	const existed = styleCache.has(key);
+	existed && removeEntry(key);
+	return existed;
 };
 
-// -------------------------------------------------------------------------------------------------
 export const cacheClear = (): void => {
 	styleCache.clear();
+	totalMemoryBytes = 0;
 };
 
-// -------------------------------------------------------------------------------------------------
-export const cacheSize = (): number => {
-	return styleCache.size;
+export const cacheSize = (): number => styleCache.size;
+
+export const cacheStats = (): {
+	entries: number;
+	maxEntries: number;
+	memoryMb: number;
+	maxMemoryMb: number;
+	ttlMs: number;
+	hitRate?: number;
+} => ({
+	entries: styleCache.size,
+	maxEntries: config.maxEntries,
+	memoryMb: Math.round(totalMemoryBytes / 1024 / 1024 * 100) / 100,
+	maxMemoryMb: config.maxMemoryMb,
+	ttlMs: config.ttlMs,
+});
+
+export const cacheConfig = (newConfig: Partial<CacheConfig>): void => {
+	config = { ...config, ...newConfig };
+	ensureLimit();
 };
 
-// -------------------------------------------------------------------------------------------------
-export const cacheStats = (): {size: number; maxSize: number; ttlMs: number} => {
-	return {
-		size: styleCache.size,
-		maxSize: MAX_CACHE,
-		ttlMs: CACHE_TTL_MS,
-	};
-};
+export const cacheCleanup = (): number => cleanExpired();
