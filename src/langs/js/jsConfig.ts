@@ -122,20 +122,18 @@ export const loadJSHint = (): JSHintInstance | null => {
 	const candidates: string[] = [];
 
 	try {
-		typeof __dirname === `string` ? (
-			candidates.push(__dirname),
-			candidates.push(path.resolve(__dirname, `..`)),
-			candidates.push(path.resolve(__dirname, `..`, `..`))
-		) : (
-			void 0
-		);
+		const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+		const extPath = ext?.extensionPath;
+		typeof extPath === `string` && extPath.length > 0 && candidates.push(extPath);
 	}
 	catch {}
 
 	try {
-		const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
-		const extPath = extContext?.extensionPath;
-		extPath && extPath.length > 0 ? candidates.push(extPath) : void 0;
+		typeof __dirname === `string` && __dirname.length > 0 && (
+			candidates.push(__dirname),
+			candidates.push(path.resolve(__dirname, `..`)),
+			candidates.push(path.resolve(__dirname, `..`, `..`))
+		);
 	}
 	catch {}
 
@@ -152,7 +150,8 @@ export const loadJSHint = (): JSHintInstance | null => {
 			void 0
 		) : (() => {
 			try {
-				const req = createRequire(path.join(base, `index.js`));
+				const reqPath = path.join(base, `index.js`);
+				const req = createRequire(reqPath);
 				const mod = fnValidate(req(`jshint`));
 
 				mod ? (
@@ -161,7 +160,7 @@ export const loadJSHint = (): JSHintInstance | null => {
 					void 0
 				);
 
-				result ? logger(`debug`, `module loaded: ${base}`) : void 0;
+				result && logger(`debug`, `module loaded: ${base}`);
 			}
 			catch {
 				logger(`debug`, `load attempt failed: ${base}`);
@@ -169,11 +168,7 @@ export const loadJSHint = (): JSHintInstance | null => {
 		})();
 	}
 
-	result ? (
-		void 0
-	) : (
-		logger(`warn`, `module not loaded - JSHint is optional`)
-	);
+	!result && logger(`warn`, `module not loaded - JSHint is optional`);
 
 	return result;
 };

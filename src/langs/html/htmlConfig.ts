@@ -9,6 +9,27 @@ import { logger } from "@exportScripts";
 import type { HtmlHintInstance } from "@langs/html/htmlType";
 
 // -------------------------------------------------------------------------------------------------
+const getBaseUrl = (): string => {
+	try {
+		const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+		const extPath = ext?.extensionPath;
+		if (typeof extPath === `string` && extPath.length > 0) {
+			return path.join(extPath, `out`, `index.js`);
+		}
+	}
+	catch {}
+
+	try {
+		if (typeof __dirname === `string` && __dirname.length > 0) {
+			return path.join(__dirname, `index.js`);
+		}
+	}
+	catch {}
+
+	return path.join(process.cwd(), `index.js`);
+};
+
+// -------------------------------------------------------------------------------------------------
 export const loadHtmlHint = (): HtmlHintInstance | null => {
 	let result: HtmlHintInstance | null = null;
 
@@ -19,20 +40,12 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
 	};
 
 	try {
-		const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
-		const extPath = extContext?.extensionPath ?? ``;
-		const primaryUrl = extPath.length > 0 ? (
-			path.join(extPath, `out`, `index.js`)
-		) : typeof __dirname === `string` ? (
-			path.join(__dirname, `..`, `..`, `index.js`)
-		) : (
-			path.join(process.cwd(), `index.js`)
-		);
+		const primaryUrl = getBaseUrl();
 		const primaryReq = createRequire(primaryUrl);
 		const primaryMod = fnValidate(primaryReq(`htmlhint`));
 		if (primaryMod) {
 			result = primaryMod;
-			logger(`debug`, `module loaded successfully (primary: ${extPath})`);
+			logger(`debug`, `module loaded successfully (primary: ${primaryUrl})`);
 		}
 		else {
 			logger(`warn`, `primary validation failed`);
@@ -46,26 +59,26 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
 	!result ? (() => {
 		const arr: string[] = [];
 		try {
-			typeof __dirname === `string` ? (
-				arr.push(__dirname),
-				arr.push(path.resolve(__dirname, `..`)),
-				arr.push(path.resolve(__dirname, `..`, `..`))
-			) : void 0;
+			const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+			const extPath = ext?.extensionPath;
+			typeof extPath === `string` && extPath.length > 0 && arr.push(extPath);
 		}
 		catch {}
 		try {
-			const extContext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
-			const extPath = extContext?.extensionPath ?? ``;
-			extPath.length > 0 ? arr.push(extPath) : void 0;
+			typeof __dirname === `string` && __dirname.length > 0 && (
+				arr.push(__dirname),
+				arr.push(path.resolve(__dirname, `..`)),
+				arr.push(path.resolve(__dirname, `..`, `..`))
+			);
 		}
 		catch {}
 		arr.push(process.cwd());
 		const folders = vscode.workspace.workspaceFolders;
-		folders ? (() => {
+		folders && (() => {
 			for (const f of folders) {
 				arr.push(f.uri.fsPath);
 			}
-		})() : void 0;
+		})();
 
 		for (const base of arr) {
 			if (result) {

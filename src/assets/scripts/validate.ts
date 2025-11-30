@@ -13,7 +13,6 @@ import type { CssSupportLike } from "@langs/css/cssType";
 import {
 	collectKnownSelectors,
 	scanDocumentUsages,
-	scanLocalUnused,
 	scanEmbeddedUnused,
 } from "@langs/css/cssUtils";
 
@@ -70,10 +69,8 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
 	let unusedDiagnostics: vscode.Diagnostic[] = [];
 	const lintDiagnostics: vscode.Diagnostic[] = [];
 
-	// CSS 파일 검사
+	// CSS 파일 검사 (unused 검사 제외 - CSS 파일 내부에서 선택자 사용 여부 검사는 의미 없음)
 	if (isCssLikeDoc(doc) && isCssHintEnabled(doc.uri)) {
-		unusedDiagnostics = await scanLocalUnused(doc, support, fullText);
-
 		try {
 			const analysis = analyzeCssCode(fullText);
 			const analysisDiagnostics = generateCssAnalysisDiagnostics(doc, analysis);

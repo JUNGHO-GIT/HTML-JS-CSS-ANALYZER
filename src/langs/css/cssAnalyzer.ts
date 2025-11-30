@@ -214,34 +214,50 @@ export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
 			parseValue: true,
 		});
 
-		csstree.walk(ast, (node) => {
-			if (node.type === `Rule`) {
-				const result = analyzeRule(node, issues);
-				ruleCount += result.rules;
-				selectorCount += result.selectors;
+		// 미디어쿼리 컨텍스트 추적을 위한 스택
+		const mediaStack: string[] = [];
 
-				// Duplicate selector check
-				if (node.prelude.type === `SelectorList`) {
-					const selectorText = csstree.generate(node.prelude);
-					const existingLine = selectorCache.get(selectorText);
-					existingLine !== undefined && node.loc ? (
-						addIssue(
-							issues,
-							`duplicate-selector`,
-							node.loc.start.line,
-							`Duplicate selector (first defined at line ${existingLine})`,
-							`warning`,
-							node.loc.start.column,
-							`Merge rules or use more specific selectors`
-						)
-					) : node.loc && selectorCache.set(selectorText, node.loc.start.line);
+		csstree.walk(ast, {
+			enter: (node: csstree.CssNode) => {
+				// @media, @supports 등 at-rule 진입 시 컨텍스트 푸시
+				node.type === `Atrule` && node.name && (
+					mediaStack.push(`@${node.name}${node.prelude ? csstree.generate(node.prelude) : ``}`)
+				);
+
+				if (node.type === `Rule`) {
+					const result = analyzeRule(node, issues);
+					ruleCount += result.rules;
+					selectorCount += result.selectors;
+
+					// Duplicate selector check (미디어쿼리 컨텍스트 포함)
+					if (node.prelude.type === `SelectorList`) {
+						const selectorText = csstree.generate(node.prelude);
+						// 미디어쿼리 컨텍스트를 포함한 고유 키 생성
+						const contextKey = mediaStack.length > 0 ? (
+							`${mediaStack.join(`|`)}::${selectorText}`
+						) : selectorText;
+						const existingLine = selectorCache.get(contextKey);
+						existingLine !== undefined && node.loc ? (
+							addIssue(
+								issues,
+								`duplicate-selector`,
+								node.loc.start.line,
+								`Duplicate selector (first defined at line ${existingLine})`,
+								`warning`,
+								node.loc.start.column,
+								`Merge rules or use more specific selectors`
+							)
+						) : node.loc && selectorCache.set(contextKey, node.loc.start.line);
+					}
 				}
-			}
-			if (node.type === `Declaration`) {
-				declarationCount += analyzeDeclaration(node, issues);
-			}
-			node.type === `TypeSelector` && analyzeTypeSelector(node, issues);
-			node.type === `AttributeSelector` && analyzeAttributeSelector(node, issues);
+				node.type === `Declaration` && (declarationCount += analyzeDeclaration(node, issues));
+				node.type === `TypeSelector` && analyzeTypeSelector(node, issues);
+				node.type === `AttributeSelector` && analyzeAttributeSelector(node, issues);
+			},
+			leave: (node: csstree.CssNode) => {
+				// at-rule 이탈 시 컨텍스트 팝
+				node.type === `Atrule` && node.name && mediaStack.pop();
+			},
 		});
 	}
 	catch (error) {
