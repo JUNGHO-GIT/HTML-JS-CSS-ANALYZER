@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -146,8 +146,8 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "start-server": "bun .node/swc.cjs --bun --start --server",
-    "build-server": "bun .node/swc.cjs --bun --build --server",
+    "start": "bun .node/swc.cjs --bun --start --server",
+    "build": "bun .node/swc.cjs --bun --build --server",
     "git-fetch": "bun .node/git.cjs --bun --fetch",
     "git-push": "bun .node/git.cjs --bun --push",
     "fix": "bun .node/fix.cjs --bun --fix",
