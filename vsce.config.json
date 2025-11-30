@@ -4,6 +4,8 @@
   ],
   "copyPackages": [
     "htmlhint",
+		"jshint",
+		"css-tree",
 		"minimatch"
   ],
   "esbuildOptions": {
