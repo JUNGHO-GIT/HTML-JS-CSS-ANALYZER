@@ -85,7 +85,7 @@ const modifyEnvAndIndex = () => {
 			},
 			{
 				match: (line) => line.startsWith(`GOOGLE_CALLBACK_URL=`),
-				replace: () => `GOOGLE_CALLBACK_URL=https://www.${CONFIG.domain}/${CONFIG.projectName}/api/auth/google/callback`
+				replace: () => `GOOGLE_CALLBACK_URL=https://www.${CONFIG.domain}/${CONFIG.projectName}/${CONFIG.gcp.callback}`
 			}
 		];
 		fs.writeFileSync(`.env`, transformLines(envContent, envRules));
@@ -130,7 +130,7 @@ const restoreEnvAndIndex = () => {
 			},
 			{
 				match: (line) => line.startsWith(`GOOGLE_CALLBACK_URL=`),
-				replace: () => `GOOGLE_CALLBACK_URL=http://localhost:${CONFIG.localPort.server}/${CONFIG.projectName}/api/auth/google/callback`
+				replace: () => `GOOGLE_CALLBACK_URL=http://localhost:${CONFIG.localPort.server}/${CONFIG.projectName}/${CONFIG.gcp.callback}`
 			}
 		];
 		fs.writeFileSync(`.env`, transformLines(envContent, envRules));
