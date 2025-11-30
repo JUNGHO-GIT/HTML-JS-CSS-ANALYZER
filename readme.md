@@ -1,36 +1,30 @@
-# 🚀 Html-Js-Css-Analyzer
+# Html-Js-Css-Analyzer
 
-Visual Studio Code extension that analyzes HTML, CSS, and JavaScript files to detect undefined classes/ids, unused selectors, and provides code intelligence features.
+A lightweight VS Code extension for analyzing HTML, JavaScript, and CSS. It helps you find undefined classes, unused selectors, and provides intelligent code completion.
 
-## Features 🔎 🔎
+## Key Features
 
-- ⚠️ Undefined class/id detection in HTML files
-- 🔍 Unused CSS selector highlighting
-- ✨ IntelliSense support (completion and go-to-definition)
-- 🛠️ HTMLHint integration with Quick Fixes
-- 🛠️ JSHint integration for JavaScript analysis
-- 🔗 Multi-file CSS analysis across workspace
-- 🗄️ Style cache management
+* **HTML Analysis**: Detects undefined classes/IDs and integrates HTMLHint for validation.
+* **CSS Analysis**: Highlights unused selectors and validates syntax using advanced parsing.
+* **JavaScript Analysis**: Integrates JSHint for code quality and error detection.
+* **IntelliSense**: Provides auto-completion and "Go to Definition" for CSS classes and IDs across your workspace.
 
-## Installation ⬇️ ⬇️
+## Usage
 
-- ⬇️ Install from Visual Studio Code Marketplace: `Html-Js-Css-Analyzer`
-- ⚠️ Requirements: Node >= 18, npm >= 10, VS Code >= 1.105.0
+The extension activates automatically when you open supported files.
 
-## Usage ▶️ ▶️
+* **Validate**: Open the Command Palette (`Ctrl+Shift+P`) and run `Html-Js-Css-Analyzer: Validate Current Document`.
+* **Clear Cache**: Run `Html-Js-Css-Analyzer: Clear Style Cache` to refresh the workspace analysis.
 
-- ▶️ Extension activates automatically when opening HTML, CSS, or JavaScript files.
-- 🛠️ Commands:
-  - `Html-Js-Css-Analyzer: Validate Current Document`
-  - `Html-Js-Css-Analyzer: Clear Style Cache`
+## Configuration
 
-## Configuration ⚙️
+You can customize the extension in VS Code settings:
 
-- `Html-Js-Css-Analyzer.logLevel` - Set logging level
-- `Html-Js-Css-Analyzer.exclude` - Exclude patterns from scanning
-- `Html-Js-Css-Analyzer.htmlHint.enabled` - Enable/disable HTML analysis
-- `Html-Js-Css-Analyzer.cssHint.enabled` - Enable/disable CSS analysis
+* `Html-Js-Css-Analyzer.enable`: Enable or disable the extension.
+* `Html-Js-Css-Analyzer.exclude`: Glob patterns to exclude specific files or folders from analysis.
+* `Html-Js-Css-Analyzer.htmlHint.enabled`: Toggle HTML validation.
+* `Html-Js-Css-Analyzer.jsHint.enabled`: Toggle JavaScript validation.
 
-## License 📄
+## License
 
-- 🔓 Apache-2.0
+Apache-2.0

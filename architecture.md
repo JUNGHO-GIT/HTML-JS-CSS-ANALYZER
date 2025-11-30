@@ -28,8 +28,9 @@ src/
 │   └── ExportTypes.ts              # Type Definition Exports
 └── langs/                          # Language-Specific Modules
     ├── css/
+    │   ├── cssAnalyzer.ts          # CSS Code Analysis (AST based)
     │   ├── cssCache.ts             # CSS Selector Cache (LRU)
-    │   ├── cssParser.ts            # CSS Selector Parser
+    │   ├── cssParser.ts            # CSS Selector Parser (css-tree)
     │   ├── cssType.ts              # CSS Type Definitions
     │   ├── cssUtils.ts             # CSS Utilities (fetch, file read, validation helpers)
     │   └── cssValidator.ts         # CSS Provider (Completion, Definition, Validation)
@@ -67,7 +68,7 @@ src/
 
 | Language | Components | Purpose |
 |----------|------------|---------|
-| **CSS** | `cssCache`, `cssParser`, `cssUtils`, `cssValidator` | 셀렉터 파싱, 캐싱, 자동완성/정의 제공, 원격/로컬 CSS 파일 처리 |
+| **CSS** | `cssAnalyzer`, `cssCache`, `cssParser`, `cssUtils`, `cssValidator` | AST 기반 파싱(css-tree), 린팅, 캐싱, 자동완성/정의 제공 |
 | **HTML** | `htmlConfig`, `htmlValidator`, `htmlUtils`, `htmlCodeActions` | HTMLHint 실행, Quick Fix 제공, 유틸리티 함수 |
 | **JS** | `jsConfig`, `jsValidator`, `jsUtils`, `jsAnalyzer`, `jsCodeActions` | JSHint 실행, 코드 분석, 유틸리티 함수 |
 

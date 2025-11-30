@@ -3,177 +3,38 @@
  * @since 2025-11-22
  */
 
-import { type LineIndex, LineIndexMapper } from "@exportScripts";
 import { type SelectorPos, SelectorType } from "@exportTypes";
+import * as csstree from "css-tree";
 
 // -------------------------------------------------------------------------------------------------
-// 최적화된 정규표현식 패턴 (백트래킹 방지 및 성능 개선)
-const SELECTOR_BOUNDARY_REGEX = /\s|[#.:,[\]()>+~=*^$|{}]/;
-const LEADING_WHITESPACE_REGEX = /^\s*/;
-
-// -------------------------------------------------------------------------------------------------
-// CSS 선택자 파서 (성능 최적화 및 메모리 효율 개선)
+// CSS 선택자 파서 (css-tree 라이브러리 사용)
 export const parseSelectors = (cssText: string): SelectorPos[] => {
 	const positions: SelectorPos[] = [];
-	const mapper = LineIndexMapper(cssText, {origin: 0}) as LineIndex;
 
-	let depth = 0;
-	let inStr: `'` | `"` | "`" | null = null;
-	let inComment = 0;
-	let preludeStart = 0;
+	try {
+		const ast = csstree.parse(cssText, {
+			positions: true,
+			parseAtrulePrelude: false,
+			parseRulePrelude: true,
+			parseValue: false
+		});
 
-	const extractFromPrelude = (prelude: string, baseIndex: number) => {
-		const parts: Array<{text: string; offset: number;}> = [];
-		let partStart = 0;
-		let sInStr: `'` | `"` | "`" | null = null;
-		let sInBracket = 0;
-
-		for (let i = 0; i < prelude.length; i++) {
-			const ch = prelude[i];
-			const prev = i > 0 ? prelude[i - 1] : ``;
-			if (sInStr) {
-				if (ch === sInStr && prev !== `\\`) {
-					sInStr = null;
+		csstree.walk(ast, (node) => {
+			if (node.type === `ClassSelector` || node.type === `IdSelector`) {
+				if (node.loc) {
+					positions.push({
+						index: node.loc.start.offset,
+						line: node.loc.start.line - 1,
+						col: node.loc.start.column - 1,
+						type: node.type === `ClassSelector` ? SelectorType.CLASS : SelectorType.ID,
+						selector: node.name
+					});
 				}
 			}
-			else {
-				if (ch === `'` || ch === `"` || ch === "`") {
-					sInStr = ch as unknown as typeof sInStr;
-				}
-				else {
-					if (ch === `(` || ch === `[` || ch === `{`) {
-						sInBracket++;
-					}
-					else {
-						if (ch === `)` || ch === `]` || ch === `}`) {
-							if (sInBracket > 0) {
-								sInBracket--;
-							}
-						}
-						else {
-							if (ch === `,` && sInBracket === 0) {
-								parts.push({text: prelude.slice(partStart, i), offset: partStart});
-								partStart = i + 1;
-							}
-						}
-					}
-				}
-			}
-		}
-		parts.push({text: prelude.slice(partStart), offset: partStart});
-
-		for (const p of parts) {
-			const frag = p.text.trim();
-			if (frag.length === 0) {
-				continue;
-			}
-
-			for (let i = 0; i < frag.length; i++) {
-				const ch = frag[i];
-				const prev = i > 0 ? frag[i - 1] : ``;
-
-				if ((ch === `.` || ch === `#`) && prev !== `\\`) {
-					let j = i + 1;
-					let value = ``;
-
-					while (j < frag.length) {
-						const c = frag[j];
-
-						if (c === `\\` && j + 1 < frag.length) {
-							value += frag[j + 1];
-							j += 2;
-							continue;
-						}
-
-						if (SELECTOR_BOUNDARY_REGEX.test(c)) {
-							break;
-						}
-
-						value += c;
-						j++;
-					}
-
-					if (value.length > 0) {
-						const absIdx = baseIndex + p.offset + i;
-						const pos = mapper.fromIndex(absIdx);
-
-						if (pos) {
-							positions.push({
-								index: absIdx,
-								line: pos.line,
-								col: pos.col,
-								type: ch === `#` ? SelectorType.ID : SelectorType.CLASS,
-								selector: value,
-							});
-						}
-					}
-
-					i = j - 1;
-				}
-			}
-		}
-	};
-
-	for (let i = 0; i < cssText.length; i++) {
-		const ch = cssText[i];
-		const prev = i > 0 ? cssText[i - 1] : ``;
-
-		if (inComment === 1) {
-			if (prev === `*` && ch === `/`) {
-				inComment = 0;
-			}
-			continue;
-		}
-		else {
-			if (inComment === 2) {
-				if (ch === `\n`) {
-					inComment = 0;
-				}
-				continue;
-			}
-		}
-
-		if (!inStr) {
-			if (prev === `/` && ch === `*`) {
-				inComment = 1;
-				continue;
-			}
-			if (prev === `/` && ch === `/`) {
-				inComment = 2;
-				continue;
-			}
-		}
-
-		if (inStr) {
-			if (ch === inStr && prev !== `\\`) {
-				inStr = null;
-			}
-			continue;
-		}
-		else {
-			if (ch === `'` || ch === `"` || ch === "`") {
-				inStr = ch as unknown as typeof inStr;
-				continue;
-			}
-		}
-
-		if (ch === `{`) {
-			const rawPrelude = cssText.slice(preludeStart, i);
-			const leading = LEADING_WHITESPACE_REGEX.exec(rawPrelude)?.[0].length || 0;
-			const prelude = rawPrelude.trim();
-			// skip at-rules like @media, but extract selectors for nested rules
-			prelude.length > 0 && !prelude.startsWith(`@`) && extractFromPrelude(prelude, preludeStart + leading);
-			depth++;
-			preludeStart = i + 1;
-		}
-
-		if (ch === `}`) {
-			if (depth > 0) {
-				depth--;
-			}
-			// move prelude start to just after the closing brace to prepare for next rule
-			preludeStart = i + 1;
-		}
+		});
+	}
+	catch (error) {
+		// 파싱 에러 발생 시 무시 (유효하지 않은 CSS일 수 있음)
 	}
 
 	return positions;

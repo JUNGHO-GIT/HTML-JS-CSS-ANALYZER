@@ -5,14 +5,11 @@
  */
 
 import { vscode } from "@exportLibs";
+import * as csstree from "css-tree";
 
 // -------------------------------------------------------------------------------------------------
 // CONSTANTS
 // -------------------------------------------------------------------------------------------------
-const EMPTY_RULE_REGEX = /([^{]+)\{\s*\}/g;
-const IMPORTANT_REGEX = /!important/g;
-const UNIVERSAL_SELECTOR_REGEX = /(^|[\s>+~])\*(?![a-zA-Z0-9-_])/g;
-const ID_SELECTOR_REGEX = /#[a-zA-Z0-9-_]+/g;
 const MAX_ID_SELECTORS = 2;
 
 // -------------------------------------------------------------------------------------------------
@@ -30,78 +27,85 @@ export type CssAnalysisResult = {
 };
 
 // -------------------------------------------------------------------------------------------------
-// ANALYSIS FUNCTIONS
-// -------------------------------------------------------------------------------------------------
-const analyzeEmptyRules = (sourceCode: string, issues: CssAnalysisIssue[]): void => {
-	const lines = sourceCode.split(`\n`);
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const lineNum = i + 1;
-
-		if (EMPTY_RULE_REGEX.test(line)) {
-			issues.push({
-				type: `empty-rule`,
-				line: lineNum,
-				message: `Empty CSS rule detected`,
-				severity: `warning`,
-			});
-		}
-	}
-};
-
-const analyzeImportant = (sourceCode: string, issues: CssAnalysisIssue[]): void => {
-	const lines = sourceCode.split(`\n`);
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const lineNum = i + 1;
-
-		if (IMPORTANT_REGEX.test(line)) {
-			issues.push({
-				type: `important-usage`,
-				line: lineNum,
-				message: `Avoid using !important; it breaks cascading`,
-				severity: `info`,
-			});
-		}
-	}
-};
-
-const analyzePerformance = (sourceCode: string, issues: CssAnalysisIssue[]): void => {
-	const lines = sourceCode.split(`\n`);
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const lineNum = i + 1;
-
-		if (UNIVERSAL_SELECTOR_REGEX.test(line)) {
-			issues.push({
-				type: `universal-selector`,
-				line: lineNum,
-				message: `Universal selector (*) can be slow`,
-				severity: `info`,
-			});
-		}
-
-		const idCount = (line.match(ID_SELECTOR_REGEX) || []).length;
-		if (idCount > MAX_ID_SELECTORS) {
-			issues.push({
-				type: `too-many-ids`,
-				line: lineNum,
-				message: `High specificity: ${idCount} ID selectors in one rule`,
-				severity: `warning`,
-			});
-		}
-	}
-};
-
-// -------------------------------------------------------------------------------------------------
 // MAIN ANALYSIS FUNCTION
 // -------------------------------------------------------------------------------------------------
 export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
 	const issues: CssAnalysisIssue[] = [];
 
-	analyzeEmptyRules(sourceCode, issues);
-	analyzeImportant(sourceCode, issues);
-	analyzePerformance(sourceCode, issues);
+	try {
+		const ast = csstree.parse(sourceCode, {
+			positions: true,
+			parseAtrulePrelude: false,
+			parseRulePrelude: true,
+			parseValue: false
+		});
+
+		csstree.walk(ast, (node) => {
+			// 1. Empty Rules
+			if (node.type === `Rule`) {
+				if (node.block.children.isEmpty) {
+					if (node.loc) {
+						issues.push({
+							type: `empty-rule`,
+							line: node.loc.start.line,
+							message: `Empty CSS rule detected`,
+							severity: `warning`,
+						});
+					}
+				}
+
+				// 4. Too many IDs
+				if (node.prelude.type === `SelectorList`) {
+					node.prelude.children.forEach((selector) => {
+						let idCount = 0;
+						csstree.walk(selector, (child) => {
+							if (child.type === `IdSelector`) {
+								idCount++;
+							}
+						});
+
+						if (idCount > MAX_ID_SELECTORS) {
+							if (node.loc) {
+								issues.push({
+									type: `too-many-ids`,
+									line: node.loc.start.line,
+									message: `High specificity: ${idCount} ID selectors in one rule`,
+									severity: `warning`,
+								});
+							}
+						}
+					});
+				}
+			}
+
+			// 2. !important usage
+			if (node.type === `Declaration` && node.important === true) {
+				if (node.loc) {
+					issues.push({
+						type: `important-usage`,
+						line: node.loc.start.line,
+						message: `Avoid using !important; it breaks cascading`,
+						severity: `info`,
+					});
+				}
+			}
+
+			// 3. Universal Selector
+			if (node.type === `TypeSelector` && node.name === `*`) {
+				if (node.loc) {
+					issues.push({
+						type: `universal-selector`,
+						line: node.loc.start.line,
+						message: `Universal selector (*) can be slow`,
+						severity: `info`
+					});
+				}
+			}
+		});
+	}
+	catch (error) {
+		// Ignore parse errors
+	}
 
 	return { issues };
 };

@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -148,13 +148,14 @@
   "scripts": {
     "start": "bun .node/swc.cjs --bun --start --server",
     "build": "bun .node/swc.cjs --bun --build --server",
-    "git-fetch": "bun .node/git.cjs --bun --fetch",
-    "git-push": "bun .node/git.cjs --bun --push",
     "fix": "bun .node/fix.cjs --bun --fix",
     "reset": "bun .node/reset.cjs --bun --reset",
-    "vsce": "bun .node/vsce.cjs --bun --package"
+    "vsce": "bun .node/vsce.cjs --bun --package",
+    "git-fetch": "bun .node/git.cjs --bun --fetch",
+    "git-push": "bun .node/git.cjs --bun --push"
   },
   "dependencies": {
+    "css-tree": "^3.1.0",
     "htmlhint": "^1.8.0",
     "jshint": "^2.13.6",
     "minimatch": "^10.1.1"
@@ -163,6 +164,7 @@
     "@eslint/js": "^9.39.1",
     "@swc/cli": "^0.7.9",
     "@swc/core": "^1.15.3",
+    "@types/css-tree": "^2.3.11",
     "@types/htmlhint": "^1.1.5",
     "@types/jshint": "^2.12.4",
     "@types/node": "^24.10.1",

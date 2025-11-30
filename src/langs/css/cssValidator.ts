@@ -4,20 +4,18 @@
  * @description CSS 검증 및 Provider 클래스
  */
 
-import { vscode, https, http, path, fs } from "@exportLibs";
-import { type SelectorPos, SelectorType } from "@exportTypes";
-import { parseSelectors, cacheGet, cacheSet, ensureWorkspaceCssFiles, getWorkspaceCssFiles, clearWorkspaceCssFilesCache, processCssFilesInBatches, readSelectorsFromFsPath } from "@exportLangs";
-import { getCssExcludePatterns } from "@exportConsts";
-import { isAnalyzable, logger, validateDocument, withPerformanceMonitoring } from "@exportScripts";
-import type { FetchResponse, CssSupportLike } from "@langs/css/cssType";
+import {getCssExcludePatterns} from "@exportConsts";
+import {cacheGet, cacheSet, clearWorkspaceCssFilesCache, ensureWorkspaceCssFiles, fetchCssContent, getWorkspaceCssFiles, parseSelectors, processCssFilesInBatches, readSelectorsFromFsPath} from "@exportLangs";
+import {fs, path, vscode} from "@exportLibs";
+import {isAnalyzable, logger, validateDocument, withPerformanceMonitoring} from "@exportScripts";
+import {type SelectorPos, SelectorType} from "@exportTypes";
+import type {CssSupportLike} from "@langs/css/cssType";
 
 // -------------------------------------------------------------------------------------------------
 // CONSTANTS
 // -------------------------------------------------------------------------------------------------
-const ZERO_POSITION = new vscode.Position(0, 0);
 const REMOTE_URL_REGEX = /^https?:\/\//i;
 const WORD_RANGE_REGEX = /[_a-zA-Z0-9-]+/;
-const COMPLETION_CONTEXT_REGEX = /(?:(?:id|class|className|[.#])\s*[=:]?\s*["'`]?[^\n]*|classList\.(?:add|remove|toggle|contains|replace)\s*\([^)]*|querySelector(?:All)?\s*\(\s*["'`][^)]*|getElementById\s*\(\s*["'][^)]*)$/i;
 const LINK_STYLESHEET_REGEX = /<link\s+[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>/gi;
 const HREF_ATTRIBUTE_REGEX = /\bhref\s*=\s*(["'])([^"']+)\1/i;
 
@@ -28,106 +26,26 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 	// 정규식 패턴 접근자들
 	private get isRemoteUrl(): RegExp { return REMOTE_URL_REGEX; }
 	private get wordRange(): RegExp { return WORD_RANGE_REGEX; }
-	private get canComplete(): RegExp { return COMPLETION_CONTEXT_REGEX; }
 
 	// -------------------------------------------------------------------------------------------------
 	// Ongoing style collection promises to deduplicate concurrent requests
 	private pendingStyles: Map<string, Promise<Map<string, SelectorPos[]>>> = new Map();
-
-	private fnFetchWithNativeFetch = async (url: string): Promise<string> => {
-		const response = await (globalThis as any).fetch(url) as FetchResponse;
-
-		if (!response.ok) {
-			const statusInfo = response?.statusText || `HTTP ${response?.status || `unknown`}`;
-			throw new Error(statusInfo);
-		}
-
-		return await response.text();
-	};
-
-	// -------------------------------------------------------------------------------------------------
-	private fnFetchWithNodeHttp = async (url: string, redirectsRemaining = 5): Promise<string> => {
-		const REQUEST_TIMEOUT_MS = 10000; // 10s
-		return new Promise<string>((resolve, reject) => {
-			const httpLib = url.startsWith(`https`) ? https : http;
-
-			const request = httpLib.get(url, (response) => {
-				const status = response.statusCode || 0;
-
-				// follow redirects
-				if (status >= 300 && status < 400 && response.headers?.location) {
-					const location = response.headers.location;
-					if (redirectsRemaining > 0) {
-						try {
-							// resolve relative locations against original url
-							const newUrl = location.startsWith(`http`) ? location : new URL(location, url).toString();
-							response.resume();
-							resolve(this.fnFetchWithNodeHttp(newUrl, redirectsRemaining - 1));
-							return;
-						}
-						catch (e: any) {
-							response.resume();
-							reject(new Error(`Invalid redirect location: ${location}`));
-							return;
-						}
-					}
-					response.resume();
-					reject(new Error(`Too many redirects`));
-					return;
-				}
-
-				let data = ``;
-				response.setEncoding && response.setEncoding(`utf8`);
-
-				response.on(`data`, (chunk: string) => {
-					data += chunk;
-				});
-
-				response.on(`end`, () => {
-					const isSuccessStatus = status >= 200 && status < 300;
-					isSuccessStatus ? resolve(data) : reject(new Error(`HTTP ${status}`));
-				});
-			});
-
-			request.on(`error`, (err: Error) => { reject(err); });
-			request.setTimeout && request.setTimeout(REQUEST_TIMEOUT_MS, () => {
-				try {
-					request.abort();
-				}
-				catch (_e) {
-					// ignore
-				}
-				reject(new Error(`Request timeout`));
-			});
-		});
-	};
-
-	// -------------------------------------------------------------------------------------------------
-	fnFetch = async (url: string): Promise<string> => {
-		try {
-			// 네이티브 fetch가 사용 가능한 경우
-			if (typeof (globalThis as any).fetch === `function`) {
-				return await this.fnFetchWithNativeFetch(url);
-			}
-
-			// Node.js HTTP 모듈 사용
-			return await this.fnFetchWithNodeHttp(url);
-		}
-		catch (error: any) {
-			const errorMessage = error?.message || String(error);
-			logger(`error`, `file fetch failed (${url}): ${errorMessage}`);
-			return ``;
-		}
-	};
 
 	// -------------------------------------------------------------------------------------------------
 	// Remote stylesheet parsing
 	getRemote = async (url: string): Promise<SelectorPos[]> => {
 		const cached = cacheGet(url);
 		return cached ? cached.data : (async () => {
-			const data = parseSelectors(await this.fnFetch(url));
-			cacheSet(url, {version: -1, data});
-			return data;
+			try {
+				const cssText = await fetchCssContent(url);
+				const data = parseSelectors(cssText);
+				cacheSet(url, {version: -1, data});
+				return data;
+			}
+			catch (error) {
+				logger(`error`, `Remote CSS fetch failed: ${url}`);
+				return [];
+			}
 		})();
 	};
 
@@ -320,13 +238,55 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 			return undefined;
 		}
 
-		const prefixText = doc.getText(new vscode.Range(ZERO_POSITION, position));
-		if (!this.canComplete.test(prefixText)) {
+		const line = doc.lineAt(position.line).text;
+		const prefix = line.slice(0, position.character);
+
+		// 1. Check for ID context
+		// id="...", id='...', id=...
+		// getElementById('...')
+		// #...
+		const isIdContext =
+			/id\s*=\s*["'][^"']*$/.test(prefix) ||
+			/getElementById\s*\(\s*["'][^"']*$/.test(prefix) ||
+			/#[\w-]*$/.test(prefix);
+
+		// 2. Check for Class context
+		// class="...", class='...', class=...
+		// className="...", className='...'
+		// classList.add('...'), .remove('...'), .toggle('...'), .contains('...')
+		// getElementsByClassName('...')
+		// .class...
+		const isClassContext =
+			/(?:class|className)\s*=\s*["'][^"']*$/.test(prefix) ||
+			/classList\.(?:add|remove|toggle|contains|replace)\s*\(\s*["'][^"']*$/.test(prefix) ||
+			/getElementsByClassName\s*\(\s*["'][^"']*$/.test(prefix) ||
+			/\.[\w-]*$/.test(prefix);
+
+		// 3. Check for QuerySelector context (can be both)
+		// querySelector('...'), querySelectorAll('...')
+		// $ ('...') (jQuery)
+		const isQuerySelectorContext =
+			/(?:querySelector(?:All)?|\$)\s*\(\s*["'][^"']*$/.test(prefix);
+
+		if (!isIdContext && !isClassContext && !isQuerySelectorContext) {
 			return undefined;
 		}
 
-		const isIdCtx = /(?:\bid\s*[=:]|[#])\s*["'`]?[^]*$/.test(prefixText);
-		const kind = isIdCtx ? SelectorType.ID : SelectorType.CLASS;
+		let kind = SelectorType.CLASS;
+		if (isIdContext) {
+			kind = SelectorType.ID;
+		}
+		else if (isQuerySelectorContext) {
+			// If querySelector, check the last character before cursor
+			// If it's #, then ID. If ., then Class. Default to both?
+			// For now, let's try to infer from the last char.
+			if (prefix.endsWith(`#`)) {
+				kind = SelectorType.ID;
+			}
+			else {
+				kind = SelectorType.CLASS;
+			}
+		}
 
 		return await this.fnGetCompletionItems(doc, position, kind);
 	};
@@ -359,8 +319,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
 						const location = new vscode.Location(uri, new vscode.Position(s.line, s.col));
 						locations.push(location);
 					}
-					catch (e: any) {
-						logger(`error`, `location parse failed: ${uriString} -> ${e?.message || e}`);
+					catch (error) {
+						const errorMessage = error instanceof Error ? error.message : String(error);
+						logger(`error`, `location parse failed: ${uriString} -> ${errorMessage}`);
 					}
 				}
 			}
