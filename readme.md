@@ -28,6 +28,10 @@ Find undefined classes, unused selectors, and get intelligent code completion.
 | `htmlHint.enabled` | `true` | Toggle HTML validation |
 | `jsHint.enabled` | `true` | Toggle JavaScript validation |
 
+## Architecture
+
+[Architecture Document](./architecture.md)
+
 ## License
 
 [Apache License 2.0](./license.md)
