@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.1.7",
+  "version": "3.1.8",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -152,8 +152,8 @@
     "fix": "bun .node/mjs/fix.mjs --bun --fix",
     "reset": "bun .node/mjs/reset.mjs --bun --reset",
     "vsce": "bun .node/mjs/vsce.mjs --bun --package",
-    "git-push-my": "bun .node/mjs/git.mjs --bun --push --my",
-    "git-push-mn": "bun .node/mjs/git.mjs --bun --push --mn"
+    "git-push-y": "bun .node/mjs/git.mjs --bun --push --y",
+    "git-push-n": "bun .node/mjs/git.mjs --bun --push --n"
   },
   "dependencies": {
     "css-tree": "^3.1.0",
