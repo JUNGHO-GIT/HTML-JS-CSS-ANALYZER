@@ -48,18 +48,20 @@ export type UnusedSeverity = never;
 
 // -------------------------------------------------------------------------------------------------
 const EXTENSION_CONFIG_SECTION = `Html-Js-Css-Analyzer`;
-const DEFAULT_ANALYZABLE_EXTENSIONS = [ `html`, `htm`, `js`, `mjs`, `css` ];
+const DEFAULT_ANALYZABLE_EXTENSIONS = [
+	`html`,
+	`htm`,
+	`js`,
+	`mjs`,
+	`css`,
+];
 const EXTENSION_VALIDATION_REGEX = /^[a-z0-9_-]{1,16}$/;
 
 // -------------------------------------------------------------------------------------------------
-const getConfiguration = (resource?: vscode.Uri): vscode.WorkspaceConfiguration => {
-	return vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION, resource);
-};
+const getConfiguration = (resource?: vscode.Uri): vscode.WorkspaceConfiguration => vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION, resource);
 
 // -------------------------------------------------------------------------------------------------
-export const getLogLevel = (resource?: vscode.Uri): LogLevel => {
-	return getConfiguration(resource).get<LogLevel>(`logLevel`, `off`);
-};
+export const getLogLevel = (resource?: vscode.Uri): LogLevel => getConfiguration(resource).get<LogLevel>(`logLevel`, `off`);
 
 // -------------------------------------------------------------------------------------------------
 export const getCssExcludePatterns = (resource?: vscode.Uri): string[] => {
@@ -86,16 +88,10 @@ export const getAdditionalExtensions = (resource?: vscode.Uri): string[] => {
 };
 
 // -------------------------------------------------------------------------------------------------
-export const isHtmlHintEnabled = (resource?: vscode.Uri): boolean => {
-	return getConfiguration(resource).get<boolean>(`htmlHint.enabled`, true);
-};
+export const isHtmlHintEnabled = (resource?: vscode.Uri): boolean => getConfiguration(resource).get<boolean>(`htmlHint.enabled`, true);
 
 // -------------------------------------------------------------------------------------------------
-export const isCssHintEnabled = (resource?: vscode.Uri): boolean => {
-	return getConfiguration(resource).get<boolean>(`cssHint.enabled`, true);
-};
+export const isCssHintEnabled = (resource?: vscode.Uri): boolean => getConfiguration(resource).get<boolean>(`cssHint.enabled`, true);
 
 // -------------------------------------------------------------------------------------------------
-export const isJsHintEnabled = (resource?: vscode.Uri): boolean => {
-	return getConfiguration(resource).get<boolean>(`jsHint.enabled`, true);
-};
+export const isJsHintEnabled = (resource?: vscode.Uri): boolean => getConfiguration(resource).get<boolean>(`jsHint.enabled`, true);

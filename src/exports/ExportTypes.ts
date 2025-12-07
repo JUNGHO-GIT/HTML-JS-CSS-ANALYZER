@@ -14,7 +14,7 @@ export {
 	AutoValidationMode,
 	SelectorType,
 	type SelectorPos,
-} from "@assets/types/common";
+} from "@type/common";
 
 // 2. Line Index -----------------------------------------------------------------
 export type {
