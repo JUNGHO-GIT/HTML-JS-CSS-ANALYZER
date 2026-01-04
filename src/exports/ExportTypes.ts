@@ -5,18 +5,18 @@
 
 // -------------------------------------------------------------------------------------------------
 export type PerformanceMetricsType = {
-	startTime: number;
-	operationName: string;
+  startTime: number;
+  operationName: string;
 };
 
 // 1. Common ---------------------------------------------------------------------
 export {
-	AutoValidationMode,
-	SelectorType,
-	type SelectorPos,
+  AutoValidationMode,
+  SelectorType,
+  type SelectorPos,
 } from "@type/common";
 
 // 2. Line Index -----------------------------------------------------------------
 export type {
-	LineIndex,
+  LineIndex,
 } from "@scripts/lineIndex";
