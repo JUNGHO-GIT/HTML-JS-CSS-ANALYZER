@@ -67,12 +67,13 @@ export const parseSelectors = (cssText: string, options?: ParseOptions): Selecto
       if (!loc) {
         return;
       }
+      const selector = typeof node.name === `string` ? node.name.replaceAll(/\\/g, ``) : ``;
       const pos: ParsedSelector = {
         index: loc.start.offset,
         line: loc.start.line - 1,
         col: loc.start.column - 1,
         type,
-        selector: node.name,
+        selector,
       };
 
       options?.includeSpecificity === true && (pos.specificity = calculateSpecificity(node));
