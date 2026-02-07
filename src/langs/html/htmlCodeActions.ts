@@ -1,6 +1,7 @@
 /**
  * @file htmlCodeActions.ts
  * @since 2025-11-22
+ * @description HTML 코드 액션 및 Quick Fix 제공
  */
 
 import { vscode, Position, Range, CodeAction, CodeActionKind, Diagnostic } from "@exportLibs";

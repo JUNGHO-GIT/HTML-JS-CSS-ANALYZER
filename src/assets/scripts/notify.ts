@@ -1,17 +1,16 @@
 /**
  * @file notify.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 사용자 알림 및 진행 표시
  */
 
 import { vscode } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const MAIN = `Html-Js-Css-Analyzer`;
 const AUTO_CLOSE_MS = 1000;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 const showProgress = async (text: string): Promise<void> => {
   await vscode.window.withProgress({
     location: vscode.ProgressLocation.Notification,

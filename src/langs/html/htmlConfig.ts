@@ -8,7 +8,7 @@ import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { HtmlHintInstance } from "@langs/html/htmlType";
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 const getBaseUrl = (): string => {
   try {
     const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);

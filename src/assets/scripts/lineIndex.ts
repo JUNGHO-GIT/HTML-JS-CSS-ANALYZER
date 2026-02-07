@@ -1,11 +1,10 @@
 /**
  * @file lineIndex.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 라인/컨럼 오프셋 인덱스 매퍼
  */
 
-// -------------------------------------------------------------------------------------------------
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 type FromIndexPos = { line: number; col: number } | null;
 type LineIndexMapperOverload = {
   (text: string, options?: { origin?: number }): LineIndex;
@@ -21,7 +20,7 @@ export type LineIndex = {
   toIndex: (line: number, col?: number) => number;
 };
 
-// -------------------------------------------------------------------------------------------------
+// HELPERS -----------------------------------------------------------------------------------------
 const objectToString = {}.toString;
 const isArray = Array.isArray || ((value: unknown) => {
   return objectToString.call(value) === `[object Array]`;
@@ -30,7 +29,7 @@ const isPlainObject = (value: unknown) => {
   return value != null && typeof value === `object` && !1 === isArray(value);
 };
 
-// -------------------------------------------------------------------------------------------------
+// MAIN FUNCTION -----------------------------------------------------------------------------------
 export const LineIndexMapper: LineIndexMapperOverload = ((text: string, options?: { origin?: number } | number): LineIndex | FromIndexPos => {
   const fnCreate = (sourceText: string, opts?: { origin?: number }): LineIndex => {
     const str = sourceText || ``;

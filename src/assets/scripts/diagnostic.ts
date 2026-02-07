@@ -1,6 +1,7 @@
 /**
  * @file diagnostic.ts
  * @since 2025-11-21
+ * @description 진단 컬렉션 관리 및 자동 유효성 검사 스케줄링
  */
 
 import { vscode } from "@exportLibs";
@@ -10,12 +11,12 @@ import { CssSupport } from "@exportLangs";
 import { isAnalyzable } from "@exportScripts";
 import { logger } from "@exportScripts";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const BASE_VALIDATION_DELAY_MS = 250;
 const MAX_VALIDATION_DELAY_MS = 1000;
 const RAPID_CHANGE_THRESHOLD = 5;
 
-// -------------------------------------------------------------------------------------------------
+// DIAGNOSTIC MANAGER CLASS ------------------------------------------------------------------------
 class DiagnosticManager {
   private readonly cssCollection: vscode.DiagnosticCollection;
   private readonly htmlHintCollection: vscode.DiagnosticCollection;

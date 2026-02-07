@@ -7,9 +7,7 @@
 import { vscode, Position } from "@exportLibs";
 import type { JSHintError } from "@langs/js/jsType";
 
-// -------------------------------------------------------------------------------------------------
-// CONSTANTS
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const ERROR_W033_CODES = new Set([`W033`]);
 const ERROR_W116_W117_CODES = new Set([ `W116`, `W117` ]);
 const ERROR_W030_CODES = new Set([`W030`]);
@@ -25,9 +23,7 @@ const W116_W117_REGEX = /^(?:\w+|==|!=)/;
 const W030_REGEX = /^[^;]+/;
 const DEFAULT_TOKEN_REGEX = /^\S+/;
 
-// -------------------------------------------------------------------------------------------------
-// UTILITY FUNCTIONS
-// -------------------------------------------------------------------------------------------------
+// UTILITY FUNCTIONS -------------------------------------------------------------------------------
 export const clamp = (value: number, min: number, max: number): number => {
   return value < min ? min : value > max ? max : value;
 };

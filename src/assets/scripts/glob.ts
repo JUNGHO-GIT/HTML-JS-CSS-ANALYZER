@@ -1,11 +1,12 @@
 /**
  * @file glob.ts
  * @since 2025-11-22
+ * @description Glob 패턴 매칭 유틸리티
  */
 
 import { vscode } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const globToRegExp = (glob: string): RegExp => {
   let s = glob.replaceAll(`\\`, `/`);
   s = s.replaceAll(/[$()+.[\\\]^{|}]/g, `\\$&`);

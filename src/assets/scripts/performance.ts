@@ -1,14 +1,13 @@
 /**
  * @file performance.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 성능 모니터링 및 리소스 제한
  */
 
 import { logger } from "@exportScripts";
 import type { PerformanceMetricsType } from "@exportTypes";
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 let __pmInstance: { metrics: Map<string, PerformanceMetricsType>; start: (operationName: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
 export const performanceMonitor = () => {
   !__pmInstance && (

@@ -1,13 +1,14 @@
 /**
  * @file jsConfig.ts
  * @since 2025-11-22
+ * @description JSHint 모듈 로드 및 설정 파일 로드
  */
 
 import { path, fs, createRequire, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { JSHintInstance } from "@langs/js/jsType";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
   esversion: 2022,
   moz: false,
@@ -94,7 +95,7 @@ export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
   ],
 };
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const loadJSHint = (): JSHintInstance | null => {
   let result: JSHintInstance | null = null;
 

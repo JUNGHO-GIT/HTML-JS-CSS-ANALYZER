@@ -1,19 +1,19 @@
 /**
  * @file jsAnalyzer.ts
  * @since 2025-11-22
+ * @description JS 소스코드 분석 및 품질 검사
  */
 
 import { vscode } from "@exportLibs";
 import type { SourceAnalysis, AnalyzeResult } from "@exportLangs";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const MAX_NESTING = 8;
 const MAX_LINE_LENGTH = 200;
 const MAX_REGEX_LENGTH = 80;
 const MAX_REGEX_COMPLEXITY = 15;
 
-// -------------------------------------------------------------------------------------------------
-// 최적화된 정규식 패턴 (성능 및 정확도 개선)
+// REGEX PATTERNS ----------------------------------------------------------------------------------
 const INDENT_REGEX = /^\s*/;
 const REGEX_PATTERN = /\/(?![*/])(?:[^\n/\\]|\\.)+\/[gimsuvy]*/g;
 const COMPLEX_CHARS_REGEX = /[()*+?[\]{|}]/g;
@@ -25,7 +25,7 @@ const EVAL_USAGE_REGEX = /\beval\s*\(/;
 const WITH_STATEMENT_REGEX = /\bwith\s*\(/;
 const LOOP_START_REGEX = /\b(for|while)\s*\(/;
 
-// Helper: Remove strings and comments from line for accurate analysis
+// HELPERS -----------------------------------------------------------------------------------------
 const stripStringsAndComments = (line: string): string => {
   return line
   .replaceAll(STRING_CONTENT_REGEX, `""`)
@@ -65,7 +65,7 @@ const precomputeBlockCommentState = (lines: string[]): boolean[] => {
   return state;
 };
 
-// -------------------------------------------------------------------------------------------------
+// ANALYSIS FUNCTIONS ------------------------------------------------------------------------------
 const analyzeComplexity = (lines: string[], analysis: SourceAnalysis): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;

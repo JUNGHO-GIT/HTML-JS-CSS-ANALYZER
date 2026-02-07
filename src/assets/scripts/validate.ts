@@ -1,8 +1,7 @@
 /**
  * @file validate.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 문서 유효성 검사 통합 실행
  */
 
 import { vscode } from "@exportLibs";
@@ -17,18 +16,14 @@ import {
   scanEmbeddedUnused,
 } from "@langs/css/cssUtils";
 
-// -------------------------------------------------------------------------------------------------
-// CONSTANTS
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const HTML_FILE_REGEX = /\.html?$/i;
 const CSS_LANGUAGES = new Set([`css`]);
 const CSS_EXTENSIONS = [`.css`];
 const JS_LANGUAGES = new Set([`javascript`]);
 const JS_EXTENSIONS = [ `.js`, `.mjs`, `.cjs` ];
 
-// -------------------------------------------------------------------------------------------------
-// DOCUMENT TYPE CHECKERS
-// -------------------------------------------------------------------------------------------------
+// DOCUMENT TYPE CHECKERS ---------------------------------------------------------------------------
 const isHtmlDoc = (doc: vscode.TextDocument) => HTML_FILE_REGEX.test(doc.fileName) || doc.languageId === `html`;
 
 const isCssLikeDoc = (doc: vscode.TextDocument) => {

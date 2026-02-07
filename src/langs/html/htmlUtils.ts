@@ -6,10 +6,10 @@
 
 import { vscode, CodeAction, CodeActionKind, Diagnostic } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
-export const HEAD_TAG_REGEX = /<head(?:\s[^>]*)?>([\S\s]*?)<\/head>/i;
+// CONSTANTS ---------------------------------------------------------------------------------------
+export const HEAD_TAG_REGEX = /<head(?:\s[^>]*)?>[\S\s]*?<\/head>/i;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const clamp = (value: number, min: number, max: number): number => {
   return value < min ? min : value > max ? max : value;
 };

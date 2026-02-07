@@ -6,7 +6,7 @@
 
 import type { vscode, Diagnostic, CodeAction } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 export declare type HtmlHintRule = {
   id: string;
   description?: string;

@@ -11,17 +11,13 @@ import { isAnalyzable, logger, validateDocument, withPerformanceMonitoring } fro
 import { type SelectorPos, SelectorType } from "@exportTypes";
 import type { CssSupportLike } from "@langs/css/cssType";
 
-// -------------------------------------------------------------------------------------------------
-// CONSTANTS
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const REMOTE_URL_REGEX = /^https?:\/\//i;
 const WORD_RANGE_REGEX = /[\w-]+/;
 const LINK_STYLESHEET_REGEX = /<link\s+[^/>]*\brel\s*=\s*["']stylesheet["'][^>]*>/gi;
 const HREF_ATTRIBUTE_REGEX = /\bhref\s*=\s*(["'])([^"']+)\1/i;
 
-// -------------------------------------------------------------------------------------------------
-// CSS PROVIDER CLASS
-// -------------------------------------------------------------------------------------------------
+// CSS PROVIDER CLASS ------------------------------------------------------------------------------
 export class CssSupport implements vscode.CompletionItemProvider, vscode.DefinitionProvider, CssSupportLike {
   // 정규식 패턴 접근자들
   private get isRemoteUrl(): RegExp {

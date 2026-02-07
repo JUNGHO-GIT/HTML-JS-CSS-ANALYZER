@@ -11,9 +11,7 @@ import { logger, isUriExcludedByGlob, withPerformanceMonitoring, resourceLimiter
 import { getAnalyzableExtensions } from "@exportConsts";
 import type { FetchResponse, CssSupportLike } from "@langs/css/cssType";
 
-// -------------------------------------------------------------------------------------------------
-// CONSTANTS
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const MAX_CONTENT_LENGTH = 500_000;
 const MAX_WORKSPACE_FILES = 500;
@@ -42,9 +40,7 @@ const REMOTE_URL_REGEX = /^https?:\/\//i;
 // MODULE STATE ------------------------------------------------------------------------------------
 let workspaceCssFiles: string[] | null = null;
 
-// -------------------------------------------------------------------------------------------------
-// FETCH UTILITIES
-// -------------------------------------------------------------------------------------------------
+// FETCH UTILITIES ---------------------------------------------------------------------------------
 const fnFetchWithNativeFetch = async (url: string): Promise<string> => {
   const response = (await (globalThis as any).fetch(url)) as FetchResponse;
 
@@ -123,9 +119,7 @@ export const fetchCssContent = async (url: string): Promise<string> => {
   }
 };
 
-// -------------------------------------------------------------------------------------------------
-// FILE READER UTILITIES
-// -------------------------------------------------------------------------------------------------
+// FILE READER UTILITIES ---------------------------------------------------------------------------
 export const readSelectorsFromFsPath = async (fsPath: string): Promise<SelectorPos[]> => {
   try {
     const stat = await fs.promises.stat(fsPath);
@@ -221,9 +215,7 @@ export const clearWorkspaceCssFilesCache = (): void => {
   workspaceCssFiles = null;
 };
 
-// -------------------------------------------------------------------------------------------------
-// VALIDATION HELPERS
-// -------------------------------------------------------------------------------------------------
+// VALIDATION HELPERS ------------------------------------------------------------------------------
 export const normalizeToken = (token: string): string => {
   const normalized = !token ? `` : token.replaceAll(TEMPLATE_LITERAL_REGEX, ` `);
   const isQuoted = normalized && QUOTE_CHARS.some((quote) => normalized.startsWith(quote) && normalized.endsWith(quote));
@@ -254,8 +246,7 @@ export const isValidCssIdentifier = (value: string): boolean => VALID_CSS_IDENTI
 // -------------------------------------------------------------------------------------------------
 export const isRemoteUrl = (url: string): boolean => REMOTE_URL_REGEX.test(url);
 
-// -------------------------------------------------------------------------------------------------
-// CSS 본문 추출 (성능 최적화 및 메모리 효율 개선)
+// CSS BODY EXTRACTION -----------------------------------------------------------------------------
 export const extractCssBodies = (fullText: string): string => {
   let depth = 0;
   let start = -1;
@@ -299,14 +290,10 @@ export const extractCssBodies = (fullText: string): string => {
   return bodies.join(`\n`);
 };
 
-// -------------------------------------------------------------------------------------------------
-// REGEX EXPORTS (for use in validator)
-// -------------------------------------------------------------------------------------------------
+// REGEX EXPORTS -----------------------------------------------------------------------------------
 export { CLASS_ATTRIBUTE_REGEX, CLASSLIST_METHOD_REGEX, STRING_LITERAL_REGEX, QUERYSELECTOR_REGEX, GETELEMENTBYID_REGEX, BACKSLASH_REGEX, REMOTE_URL_REGEX };
 
-// -------------------------------------------------------------------------------------------------
-// VALIDATION FUNCTIONS
-// -------------------------------------------------------------------------------------------------
+// VALIDATION FUNCTIONS ----------------------------------------------------------------------------
 const isHtmlLikeDocument = (document: vscode.TextDocument): boolean => {
   return document.languageId === `html` || /\.html?$/i.test(document.fileName);
 };
@@ -521,8 +508,8 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
 
   // HTML 마크업에 정의된 class/id를 사전수집 → JS 셀렉터에서 참조 시 오탐 방지
   const { markupClasses, markupIds } = isHtml ? collectMarkupDefinitions(fullText, htmlScriptRanges, htmlStyleRanges) : { markupClasses: new Set<string>(), markupIds: new Set<string>() };
-  const allKnownClasses = markupClasses.size > 0 ? new Set([...knownClasses, ...markupClasses]) : knownClasses;
-  const allKnownIds = markupIds.size > 0 ? new Set([...knownIds, ...markupIds]) : knownIds;
+  const allKnownClasses = markupClasses.size > 0 ? new Set([ ...knownClasses, ...markupClasses ]) : knownClasses;
+  const allKnownIds = markupIds.size > 0 ? new Set([ ...knownIds, ...markupIds ]) : knownIds;
 
   // Reset regex lastIndex
   CLASS_ATTRIBUTE_REGEX.lastIndex = 0;
@@ -606,7 +593,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
   }
 
   // querySelector* / jQuery selectors (unified loop) ----
-  for (const selectorRegex of [QUERYSELECTOR_REGEX, JQUERY_SELECTOR_REGEX]) {
+  for (const selectorRegex of [ QUERYSELECTOR_REGEX, JQUERY_SELECTOR_REGEX ]) {
     selectorRegex.lastIndex = 0;
     let selectorMatch: RegExpExecArray | null;
     while ((selectorMatch = selectorRegex.exec(fullText))) {

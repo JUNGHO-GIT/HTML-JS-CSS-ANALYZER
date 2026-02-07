@@ -1,6 +1,7 @@
 /**
  * @file extension.ts
  * @since 2025-11-22
+ * @description VS Code 확장 진입점 (활성화, 프로바이더 등록)
  */
 
 import { vscode } from "@exportLibs";
@@ -9,12 +10,12 @@ import { AutoValidationMode } from "@exportTypes";
 import { scheduleValidate, updateDiagnostics, onClosed, clearAll, bindCssSupport } from "@exportScripts";
 import { initLogger, logger } from "@exportScripts";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const HTML_LANGUAGE: vscode.DocumentSelector = [{ language: `html` }];
 const JS_LANGUAGES: vscode.DocumentSelector = [{ language: `javascript` }];
 const CSS_LANGUAGES: vscode.DocumentSelector = [{ language: `html` }, { language: `css` }];
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const deactivate = () => {};
 export const activate = (context: vscode.ExtensionContext) => {
   initLogger();

@@ -10,14 +10,14 @@ import type { JSHintInstance, SourceAnalysis, ComplexityIssue, PotentialBug, Fun
 import { loadJSHint, loadJSHintConfig, analyzeSourceCode } from "@exportLangs";
 import { calculateErrorRange, calculateSeverity } from "@langs/js/jsUtils";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const ERROR_SEVERITY_TYPES = new Set([ `eval-usage`, `with-statement`, `assignment-in-condition`, `innerhtml-usage`, `document-write` ]);
 const WARNING_SEVERITY_TYPES = new Set([ `empty-catch`, `var-usage` ]);
 const MAX_FUNCTION_PARAMS = 6;
 const MODULE_EXTENSIONS = [ `.mjs`, `.cjs` ];
 let jsHintCache: JSHintInstance | null | undefined;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const getJSHint = (): JSHintInstance | null => {
   let result: JSHintInstance | null;
 

@@ -1,15 +1,14 @@
 /**
  * @file filter.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 문서 필터링 및 분석 대상 판별
  */
 
 import { vscode } from "@exportLibs";
 import { getCssExcludePatterns, getAnalyzableExtensions } from "@exportConsts";
 import { isUriExcludedByGlob } from "@exportScripts";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const SUPPORTED_SCHEMES = [ `file`, `vscode-file`, `vscode-remote` ] as const;
 const EXCLUDED_PATH_PATTERNS = [
   `/appdata/roaming/code/user/`,
@@ -17,7 +16,7 @@ const EXCLUDED_PATH_PATTERNS = [
   `mcp.json`,
 ] as const;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 const isValidScheme = (scheme: string): boolean => {
   return SUPPORTED_SCHEMES.includes(scheme as any);
 };

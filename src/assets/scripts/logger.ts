@@ -1,20 +1,19 @@
 /**
  * @file logger.ts
- * @description foo
- * @author Jungho
- * @since 2026-1-4
+ * @since 2026-01-04
+ * @description 출력 채널 기반 로깅 유틸리티
  */
 
 import { vscode } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const MAIN = `Html-Js-Css-Analyzer`;
 const logLevelMap = {
   off: 0, debug: 1, info: 2, hint: 3, warn: 4, error: 5,
 };
 let outputChannel: vscode.OutputChannel | null = null;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const initLogger = (): void => {
 	!outputChannel ? (
 		outputChannel = vscode.window.createOutputChannel(MAIN)

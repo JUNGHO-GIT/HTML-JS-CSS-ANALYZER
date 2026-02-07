@@ -6,9 +6,7 @@
 
 import { vscode } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
-// CONSTANTS
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 const MAX_NESTING_LEVEL = 10;
 const MAX_LINE_LENGTH = 200;
 const MAX_ATTRIBUTES_PER_TAG = 15;
@@ -30,9 +28,7 @@ const TARGET_BLANK_TEST = /target\s*=\s*["']_blank["'](?![^>]*\brel\s*=\s*["'](?
 // Script/Style content removal
 const SCRIPT_STYLE_CONTENT_REGEX = /<(script|style)[^>]*>[\S\s]*?<\/\1>/gi;
 
-// -------------------------------------------------------------------------------------------------
-// TYPE DEFINITIONS
-// -------------------------------------------------------------------------------------------------
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 declare type HtmlAnalysisIssue = {
   type: string;
   line: number;
@@ -52,9 +48,7 @@ declare type HtmlAnalysisResult = {
   inlineEventCount: number;
 };
 
-// -------------------------------------------------------------------------------------------------
-// ANALYSIS FUNCTIONS
-// -------------------------------------------------------------------------------------------------
+// ANALYSIS FUNCTIONS ------------------------------------------------------------------------------
 const analyzeNesting = (sourceCode: string, issues: HtmlAnalysisIssue[]): number => {
   // Remove script and style content to avoid false positives
   const cleanedSource = sourceCode.replaceAll(SCRIPT_STYLE_CONTENT_REGEX, (match, tag) => `<${tag}></${tag}>`);
@@ -287,9 +281,7 @@ const analyzeSecurity = (lines: string[], issues: HtmlAnalysisIssue[]): void => 
   }
 };
 
-// -------------------------------------------------------------------------------------------------
-// MAIN ANALYSIS FUNCTION
-// -------------------------------------------------------------------------------------------------
+// MAIN ANALYSIS FUNCTION --------------------------------------------------------------------------
 export const analyzeHtmlCode = (sourceCode: string): HtmlAnalysisResult => {
   const issues: HtmlAnalysisIssue[] = [];
   const lines = sourceCode.split(`\n`);
@@ -317,9 +309,7 @@ export const analyzeHtmlCode = (sourceCode: string): HtmlAnalysisResult => {
   };
 };
 
-// -------------------------------------------------------------------------------------------------
-// DIAGNOSTIC GENERATION
-// -------------------------------------------------------------------------------------------------
+// DIAGNOSTIC GENERATION ---------------------------------------------------------------------------
 export const generateHtmlAnalysisDiagnostics = (document: vscode.TextDocument, analysis: HtmlAnalysisResult): vscode.Diagnostic[] => {
   const diagnostics: vscode.Diagnostic[] = [];
 
@@ -345,7 +335,5 @@ export const generateHtmlAnalysisDiagnostics = (document: vscode.TextDocument, a
   return diagnostics;
 };
 
-// -------------------------------------------------------------------------------------------------
-// EXPORT TYPES
-// -------------------------------------------------------------------------------------------------
+// EXPORT TYPES ------------------------------------------------------------------------------------
 export type { HtmlAnalysisIssue, HtmlAnalysisResult };

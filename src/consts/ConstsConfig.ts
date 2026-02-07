@@ -1,11 +1,12 @@
 /**
  * @file ConstsConfig.ts
  * @since 2025-11-21
+ * @description 확장 설정 상수 및 구성 관리
  */
 
 import { vscode } from "@exportLibs";
 
-// -------------------------------------------------------------------------------------------------
+// CONSTANTS ---------------------------------------------------------------------------------------
 export const DEFAULT_CSS_EXCLUDE: string[] = [
   `**/node_modules/**`,
   `**/.git/**`,
@@ -42,7 +43,7 @@ export const DEFAULT_CSS_EXCLUDE: string[] = [
   `**/.coverage`,
 ];
 
-// -------------------------------------------------------------------------------------------------
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 export type LogLevel = `off` | `error` | `info` | `debug`;
 export type UnusedSeverity = never;
 
@@ -57,7 +58,7 @@ const DEFAULT_ANALYZABLE_EXTENSIONS = [
 ];
 const EXTENSION_VALIDATION_REGEX = /^[\d_a-z-]{1,16}$/;
 
-// -------------------------------------------------------------------------------------------------
+// FUNCTIONS ---------------------------------------------------------------------------------------
 const getConfiguration = (resource?: vscode.Uri): vscode.WorkspaceConfiguration => vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION, resource);
 
 // -------------------------------------------------------------------------------------------------
