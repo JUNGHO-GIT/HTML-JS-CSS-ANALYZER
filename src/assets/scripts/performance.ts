@@ -126,10 +126,10 @@ export const resourceLimiter = () => {
         });
       },
       processQueue(): void {
-        this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS && (() => {
+        while (this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
           const operation = this.queue.shift();
           operation?.();
-        })();
+        }
       },
     }
   );

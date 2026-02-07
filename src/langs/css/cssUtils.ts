@@ -240,9 +240,11 @@ export const makeRange = (doc: vscode.TextDocument, startIdx: number, length: nu
 export const collectKnownSelectors = (all: Map<string, SelectorPos[]>): { knownClasses: Set<string>; knownIds: Set<string> } => {
   const knownClasses = new Set<string>();
   const knownIds = new Set<string>();
-  [...all.values()].forEach((arr) => {
-    arr.forEach((s) => (s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector));
-  });
+  for (const arr of all.values()) {
+    for (const s of arr) {
+      (s.type === SelectorType.CLASS ? knownClasses : knownIds).add(s.selector);
+    }
+  }
   return { knownClasses, knownIds };
 };
 
@@ -327,8 +329,18 @@ const collectHtmlBlockRanges = (fullText: string, tag: `script` | `style`): Bloc
 
 // -------------------------------------------------------------------------------------------------
 const isIndexInRanges = (index: number, ranges: BlockRange[]): boolean => {
-  for (const r of ranges) {
-    if (index >= r.start && index < r.end) {
+  let lo = 0;
+  let hi = ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const r = ranges[mid];
+    if (index < r.start) {
+      hi = mid - 1;
+    }
+    else if (index >= r.end) {
+      lo = mid + 1;
+    }
+    else {
       return true;
     }
   }
@@ -469,6 +481,36 @@ const processClassListCall = (match: RegExpExecArray, document: vscode.TextDocum
 };
 
 // -------------------------------------------------------------------------------------------------
+// 2. HTML 마크업에서 정의된 class/id 사전수집 (JS 셀렉터 오탐 방지) ----
+const collectMarkupDefinitions = (fullText: string, scriptRanges: BlockRange[], styleRanges: BlockRange[]): { markupClasses: Set<string>; markupIds: Set<string> } => {
+  const markupClasses = new Set<string>();
+  const markupIds = new Set<string>();
+
+  const classRe = /(?<!:)\b(?:class|classname|ngclass)\b\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/gis;
+  let m: RegExpExecArray | null;
+  while ((m = classRe.exec(fullText))) {
+    if (isIndexInRanges(m.index, scriptRanges) || isIndexInRanges(m.index, styleRanges)) {
+      continue;
+    }
+    for (const t of collectClassTokens(m[2])) {
+      markupClasses.add(t);
+    }
+  }
+
+  const idRe = /(?<!:)\bid\b\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/gis;
+  while ((m = idRe.exec(fullText))) {
+    if (isIndexInRanges(m.index, scriptRanges) || isIndexInRanges(m.index, styleRanges)) {
+      continue;
+    }
+    for (const t of collectIdTokens(m[2])) {
+      markupIds.add(t);
+    }
+  }
+
+  return { markupClasses, markupIds };
+};
+
+// -------------------------------------------------------------------------------------------------
 export const scanDocumentUsages = (fullText: string, document: vscode.TextDocument, knownClasses: Set<string>, knownIds: Set<string>): { diagnostics: vscode.Diagnostic[]; usedClassesFromMarkup: Set<string>; usedIdsFromMarkup: Set<string> } => {
   const diagnostics: vscode.Diagnostic[] = [];
   const usedClassesFromMarkup = new Set<string>();
@@ -476,6 +518,11 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
   const isHtml = isHtmlLikeDocument(document);
   const htmlScriptRanges = isHtml ? collectHtmlBlockRanges(fullText, `script`) : [];
   const htmlStyleRanges = isHtml ? collectHtmlBlockRanges(fullText, `style`) : [];
+
+  // HTML 마크업에 정의된 class/id를 사전수집 → JS 셀렉터에서 참조 시 오탐 방지
+  const { markupClasses, markupIds } = isHtml ? collectMarkupDefinitions(fullText, htmlScriptRanges, htmlStyleRanges) : { markupClasses: new Set<string>(), markupIds: new Set<string>() };
+  const allKnownClasses = markupClasses.size > 0 ? new Set([...knownClasses, ...markupClasses]) : knownClasses;
+  const allKnownIds = markupIds.size > 0 ? new Set([...knownIds, ...markupIds]) : knownIds;
 
   // Reset regex lastIndex
   CLASS_ATTRIBUTE_REGEX.lastIndex = 0;
@@ -555,82 +602,47 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
     if (isHtml && !isIndexInRanges(classListMatch.index, htmlScriptRanges)) {
       continue;
     }
-    processClassListCall(classListMatch, document, knownClasses, diagnostics, usedClassesFromMarkup);
+    processClassListCall(classListMatch, document, allKnownClasses, diagnostics, usedClassesFromMarkup);
   }
 
-  // querySelector* selectors
-  let qsMatch: RegExpExecArray | null;
-  while ((qsMatch = QUERYSELECTOR_REGEX.exec(fullText))) {
-    if (isHtml && !isIndexInRanges(qsMatch.index, htmlScriptRanges)) {
-      continue;
-    }
-    const q = qsMatch[2];
-    if (q.includes(`\${`)) {
-      continue;
-    }
-    const base = qsMatch.index + qsMatch[0].indexOf(q);
-    const clsTok = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
-    const idTok = /(^|[^\\])#((?:\\.|[\w-])+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = clsTok.exec(q))) {
-      const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-      val &&
-        (knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
-          const start = base + m.index + (m[1] ? 1 : 0) + 1;
-          const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
-          d.source = `CSS-Analyzer`;
-          d.code = `CSS001`;
-          diagnostics.push(d);
-        })());
-    }
-    while ((m = idTok.exec(q))) {
-      const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-      val &&
-        (knownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
-          const start = base + m.index + (m[1] ? 1 : 0) + 1;
-          const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
-          d.source = `CSS-Analyzer`;
-          d.code = `CSS002`;
-          diagnostics.push(d);
-        })());
-    }
-  }
-
-  // jQuery selectors: $(".foo") / jQuery("#bar")
-  let jqMatch: RegExpExecArray | null;
-  while ((jqMatch = JQUERY_SELECTOR_REGEX.exec(fullText))) {
-    if (isHtml && !isIndexInRanges(jqMatch.index, htmlScriptRanges)) {
-      continue;
-    }
-    const q = jqMatch[2];
-    if (q.includes(`\${`)) {
-      continue;
-    }
-    const base = jqMatch.index + jqMatch[0].indexOf(q);
-    const clsTok = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
-    const idTok = /(^|[^\\])#((?:\\.|[\w-])+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = clsTok.exec(q))) {
-      const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-      val &&
-        (knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
-          const start = base + m.index + (m[1] ? 1 : 0) + 1;
-          const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
-          d.source = `CSS-Analyzer`;
-          d.code = `CSS001`;
-          diagnostics.push(d);
-        })());
-    }
-    while ((m = idTok.exec(q))) {
-      const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-      val &&
-        (knownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
-          const start = base + m.index + (m[1] ? 1 : 0) + 1;
-          const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
-          d.source = `CSS-Analyzer`;
-          d.code = `CSS002`;
-          diagnostics.push(d);
-        })());
+  // querySelector* / jQuery selectors (unified loop) ----
+  for (const selectorRegex of [QUERYSELECTOR_REGEX, JQUERY_SELECTOR_REGEX]) {
+    selectorRegex.lastIndex = 0;
+    let selectorMatch: RegExpExecArray | null;
+    while ((selectorMatch = selectorRegex.exec(fullText))) {
+      if (isHtml && !isIndexInRanges(selectorMatch.index, htmlScriptRanges)) {
+        continue;
+      }
+      const q = selectorMatch[2];
+      if (q.includes(`\${`)) {
+        continue;
+      }
+      const base = selectorMatch.index + selectorMatch[0].indexOf(q);
+      const clsTok = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
+      const idTok = /(^|[^\\])#((?:\\.|[\w-])+)/g;
+      let m: RegExpExecArray | null;
+      while ((m = clsTok.exec(q))) {
+        const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
+        val &&
+          (allKnownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
+            const start = base + m.index + (m[1] ? 1 : 0) + 1;
+            const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
+            d.source = `CSS-Analyzer`;
+            d.code = `CSS001`;
+            diagnostics.push(d);
+          })());
+      }
+      while ((m = idTok.exec(q))) {
+        const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
+        val &&
+          (allKnownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
+            const start = base + m.index + (m[1] ? 1 : 0) + 1;
+            const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
+            d.source = `CSS-Analyzer`;
+            d.code = `CSS002`;
+            diagnostics.push(d);
+          })());
+      }
     }
   }
 
@@ -642,7 +654,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
     }
     const id = gebi[2];
     id &&
-      (knownIds.has(id) ? usedIdsFromMarkup.add(id) : (() => {
+      (allKnownIds.has(id) ? usedIdsFromMarkup.add(id) : (() => {
         const m = gebi[0].match(/(["'])((?:(?!\1)[^"'`])+)\1/);
         const litLen = m ? m[0].length : id.length + 2;
         const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
@@ -664,7 +676,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
     const tokens = collectClassTokens(raw);
     for (const val of tokens) {
       val &&
-        (knownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
+        (allKnownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
           const start = base + raw.indexOf(val);
           const d = new vscode.Diagnostic(makeRange(document, start, val.length), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
           d.source = `CSS-Analyzer`;
@@ -691,7 +703,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
         const classTokens = collectClassTokens(raw);
         for (const v of classTokens) {
           v &&
-            (knownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
+            (allKnownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
               const rel = raw.indexOf(v);
               const start = rel >= 0 ? absBase + rel : absBase;
               const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
@@ -706,7 +718,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
         const idTokens = collectIdTokens(raw);
         for (const v of idTokens) {
           v &&
-            (knownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
+            (allKnownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
               const rel = raw.indexOf(v);
               const start = rel >= 0 ? absBase + rel : absBase;
               const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);
@@ -730,7 +742,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
     const tokens = collectClassTokens(raw);
     for (const v of tokens) {
       v &&
-        (knownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
+        (allKnownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
           const rel = raw.indexOf(v);
           const start = rel >= 0 ? base + rel : base;
           const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
@@ -752,7 +764,7 @@ export const scanDocumentUsages = (fullText: string, document: vscode.TextDocume
     const tokens = collectIdTokens(raw);
     for (const v of tokens) {
       v &&
-        (knownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
+        (allKnownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
           const rel = raw.indexOf(v);
           const start = rel >= 0 ? base + rel : base;
           const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);

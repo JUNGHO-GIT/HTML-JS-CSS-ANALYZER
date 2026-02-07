@@ -49,7 +49,7 @@ export const settings = {
           `reset.mjs`,
           `gcloud.mjs`,
           `vsce.mjs`,
-          `convert.mjs`,
+          `sort.mjs`,
         ],
       },
 

@@ -95,8 +95,7 @@ const analyzeNesting = (sourceCode: string, issues: HtmlAnalysisIssue[]): number
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeInlineStyles = (sourceCode: string, issues: HtmlAnalysisIssue[]): number => {
-  const lines = sourceCode.split(`\n`);
+const analyzeInlineStyles = (lines: string[], issues: HtmlAnalysisIssue[]): number => {
   let inlineStyleCount = 0;
 
   for (const [ i, line ] of lines.entries()) {
@@ -118,8 +117,7 @@ const analyzeInlineStyles = (sourceCode: string, issues: HtmlAnalysisIssue[]): n
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeInlineEvents = (sourceCode: string, issues: HtmlAnalysisIssue[]): number => {
-  const lines = sourceCode.split(`\n`);
+const analyzeInlineEvents = (lines: string[], issues: HtmlAnalysisIssue[]): number => {
   let inlineEventCount = 0;
 
   for (const [ i, line ] of lines.entries()) {
@@ -141,9 +139,7 @@ const analyzeInlineEvents = (sourceCode: string, issues: HtmlAnalysisIssue[]): n
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeDeprecatedTags = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
-  const lines = sourceCode.split(`\n`);
-
+const analyzeDeprecatedTags = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
     let match: RegExpExecArray | null;
@@ -161,9 +157,8 @@ const analyzeDeprecatedTags = (sourceCode: string, issues: HtmlAnalysisIssue[]):
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeDuplicateIds = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
+const analyzeDuplicateIds = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   const idMap = new Map<string, number[]>();
-  const lines = sourceCode.split(`\n`);
 
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
@@ -190,9 +185,7 @@ const analyzeDuplicateIds = (sourceCode: string, issues: HtmlAnalysisIssue[]): v
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeLineLength = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
-  const lines = sourceCode.split(`\n`);
-
+const analyzeLineLength = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
@@ -207,9 +200,7 @@ const analyzeLineLength = (sourceCode: string, issues: HtmlAnalysisIssue[]): voi
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeAttributeCount = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
-  const lines = sourceCode.split(`\n`);
-
+const analyzeAttributeCount = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
     let tagMatch: RegExpExecArray | null;
@@ -247,8 +238,7 @@ const countTags = (sourceCode: string): number => {
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeAccessibility = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
-  const lines = sourceCode.split(`\n`);
+const analyzeAccessibility = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
@@ -282,8 +272,7 @@ const analyzeAccessibility = (sourceCode: string, issues: HtmlAnalysisIssue[]): 
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeSecurity = (sourceCode: string, issues: HtmlAnalysisIssue[]): void => {
-  const lines = sourceCode.split(`\n`);
+const analyzeSecurity = (lines: string[], issues: HtmlAnalysisIssue[]): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
@@ -303,16 +292,17 @@ const analyzeSecurity = (sourceCode: string, issues: HtmlAnalysisIssue[]): void 
 // -------------------------------------------------------------------------------------------------
 export const analyzeHtmlCode = (sourceCode: string): HtmlAnalysisResult => {
   const issues: HtmlAnalysisIssue[] = [];
+  const lines = sourceCode.split(`\n`);
 
   const maxNestingLevel = analyzeNesting(sourceCode, issues);
-  const inlineStyleCount = analyzeInlineStyles(sourceCode, issues);
-  const inlineEventCount = analyzeInlineEvents(sourceCode, issues);
-  analyzeDeprecatedTags(sourceCode, issues);
-  analyzeDuplicateIds(sourceCode, issues);
-  analyzeLineLength(sourceCode, issues);
-  analyzeAttributeCount(sourceCode, issues);
-  analyzeAccessibility(sourceCode, issues);
-  analyzeSecurity(sourceCode, issues);
+  const inlineStyleCount = analyzeInlineStyles(lines, issues);
+  const inlineEventCount = analyzeInlineEvents(lines, issues);
+  analyzeDeprecatedTags(lines, issues);
+  analyzeDuplicateIds(lines, issues);
+  analyzeLineLength(lines, issues);
+  analyzeAttributeCount(lines, issues);
+  analyzeAccessibility(lines, issues);
+  analyzeSecurity(lines, issues);
 
   const structure = analyzeDocumentStructure(sourceCode);
   const tagCount = countTags(sourceCode);

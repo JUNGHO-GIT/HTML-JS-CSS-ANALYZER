@@ -80,18 +80,39 @@ const ensureLimit = (): void => {
   if (!needsEviction) {
     return;
   }
-  // Sort by priority: low access count + old timestamp = evict first
-  const entries = [...styleCache.entries()].sort((a, b) => {
-    const scoreDiff = a[1].accessCount - b[1].accessCount;
-    return scoreDiff !== 0 ? scoreDiff : a[1].timestamp - b[1].timestamp;
-  });
+  const overCount = Math.max(styleCache.size - config.maxEntries, 0) + 1;
 
-  // Remove until within limits
-  let i = 0;
-  while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
-    removeEntry(entries[i][0]);
-    i++;
-  }
+  // Small eviction: find minimum entries without full sort O(n*k)
+  overCount <= 5 ? (() => {
+    let evicted = 0;
+    while (evicted < overCount && styleCache.size > 0) {
+      let minKey = ``;
+      let minScore = Number.POSITIVE_INFINITY;
+      let minTimestamp = Number.POSITIVE_INFINITY;
+      for (const [ key, val ] of styleCache.entries()) {
+        if (val.accessCount < minScore || (val.accessCount === minScore && val.timestamp < minTimestamp)) {
+          minKey = key;
+          minScore = val.accessCount;
+          minTimestamp = val.timestamp;
+        }
+      }
+      minKey && removeEntry(minKey);
+      evicted++;
+      !isMemoryExceeded() && styleCache.size <= config.maxEntries && (evicted = overCount);
+    }
+  })() : (() => {
+    // Large eviction: fall back to full sort O(n log n)
+    const entries = [...styleCache.entries()].sort((a, b) => {
+      const scoreDiff = a[1].accessCount - b[1].accessCount;
+      return scoreDiff !== 0 ? scoreDiff : a[1].timestamp - b[1].timestamp;
+    });
+
+    let i = 0;
+    while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
+      removeEntry(entries[i][0]);
+      i++;
+    }
+  })();
 };
 
 // PUBLIC API --------------------------------------------------------------------------------------

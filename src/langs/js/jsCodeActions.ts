@@ -36,7 +36,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const code = diagnosticData?.ruleId || diagnostic.code?.toString();
     const evidence = diagnosticData?.evidence || ``;
 
-    !code ? actions : code === `W033` ? actions.push(...this.createSemicolonFixes(document, diagnostic)) : code === `W116` ? actions.push(...this.createEqualityFixes(document, diagnostic)) : code === `W117` ? actions.push(...this.createUndefinedVariableFixes(document, diagnostic)) : code === `W098` ? actions.push(...this.createUnusedVariableFixes(document, diagnostic)) : code === `prefer-let-const` ? actions.push(...this.createVarToLetConstFixes(document, diagnostic)) : code === `missing-strict-mode` ? actions.push(...this.createStrictModeFixes(document, diagnostic)) : code.startsWith(`complexity-`) || code.startsWith(`bug-`) ? actions.push(...this.createAnalysisFixes(document, diagnostic, code)) : (() => {
+    !code ? actions : code === `W033` ? actions.push(...this.createSemicolonFixes(document, diagnostic)) : code === `W116` ? actions.push(...this.createEqualityFixes(document, diagnostic)) : code === `W117` ? actions.push(...this.createUndefinedVariableFixes(document, diagnostic)) : code === `W098` ? actions.push(...this.createUnusedVariableFixes(document, diagnostic)) : code === `prefer-let-const` ? actions.push(...this.createVarToLetConstFixes(document, diagnostic)) : code === `missing-strict-mode` ? actions.push(...this.createStrictModeFixes(document, diagnostic)) : code.startsWith(`complexity-`) ?? code.startsWith(`bug-`) ? actions.push(...this.createAnalysisFixes(document, diagnostic, code)) : (() => {
       const genericFix = this.createGenericFix(document, diagnostic, code);
       genericFix && actions.push(genericFix);
     })();

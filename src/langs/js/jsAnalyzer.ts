@@ -33,10 +33,40 @@ const stripStringsAndComments = (line: string): string => {
   .replaceAll(/\/\*.*?\*\//g, ``);
 };
 
-// -------------------------------------------------------------------------------------------------
-const analyzeComplexity = (sourceCode: string, analysis: SourceAnalysis): void => {
-  const lines = sourceCode.split(`\n`);
+// Helper: Build line offset index for O(log n) line lookups ------
+const buildLineOffsets = (text: string): number[] => {
+  const offsets = [0];
+  for (const [ i, ch ] of [...text].entries()) {
+    ch === `\n` && offsets.push(i + 1);
+  }
+  return offsets;
+};
 
+// Helper: Binary search to find 1-based line number from offset --
+const lineAtOffset = (offsets: number[], offset: number): number => {
+  let lo = 0;
+  let hi = offsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    offsets[mid] <= offset ? (lo = mid) : (hi = mid - 1);
+  }
+  return lo + 1;
+};
+
+// Helper: Precompute block comment state per line ----------------
+const precomputeBlockCommentState = (lines: string[]): boolean[] => {
+  const state = Array.from<boolean>({ length: lines.length });
+  let inBlock = false;
+  for (const [ i, line ] of lines.entries()) {
+    line.includes(`/*`) && !line.includes(`*/`) && (inBlock = true);
+    inBlock && line.includes(`*/`) && (inBlock = false);
+    state[i] = inBlock;
+  }
+  return state;
+};
+
+// -------------------------------------------------------------------------------------------------
+const analyzeComplexity = (lines: string[], analysis: SourceAnalysis): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
     const trimmed = line.trim();
@@ -76,10 +106,7 @@ const analyzeComplexity = (sourceCode: string, analysis: SourceAnalysis): void =
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): void => {
-  const lines = sourceCode.split(`\n`);
-  let inBlockComment = false;
-
+const analyzePotentialBugs = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
     const trimmed = line.trim();
@@ -88,12 +115,8 @@ const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): voi
 
       continue;
     }
-    // Track block comments
-    line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
-    inBlockComment && line.includes(`*/`) && (inBlockComment = false);
-
-    // Skip comments
-    if (inBlockComment || COMMENT_LINE_REGEX.test(trimmed)) {
+    // Skip comments (precomputed block comment state)
+    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(trimmed)) {
       continue;
     }
     // Strip strings for accurate detection
@@ -130,18 +153,11 @@ const analyzePotentialBugs = (sourceCode: string, analysis: SourceAnalysis): voi
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeModernJs = (sourceCode: string, analysis: SourceAnalysis): void => {
-  const lines = sourceCode.split(`\n`);
-  let inBlockComment = false;
-
+const analyzeModernJs = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
-    // Track block comments
-    line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
-    inBlockComment && line.includes(`*/`) && (inBlockComment = false);
-
-    if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
 
       continue;
     }
@@ -158,18 +174,11 @@ const analyzeModernJs = (sourceCode: string, analysis: SourceAnalysis): void => 
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzeSecurity = (sourceCode: string, analysis: SourceAnalysis): void => {
-  const lines = sourceCode.split(`\n`);
-  let inBlockComment = false;
-
+const analyzeSecurity = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
-    // Track block comments
-    line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
-    inBlockComment && line.includes(`*/`) && (inBlockComment = false);
-
-    if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
 
       continue;
     }
@@ -194,20 +203,14 @@ const analyzeSecurity = (sourceCode: string, analysis: SourceAnalysis): void => 
 };
 
 // -------------------------------------------------------------------------------------------------
-const analyzePerformance = (sourceCode: string, analysis: SourceAnalysis): void => {
-  const lines = sourceCode.split(`\n`);
+const analyzePerformance = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
   const loopStack: number[] = []; // Stack of brace depths where loops started
   let braceDepth = 0;
-  let inBlockComment = false;
 
   for (const [ i, line ] of lines.entries()) {
     const lineNum = i + 1;
 
-    // Track block comments
-    line.includes(`/*`) && !line.includes(`*/`) && (inBlockComment = true);
-    inBlockComment && line.includes(`*/`) && (inBlockComment = false);
-
-    if (inBlockComment || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
 
       continue;
     }
@@ -253,13 +256,15 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   analysis.isModule = sourceCode.includes(`import `) || sourceCode.includes(`export `) || document.fileName.endsWith(`.mjs`);
   analysis.hasStrictMode = sourceCode.includes(`"use strict"`) || sourceCode.includes(`'use strict'`);
 
+  const lineOffsets = buildLineOffsets(sourceCode);
+
   // 함수 선언 분석 (최적화된 정규식)
   const functionMatches = sourceCode.matchAll(/\bfunction\s+(\w+)\s*\([^)]*\)\s*{/g);
   [...functionMatches].forEach((match) => {
     const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] ?? ``;
     analysis.functions.push({
       name: match[1],
-      line: sourceCode.slice(0, Math.max(0, match.index)).split(`\n`).length,
+      line: lineAtOffset(lineOffsets, match.index),
       parameters: paramsText.split(`,`).filter((p) => p.trim()).length,
     });
   });
@@ -270,7 +275,7 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
     const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] ?? ``;
     analysis.functions.push({
       name: match[1],
-      line: sourceCode.slice(0, Math.max(0, match.index)).split(`\n`).length,
+      line: lineAtOffset(lineOffsets, match.index),
       parameters: paramsText.split(`,`).filter((p) => p.trim()).length,
     });
   });
@@ -281,7 +286,7 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
     analysis.variables.push({
       name: match[2],
       type: match[1] as `let` | `const` | `var`,
-      line: sourceCode.slice(0, Math.max(0, match.index)).split(`\n`).length,
+      line: lineAtOffset(lineOffsets, match.index),
     });
   });
 
@@ -290,7 +295,7 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   [...importMatches].forEach((match) => {
     analysis.imports.push({
       module: match[1],
-      line: sourceCode.slice(0, Math.max(0, match.index)).split(`\n`).length,
+      line: lineAtOffset(lineOffsets, match.index),
     });
   });
 
@@ -299,15 +304,17 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   [...exportMatches].forEach((match) => {
     analysis.exports.push({
       declaration: match[1],
-      line: sourceCode.slice(0, Math.max(0, match.index)).split(`\n`).length,
+      line: lineAtOffset(lineOffsets, match.index),
     });
   });
 
-  analyzeComplexity(sourceCode, analysis);
-  analyzePotentialBugs(sourceCode, analysis);
-  analyzeModernJs(sourceCode, analysis);
-  analyzeSecurity(sourceCode, analysis);
-  analyzePerformance(sourceCode, analysis);
+  const lines = sourceCode.split(`\n`);
+  const blockCommentState = precomputeBlockCommentState(lines);
+  analyzeComplexity(lines, analysis);
+  analyzePotentialBugs(lines, blockCommentState, analysis);
+  analyzeModernJs(lines, blockCommentState, analysis);
+  analyzeSecurity(lines, blockCommentState, analysis);
+  analyzePerformance(lines, blockCommentState, analysis);
 
   const processedCode = sourceCode;
 
