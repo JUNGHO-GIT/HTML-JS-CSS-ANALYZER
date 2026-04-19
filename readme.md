@@ -1,37 +1,19 @@
 # Html-Js-Css-Analyzer
 
-A lightweight VS Code extension for analyzing HTML, JavaScript, and CSS.  
-Find undefined classes, unused selectors, and get intelligent code completion.
+## Overview
 
-## Key Features
+Html-Js-Css-Analyzer is a VS Code extension that checks HTML, JavaScript, and CSS
+files for diagnostics, cross-file issues, and editor assistance.
 
-| Feature | Description |
-| :--- | :--- |
-| **HTML Analysis** | Detects undefined classes/IDs, integrates HTMLHint for validation |
-| **CSS Analysis** | Highlights unused selectors, validates syntax using advanced parsing |
-| **JavaScript Analysis** | Integrates JSHint for code quality and error detection |
-| **IntelliSense** | Auto-completion and "Go to Definition" for CSS classes and IDs |
+## Structure
 
-## Usage
+* `src/langs/` contains language-specific analyzers and validators
+* `src/consts/` defines extension-wide configuration constants
+* `src/assets/` holds shared scripts, helpers, and type definitions
+* `src/exports/` exposes barrel modules used across the extension
+* `out/` is the generated extension output
 
-| Command | Description |
-| :--- | :--- |
-| `Validate Current Document` | Validate the current file |
-| `Clear Style Cache` | Refresh the workspace analysis |
+## Notes
 
-## Settings
-
-| Setting | Default | Description |
-| :--- | :--- | :--- |
-| `enable` | `true` | Enable or disable the extension |
-| `exclude` | `[]` | Glob patterns to exclude files or folders |
-| `htmlHint.enabled` | `true` | Toggle HTML validation |
-| `jsHint.enabled` | `true` | Toggle JavaScript validation |
-
-## Architecture
-
-[Architecture Document](./architecture.md)
-
-## License
-
-[Apache License 2.0](./license.md)
+* The repository focuses on editor feedback rather than standalone CLI execution.
+* Language behavior is split by domain so each analyzer stays isolated.
