@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -146,11 +146,9 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "project": "bun .node/bootstrap-sync.mjs --project",
-    "git": "bun .node/bootstrap-sync.mjs --git",
-    "ps1": "bun .node/bootstrap-sync.mjs --ps1",
-    "tools": "bun .node/bootstrap-sync.mjs --tools",
-    "sync": "bun .node/bootstrap-sync.mjs --sync"
+    "git": "bun ~/.bootstrap/bootstrap-sync.mjs --git",
+    "sync": "bun ~/.bootstrap/bootstrap-sync.mjs --sync",
+    "tools": "bun ~/.bootstrap/bootstrap-sync.mjs --tools"
   },
   "dependencies": {
     "css-tree": "^3.1.0",
