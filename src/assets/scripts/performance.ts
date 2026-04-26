@@ -7,7 +7,7 @@
 import { logger } from "@exportScripts";
 import type { PerformanceMetricsType } from "@exportTypes";
 
-// FUNCTIONS ---------------------------------------------------------------------------------------
+// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 let __pmInstance: { metrics: Map<string, PerformanceMetricsType>; start: (operationName: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
 export const performanceMonitor = () => {
   !__pmInstance && (
@@ -50,7 +50,7 @@ export const performanceMonitor = () => {
   return __pmInstance;
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const withPerformanceMonitoring = async <T>(
   operationName: string,
   operation: () => Promise<T> | T,
@@ -65,7 +65,7 @@ export const withPerformanceMonitoring = async <T>(
   }
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const throttle = <T extends (...args: any[]) => any>(
   func: T,
   limit: number,
@@ -80,7 +80,7 @@ export const throttle = <T extends (...args: any[]) => any>(
   }) as T;
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   delay: number,
@@ -92,7 +92,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   }) as T;
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void };
 let __rlInstance: ResourceLimiterType | null = null;
 export const resourceLimiter = () => {

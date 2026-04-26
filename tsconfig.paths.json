@@ -2,22 +2,21 @@
   "$schema": "https://www.schemastore.org/tsconfig",
   "compilerOptions": {
     "rootDir": "",
-    "baseUrl": "./",
     "outDir": "out",
     "paths": {
-			"@type/*": ["src/assets/type/domain/*"],
-			"@assets/*": ["src/assets/*"],
-			"@scripts/*": ["src/assets/scripts/*"],
-			"@consts/*": ["src/consts/*"],
-			"@langs/*": ["src/langs/*"],
-			"@exportLibs": ["src/exports/ExportLibs"],
-			"@exportScripts": ["src/exports/ExportScripts"],
-			"@exportConsts": ["src/exports/ExportConsts"],
-			"@exportTypes": ["src/exports/ExportTypes"],
-			"@exportLangs": ["src/exports/ExportLangs"]
+			"@type/*": ["./src/assets/type/domain/*"],
+			"@assets/*": ["./src/assets/*"],
+			"@scripts/*": ["./src/assets/scripts/*"],
+			"@consts/*": ["./src/consts/*"],
+			"@langs/*": ["./src/langs/*"],
+			"@exportLibs": ["./src/exports/ExportLibs"],
+			"@exportScripts": ["./src/exports/ExportScripts"],
+			"@exportConsts": ["./src/exports/ExportConsts"],
+			"@exportTypes": ["./src/exports/ExportTypes"],
+			"@exportLangs": ["./src/exports/ExportLangs"]
     },
     "typeRoots": [
-			"src/assets/type/dist",
+			"./src/assets/type/dist",
 			"node_modules/@types"
     ],
 		"types": [
@@ -25,9 +24,9 @@
 		]
   },
   "include": [
-    "src/**/*",
-    "src/**/*.ts",
-		"src/**/*.tsx",
+    "./src/**/*",
+    "./src/**/*.ts",
+		"./src/**/*.tsx",
     "**/*.ts",
     "**/*.tsx",
     "**/*.d.ts",

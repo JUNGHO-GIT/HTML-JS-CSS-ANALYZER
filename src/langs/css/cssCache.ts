@@ -6,7 +6,7 @@
 
 import type { SelectorPos } from "@exportTypes";
 
-// TYPE DEFINITIONS --------------------------------------------------------------------------------
+// TYPE DEFINITIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 interface CacheVal {
   version: number;
   data: SelectorPos[];
@@ -21,19 +21,19 @@ interface CacheConfig {
   maxMemoryMb: number;
 }
 
-// CONSTANTS ---------------------------------------------------------------------------------------
+// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const DEFAULT_CONFIG: CacheConfig = {
   maxEntries: 300,
   ttlMs: 30 * 60 * 1000,
   maxMemoryMb: 50,
 };
 
-// CACHE STATE -------------------------------------------------------------------------------------
+// CACHE STATE ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const styleCache: Map<string, CacheVal> = new Map();
 let config = { ...DEFAULT_CONFIG };
 let totalMemoryBytes = 0;
 
-// HELPER FUNCTIONS --------------------------------------------------------------------------------
+// HELPER FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 const estimateSize = (data: SelectorPos[]): number => {
   // Rough estimation: each selector entry ~100 bytes
   return data.length * 100 + 50;
@@ -115,7 +115,7 @@ const ensureLimit = (): void => {
   })();
 };
 
-// PUBLIC API --------------------------------------------------------------------------------------
+// PUBLIC API ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 export const cacheGet = (key: string): CacheVal | undefined => {
   const val = styleCache.get(key);
   if (!val) {

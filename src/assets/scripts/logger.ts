@@ -6,14 +6,14 @@
 
 import { vscode } from "@exportLibs";
 
-// CONSTANTS ---------------------------------------------------------------------------------------
+// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAIN = `Html-Js-Css-Analyzer`;
 const logLevelMap = {
   off: 0, debug: 1, info: 2, hint: 3, warn: 4, error: 5,
 };
 let outputChannel: vscode.OutputChannel | null = null;
 
-// FUNCTIONS ---------------------------------------------------------------------------------------
+// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const initLogger = (): void => {
 	!outputChannel ? (
 		outputChannel = vscode.window.createOutputChannel(MAIN)
@@ -22,7 +22,7 @@ export const initLogger = (): void => {
 	);
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const getLogLevel = (): number => {
   const config = vscode.workspace.getConfiguration(MAIN);
   const level = config.get<string>(`logLevel`, `info`);
@@ -30,24 +30,24 @@ const getLogLevel = (): number => {
   return rs;
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const appendOutput = (levelKey: keyof typeof logLevelMap, msg: string): void => {
   outputChannel && getLogLevel() <= logLevelMap[levelKey] && outputChannel.appendLine(msg);
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const formatLog = (text = ``): string => {
   return text.trim().replaceAll(/^\s+/gm, ``);
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const logger = (
   type: `debug` | `info` | `hint` | `warn` | `error`,
   value: string,
 ): void => {
   const config = {
     line: {
-      str: `-----------------------------------------`,
+      str: `―――――――――――――――――――――――――――――――――――――――--`,
       color: `\u001B[38;2;255;162;0m`,
     },
     title: {

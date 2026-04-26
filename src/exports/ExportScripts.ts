@@ -4,49 +4,43 @@
  * @description 스크립트 유틸리티 통합 내보내기
  */
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-  logger,
-  initLogger,
+	logger,
+	initLogger,
 } from "@scripts/logger";
-export {
-  notify,
-} from "@scripts/notify";
+export { notify } from "@scripts/notify";
 
-// -------------------------------------------------------------------------------------------------
-export {
-  validateDocument,
-} from "@scripts/validate";
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export { validateDocument } from "@scripts/validate";
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-  LineIndexMapper,
-  type LineIndex,
+	LineIndexMapper,
+	type LineIndex,
 } from "@scripts/lineIndex";
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-  withPerformanceMonitoring,
-  performanceMonitor,
-  resourceLimiter,
+	withPerformanceMonitoring,
+	performanceMonitor,
+	resourceLimiter,
 } from "@scripts/performance";
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-  globToRegExp,
-  isUriExcludedByGlob,
+	globToRegExp,
+	isUriExcludedByGlob,
 } from "@scripts/glob";
 
-// -------------------------------------------------------------------------------------------------
-export {
-  isAnalyzable,
-} from "@scripts/filter";
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export { isAnalyzable } from "@scripts/filter";
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-  scheduleValidate,
-  bindCssSupport,
-  updateDiagnostics,
-  clearAll,
-  onClosed,
+	scheduleValidate,
+	bindCssSupport,
+	updateDiagnostics,
+	clearAll,
+	onClosed,
 } from "@scripts/diagnostic";

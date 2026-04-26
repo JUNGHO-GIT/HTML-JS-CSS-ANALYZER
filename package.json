@@ -5,11 +5,11 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.3.3",
+  "version": "3.3.5",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JUNGHO-GIT/HTML-JS-CSS-ANALYZER.git"
+    "url": "https://github.com/jungho-dev/html-js-css-analyzer.git"
   },
   "categories": [
     "Programming Languages",

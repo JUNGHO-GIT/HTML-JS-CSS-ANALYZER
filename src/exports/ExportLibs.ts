@@ -4,8 +4,16 @@
  * @description 외부 라이브러리 통합 내보내기
  */
 
-// -------------------------------------------------------------------------------------------------
-export { default as vscode, CodeAction, CodeActionKind, Diagnostic, Position, Range, DiagnosticSeverity } from "vscode";
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export {
+	default as vscode,
+	CodeAction,
+	CodeActionKind,
+	Diagnostic,
+	Position,
+	Range,
+	DiagnosticSeverity,
+} from "vscode";
 export { default as fs } from "node:fs";
 export { default as path } from "node:path";
 export { default as http } from "node:http";

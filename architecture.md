@@ -1,9 +1,9 @@
-# HTML-JS-CSS-ANALYZER Architecture
+# html-js-css-analyzer Architecture
 
 ## Structure Map
 
 ```text
-HTML-JS-CSS-ANALYZER
+html-js-css-analyzer
 |-- src/
 |   |-- langs/
 |   |   |-- html/    -> HTML analysis rules

@@ -7,21 +7,21 @@
 import { vscode } from "@exportLibs";
 import * as csstree from "css-tree";
 
-// CONSTANTS ---------------------------------------------------------------------------------------
+// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAX_ID_SELECTORS = 2;
 const MAX_SELECTOR_DEPTH = 4;
 const VENDOR_PREFIX_REGEX = /^-(?:webkit|moz|ms|o)-/;
 const DEPRECATED_PROPERTIES = new Set([ `clip`, `zoom`, `behavior` ]);
 const PERFORMANCE_HEAVY_ATTRIBUTES = new Set([ `class`, `id`, `style` ]);
 
-// DUPLICATE SELECTOR TRACKING ---------------------------------------------------------------------
+// DUPLICATE SELECTOR TRACKING ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const selectorCache = new Map<string, number>();
 
 const resetSelectorCache = (): void => {
   selectorCache.clear();
 };
 
-// TYPE DEFINITIONS --------------------------------------------------------------------------------
+// TYPE DEFINITIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 export type CssSeverity = `error` | `warning` | `info`;
 
 export type CssIssueType = `empty-rule` | `too-many-ids` | `important-usage` | `universal-selector` | `deep-nesting` | `duplicate-selector` | `vendor-prefix` | `deprecated-property` | `syntax-error`;
@@ -44,7 +44,7 @@ export type CssAnalysisResult = {
   };
 };
 
-// HELPER FUNCTIONS --------------------------------------------------------------------------------
+// HELPER FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 const getSelectorDepth = (selector: csstree.CssNode): number => {
   let depth = 0;
   csstree.walk(selector, (node) => {
@@ -59,7 +59,7 @@ const addIssue = (issues: CssAnalysisIssue[], type: CssIssueType | string, line:
   });
 };
 
-// ANALYSIS RULES ----------------------------------------------------------------------------------
+// ANALYSIS RULES ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const analyzeRule = (node: csstree.Rule, issues: CssAnalysisIssue[]): { rules: number; selectors: number } => {
   const ruleCount = 1;
   let selectorCount = 0;
@@ -119,7 +119,7 @@ const analyzeAttributeSelector = (node: csstree.AttributeSelector, issues: CssAn
   isHeavyAttr && node.matcher === null && addIssue(issues, `universal-selector`, node.loc.start.line, `Attribute selector [${attrName}] without value can impact performance`, `info`, node.loc.start.column, `Use specific class or ID selectors`);
 };
 
-// MAIN ANALYSIS FUNCTION --------------------------------------------------------------------------
+// MAIN ANALYSIS FUNCTION ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
   const issues: CssAnalysisIssue[] = [];
   let ruleCount = 0;
@@ -175,7 +175,7 @@ export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
   return { issues, stats: { ruleCount, selectorCount, declarationCount } };
 };
 
-// DIAGNOSTIC GENERATION ---------------------------------------------------------------------------
+// DIAGNOSTIC GENERATION ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const severityMap: Record<CssSeverity, vscode.DiagnosticSeverity> = {
   error: vscode.DiagnosticSeverity.Error,
   warning: vscode.DiagnosticSeverity.Warning,
@@ -208,7 +208,7 @@ export const generateCssAnalysisDiagnostics = (document: vscode.TextDocument, an
   return diagnostic;
 });
 
-// UTILITY EXPORTS ---------------------------------------------------------------------------------
+// UTILITY EXPORTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const getAnalysisStats = (result: CssAnalysisResult): string => {
   const { stats } = result;
   return `Rules: ${stats.ruleCount}, Selectors: ${stats.selectorCount}, Declarations: ${stats.declarationCount}, Issues: ${result.issues.length}`;

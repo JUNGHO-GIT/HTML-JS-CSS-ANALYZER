@@ -6,11 +6,11 @@
 
 import { vscode } from "@exportLibs";
 
-// CONSTANTS ---------------------------------------------------------------------------------------
+// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAIN = `Html-Js-Css-Analyzer`;
 const AUTO_CLOSE_MS = 1000;
 
-// FUNCTIONS ---------------------------------------------------------------------------------------
+// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const showProgress = async (text: string): Promise<void> => {
   await vscode.window.withProgress({
     location: vscode.ProgressLocation.Notification,
@@ -22,7 +22,7 @@ const showProgress = async (text: string): Promise<void> => {
   });
 };
 
-// -------------------------------------------------------------------------------------------------
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const notify = async (
   type: `debug` | `info` | `hint` | `warn` | `error`,
   value: string,
