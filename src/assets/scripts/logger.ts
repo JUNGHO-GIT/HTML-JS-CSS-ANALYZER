@@ -9,17 +9,18 @@ import { vscode } from "@exportLibs";
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAIN = `Html-Js-Css-Analyzer`;
 const logLevelMap = {
-  off: 0, debug: 1, info: 2, hint: 3, warn: 4, error: 5,
+  off: 0,
+  debug: 1,
+  info: 2,
+  hint: 3,
+  warn: 4,
+  error: 5,
 };
 let outputChannel: vscode.OutputChannel | null = null;
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const initLogger = (): void => {
-	!outputChannel ? (
-		outputChannel = vscode.window.createOutputChannel(MAIN)
-	) : (
-		void 0
-	);
+  !outputChannel ? (outputChannel = vscode.window.createOutputChannel(MAIN)) : void 0;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
@@ -36,15 +37,10 @@ const appendOutput = (levelKey: keyof typeof logLevelMap, msg: string): void => 
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const formatLog = (text = ``): string => {
-  return text.trim().replaceAll(/^\s+/gm, ``);
-};
+const formatLog = (text=``): string => text.trim().replaceAll(/^\s+/gm, ``);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const logger = (
-  type: `debug` | `info` | `hint` | `warn` | `error`,
-  value: string,
-): void => {
+export const logger = (type: `debug` | `info` | `hint` | `warn` | `error`, value: string): void => {
   const config = {
     line: {
       str: `―――――――――――――――――――――――――――――――――――――――--`,
@@ -83,33 +79,33 @@ export const logger = (
   const title = `${config.reset.color}${config.title.color}${config.title.str}${config.reset.color}`;
   const level = `${config.reset.color}${config[type].color}${config[type].str}${config.reset.color}`;
   const logMsg = formatLog(`
-		${separator}
-		${title} ${level}
-		${value}
-	`);
+  ${separator}
+  ${title} ${level}
+  ${value}
+  `);
   const outputMsg = formatLog(`
-		${config.line.str}
-		${config[type].str} - ${value}
-	`);
+  ${config.line.str}
+  ${config[type].str} - ${value}
+  `);
 
   type === `debug` && (() => {
-    console.debug(logMsg);
-    appendOutput(`debug`, outputMsg);
-  })();
+      console.debug(logMsg);
+      appendOutput(`debug`, outputMsg);
+    })();
   type === `info` && (() => {
-    console.info(logMsg);
-    appendOutput(`info`, outputMsg);
-  })();
+      console.info(logMsg);
+      appendOutput(`info`, outputMsg);
+    })();
   type === `hint` && (() => {
-    console.log(logMsg);
-    appendOutput(`hint`, outputMsg);
-  })();
+      console.log(logMsg);
+      appendOutput(`hint`, outputMsg);
+    })();
   type === `warn` && (() => {
-    console.warn(logMsg);
-    appendOutput(`warn`, outputMsg);
-  })();
+      console.warn(logMsg);
+      appendOutput(`warn`, outputMsg);
+    })();
   type === `error` && (() => {
-    console.error(logMsg);
-    appendOutput(`error`, outputMsg);
-  })();
+      console.error(logMsg);
+      appendOutput(`error`, outputMsg);
+    })();
 };

@@ -11,8 +11,8 @@ import * as csstree from "css-tree";
 const MAX_ID_SELECTORS = 2;
 const MAX_SELECTOR_DEPTH = 4;
 const VENDOR_PREFIX_REGEX = /^-(?:webkit|moz|ms|o)-/;
-const DEPRECATED_PROPERTIES = new Set([ `clip`, `zoom`, `behavior` ]);
-const PERFORMANCE_HEAVY_ATTRIBUTES = new Set([ `class`, `id`, `style` ]);
+const DEPRECATED_PROPERTIES = new Set([`clip`, `zoom`, `behavior`]);
+const PERFORMANCE_HEAVY_ATTRIBUTES = new Set([`class`, `id`, `style`]);
 
 // DUPLICATE SELECTOR TRACKING ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const selectorCache = new Map<string, number>();
@@ -55,7 +55,12 @@ const getSelectorDepth = (selector: csstree.CssNode): number => {
 
 const addIssue = (issues: CssAnalysisIssue[], type: CssIssueType | string, line: number, message: string, severity: CssSeverity, column?: number, suggestion?: string): void => {
   issues.push({
-    type, line, column, message, severity, suggestion,
+    type,
+    line,
+    column,
+    message,
+    severity,
+    suggestion,
   });
 };
 
@@ -68,8 +73,7 @@ const analyzeRule = (node: csstree.Rule, issues: CssAnalysisIssue[]): { rules: n
   node.block.children.isEmpty && node.loc && addIssue(issues, `empty-rule`, node.loc.start.line, `Empty CSS rule detected`, `warning`, node.loc.start.column, `Remove empty rule or add declarations`);
 
   // 2. Selector Analysis
-  node.prelude.type === `SelectorList` &&
-    node.prelude.children.forEach((selector) => {
+  node.prelude.type === `SelectorList` && node.prelude.children.forEach((selector) => {
       selectorCount += 1;
       let idCount = 0;
       const depth = getSelectorDepth(selector);
@@ -112,7 +116,7 @@ const analyzeAttributeSelector = (node: csstree.AttributeSelector, issues: CssAn
   // Performance-heavy attribute selectors like [class], [id], [style]
   const attrName = node.name.name;
   if (typeof attrName !== `string` || attrName.length === 0 || !node.loc) {
-    return;
+  	return;
   }
   const isHeavyAttr = PERFORMANCE_HEAVY_ATTRIBUTES.has(attrName);
   // node.matcher is null when selector has no value (e.g., [class] vs [class="foo"])
@@ -171,7 +175,6 @@ export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
   catch (error) {
     error instanceof Error && addIssue(issues, `syntax-error`, 1, `CSS syntax error: ${error.message}`, `error`);
   }
-
   return { issues, stats: { ruleCount, selectorCount, declarationCount } };
 };
 
@@ -182,31 +185,32 @@ const severityMap: Record<CssSeverity, vscode.DiagnosticSeverity> = {
   info: vscode.DiagnosticSeverity.Information,
 };
 
-export const generateCssAnalysisDiagnostics = (document: vscode.TextDocument, analysis: CssAnalysisResult): vscode.Diagnostic[] => analysis.issues.map((issue) => {
-  const line = Math.max(issue.line - 1, 0);
-  const safeLineIndex = Math.min(line, document.lineCount - 1);
-  const lineText = document.lineAt(safeLineIndex).text;
+export const generateCssAnalysisDiagnostics = (document: vscode.TextDocument, analysis: CssAnalysisResult): vscode.Diagnostic[] =>
+  analysis.issues.map((issue) => {
+    const line = Math.max(issue.line - 1, 0);
+    const safeLineIndex = Math.min(line, document.lineCount - 1);
+    const lineText = document.lineAt(safeLineIndex).text;
 
-  const startCol = issue.column !== undefined ? Math.max(issue.column - 1, 0) : 0;
-  const endCol = lineText.length;
+    const startCol = issue.column !== undefined ? Math.max(issue.column - 1, 0) : 0;
+    const endCol = lineText.length;
 
-  const range = new vscode.Range(new vscode.Position(safeLineIndex, startCol), new vscode.Position(safeLineIndex, endCol));
+    const range = new vscode.Range(new vscode.Position(safeLineIndex, startCol), new vscode.Position(safeLineIndex, endCol));
 
-  const message = issue.suggestion !== undefined ? `${issue.message}. ${issue.suggestion}` : issue.message;
-  const diagnostic = new vscode.Diagnostic(range, message, severityMap[issue.severity]);
+    const message = issue.suggestion !== undefined ? `${issue.message}. ${issue.suggestion}` : issue.message;
+    const diagnostic = new vscode.Diagnostic(range, message, severityMap[issue.severity]);
 
-  diagnostic.source = `CSS-Analyzer`;
-  diagnostic.code = issue.type;
-  (diagnostic as vscode.Diagnostic & { data: unknown }).data = {
-    ruleId: issue.type,
-    line: issue.line,
-    column: issue.column,
-    analysisType: `css-quality`,
-    suggestion: issue.suggestion,
-  };
+    diagnostic.source = `CSS-Analyzer`;
+    diagnostic.code = issue.type;
+    (diagnostic as vscode.Diagnostic & { data: unknown }).data = {
+      ruleId: issue.type,
+      line: issue.line,
+      column: issue.column,
+      analysisType: `css-quality`,
+      suggestion: issue.suggestion,
+    };
 
-  return diagnostic;
-});
+    return diagnostic;
+  });
 
 // UTILITY EXPORTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const getAnalysisStats = (result: CssAnalysisResult): string => {

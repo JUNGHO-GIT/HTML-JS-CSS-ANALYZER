@@ -8,19 +8,17 @@ import type { SelectorPos } from "@exportTypes";
 
 // TYPE DEFINITIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 interface CacheVal {
-  version: number;
-  data: SelectorPos[];
-  timestamp: number;
   accessCount: number;
+  data: SelectorPos[];
   size: number;
+  timestamp: number;
+  version: number;
 }
-
 interface CacheConfig {
   maxEntries: number;
-  ttlMs: number;
   maxMemoryMb: number;
+  ttlMs: number;
 }
-
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const DEFAULT_CONFIG: CacheConfig = {
   maxEntries: 300,
@@ -46,7 +44,7 @@ const isMemoryExceeded = (): boolean => totalMemoryBytes > config.maxMemoryMb * 
 const touch = (key: string): void => {
   const val = styleCache.get(key);
   if (!val) {
-    return;
+  	return;
   }
   val.accessCount++;
   val.timestamp = Date.now();
@@ -66,10 +64,9 @@ const cleanExpired = (): number => {
   const now = Date.now();
   let removed = 0;
 
-  for (const [ key, val ] of styleCache.entries()) {
+  for (const [key, val] of styleCache.entries()) {
     now - val.timestamp > config.ttlMs && (removeEntry(key), removed++);
   }
-
   return removed;
 };
 
@@ -78,52 +75,52 @@ const ensureLimit = (): void => {
 
   const needsEviction = styleCache.size > config.maxEntries || isMemoryExceeded();
   if (!needsEviction) {
-    return;
+  	return;
   }
   const overCount = Math.max(styleCache.size - config.maxEntries, 0) + 1;
 
   // Small eviction: find minimum entries without full sort O(n*k)
   overCount <= 5 ? (() => {
-    let evicted = 0;
-    while (evicted < overCount && styleCache.size > 0) {
-      let minKey = ``;
-      let minScore = Number.POSITIVE_INFINITY;
-      let minTimestamp = Number.POSITIVE_INFINITY;
-      for (const [ key, val ] of styleCache.entries()) {
-        if (val.accessCount < minScore || (val.accessCount === minScore && val.timestamp < minTimestamp)) {
-          minKey = key;
-          minScore = val.accessCount;
-          minTimestamp = val.timestamp;
+      let evicted = 0;
+      while (evicted < overCount && styleCache.size > 0) {
+        let minKey = ``;
+        let minScore = Number.POSITIVE_INFINITY;
+        let minTimestamp = Number.POSITIVE_INFINITY;
+        for (const [key, val] of styleCache.entries()) {
+          if (val.accessCount < minScore || (val.accessCount === minScore && val.timestamp < minTimestamp)) {
+          	minKey = key;
+            minScore = val.accessCount;
+            minTimestamp = val.timestamp;
+          }
         }
+        minKey && removeEntry(minKey);
+        evicted++;
+        !isMemoryExceeded() && styleCache.size <= config.maxEntries && (evicted = overCount);
       }
-      minKey && removeEntry(minKey);
-      evicted++;
-      !isMemoryExceeded() && styleCache.size <= config.maxEntries && (evicted = overCount);
-    }
-  })() : (() => {
-    // Large eviction: fall back to full sort O(n log n)
-    const entries = [...styleCache.entries()].sort((a, b) => {
-      const scoreDiff = a[1].accessCount - b[1].accessCount;
-      return scoreDiff !== 0 ? scoreDiff : a[1].timestamp - b[1].timestamp;
-    });
+    })() : (() => {
+      // Large eviction: fall back to full sort O(n log n)
+      const entries = [...styleCache.entries()].sort((a, b) => {
+        const scoreDiff = a[1].accessCount - b[1].accessCount;
+        return scoreDiff !== 0 ? scoreDiff : a[1].timestamp - b[1].timestamp;
+      });
 
-    let i = 0;
-    while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
-      removeEntry(entries[i][0]);
-      i++;
-    }
-  })();
+      let i = 0;
+      while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
+        removeEntry(entries[i][0]);
+        i++;
+      }
+    })();
 };
 
 // PUBLIC API ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 export const cacheGet = (key: string): CacheVal | undefined => {
   const val = styleCache.get(key);
   if (!val) {
-    return undefined;
+  	return ;
   }
   if (isExpired(val)) {
-    removeEntry(key);
-    return undefined;
+  	removeEntry(key);
+    return ;
   }
   touch(key);
   return val;

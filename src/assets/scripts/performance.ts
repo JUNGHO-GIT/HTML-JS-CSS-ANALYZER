@@ -10,8 +10,7 @@ import type { PerformanceMetricsType } from "@exportTypes";
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 let __pmInstance: { metrics: Map<string, PerformanceMetricsType>; start: (operationName: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
 export const performanceMonitor = () => {
-  !__pmInstance && (
-    __pmInstance = {
+  !__pmInstance && (__pmInstance = {
       metrics: new Map<string, PerformanceMetricsType>(),
       start(operationName: string): string {
         const key = `${operationName}_${Date.now()}_${Math.random()}`;
@@ -20,41 +19,33 @@ export const performanceMonitor = () => {
       },
       end(key: string): number {
         const metric = this.metrics.get(key);
-        const rs = !metric ? -1 : (() => {
-          const duration = performance.now() - metric.startTime;
-          const formattedDuration = Math.round(duration * 100) / 100;
-					duration > 500 ? (
-						logger(`debug`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`)
-					) : duration > 100 ? (
-						logger(`debug`, `Timing: ${metric.operationName} took ${formattedDuration}ms`)
-					) : (
-						void 0
-					);
-					this.metrics.delete(key);
-					return duration;
-        })();
+        const rs = !metric ? -1 : (
+            (() => {
+              const duration = performance.now() - metric.startTime;
+              const formattedDuration = Math.round(duration * 100) / 100;
+              duration > 500 ? logger(`debug`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`) : duration > 100 ? logger(`debug`, `Timing: ${metric.operationName} took ${formattedDuration}ms`) : void 0;
+              this.metrics.delete(key);
+              return duration;
+            })()
+          );
         return rs;
       },
       checkMemoryUsage(): void {
         (global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
         const usage = process.memoryUsage();
-        const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100;
-        const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100;
+        const heapUsedMB = Math.round((usage.heapUsed / 1024 / 1024) * 100) / 100;
+        const heapTotalMB = Math.round((usage.heapTotal / 1024 / 1024) * 100) / 100;
         heapUsedMB > 100 && logger(`debug`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
       },
       cleanup(): void {
         this.metrics.clear();
       },
-    }
-  );
+    });
   return __pmInstance;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const withPerformanceMonitoring = async <T>(
-  operationName: string,
-  operation: () => Promise<T> | T,
-): Promise<T> => {
+export const withPerformanceMonitoring = async <T>(operationName: string, operation: () => Promise<T> | T): Promise<T> => {
   const key = performanceMonitor().start(operationName);
   try {
     const result = await operation();
@@ -66,14 +57,11 @@ export const withPerformanceMonitoring = async <T>(
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const throttle = <T extends (...args: any[]) => any>(
-  func: T,
-  limit: number,
-): T => {
+export const throttle = <T extends (...args: any[]) => any>(func: T, limit: number): T => {
   let inThrottle: boolean;
   return ((...args: any[]) => {
     if (!inThrottle) {
-      func.apply(null, args);
+    	func(...args);
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }
@@ -81,14 +69,11 @@ export const throttle = <T extends (...args: any[]) => any>(
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const debounce = <T extends (...args: any[]) => any>(
-  func: T,
-  delay: number,
-): T => {
+export const debounce = <T extends (...args: any[]) => any>(func: T, delay: number): T => {
   let timeoutId: NodeJS.Timeout;
   return ((...args: any[]) => {
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
+    timeoutId = setTimeout(() => func(...args), delay);
   }) as T;
 };
 
@@ -96,8 +81,7 @@ export const debounce = <T extends (...args: any[]) => any>(
 type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void };
 let __rlInstance: ResourceLimiterType | null = null;
 export const resourceLimiter = () => {
-  !__rlInstance && (
-    __rlInstance = {
+  !__rlInstance && (__rlInstance = {
       MAX_CONCURRENT_OPERATIONS: 5,
       activeOperations: 0,
       queue: [] as (() => void)[],
@@ -117,11 +101,7 @@ export const resourceLimiter = () => {
               this.processQueue();
             }
           };
-					this.activeOperations < this.MAX_CONCURRENT_OPERATIONS ? (
-						fnExecute()
-					) : (
-						this.queue.push(fnExecute)
-					);
+          this.activeOperations < this.MAX_CONCURRENT_OPERATIONS ? fnExecute() : this.queue.push(fnExecute);
         });
       },
       processQueue(): void {
@@ -130,7 +110,6 @@ export const resourceLimiter = () => {
           operation?.();
         }
       },
-    }
-  );
+    });
   return __rlInstance;
 };
