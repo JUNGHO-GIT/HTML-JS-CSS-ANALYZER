@@ -1,44 +1,36 @@
 {
   "$schema": "https://www.schemastore.org/tsconfig",
   "compilerOptions": {
-    "rootDir": "",
+    "rootDir": "src",
     "outDir": "out",
     "paths": {
-			"@type/*": ["./src/assets/type/domain/*"],
-			"@assets/*": ["./src/assets/*"],
-			"@scripts/*": ["./src/assets/scripts/*"],
-			"@consts/*": ["./src/consts/*"],
-			"@langs/*": ["./src/langs/*"],
-			"@exportLibs": ["./src/exports/ExportLibs"],
-			"@exportScripts": ["./src/exports/ExportScripts"],
-			"@exportConsts": ["./src/exports/ExportConsts"],
-			"@exportTypes": ["./src/exports/ExportTypes"],
-			"@exportLangs": ["./src/exports/ExportLangs"]
+      "@type/*": ["./src/assets/type/domain/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@scripts/*": ["./src/assets/scripts/*"],
+      "@consts/*": ["./src/consts/*"],
+      "@langs/*": ["./src/langs/*"],
+      "@exportLibs": ["./src/exports/ExportLibs"],
+      "@exportScripts": ["./src/exports/ExportScripts"],
+      "@exportConsts": ["./src/exports/ExportConsts"],
+      "@exportTypes": ["./src/exports/ExportTypes"],
+      "@exportLangs": ["./src/exports/ExportLangs"]
     },
-    "typeRoots": [
-			"./src/assets/type/dist",
-			"node_modules/@types"
-    ],
-		"types": [
-			"node"
-		]
+    "typeRoots": ["./src/assets/type/dist", "node_modules/@types"],
+    "types": ["node"]
   },
   "include": [
     "./src/**/*",
     "./src/**/*.ts",
-		"./src/**/*.tsx",
+    "./src/**/*.tsx",
     "**/*.ts",
     "**/*.tsx",
     "**/*.d.ts",
     "**/*.js",
     "**/*.jsx",
-		"eslint.config.js",
-		"eslint.config.cjs",
-		"eslint.config.mjs",
-		"eslint.config.ts"
+    "eslint.config.js",
+    "eslint.config.cjs",
+    "eslint.config.mjs",
+    "eslint.config.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "**/*.spec.ts"
-  ]
+  "exclude": ["node_modules", "**/*.spec.ts"]
 }

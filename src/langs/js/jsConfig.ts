@@ -97,9 +97,11 @@ export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
 export const loadJSHint = (): JSHintInstance | null => {
   let result: JSHintInstance | null = null;
 
-  const fnValidate = (mod: any): JSHintInstance | null => {
-    const isValid = mod?.JSHINT && typeof mod.JSHINT === `function` && typeof mod.JSHINT.data === `function`;
-    return isValid ? mod : null;
+  const fnValidate = (mod: unknown): JSHintInstance | null => {
+    const candidate = mod as { JSHINT?: unknown } | undefined;
+    const jshint = candidate?.JSHINT as { data?: unknown } | undefined;
+    const isValid = typeof candidate?.JSHINT === `function` && typeof jshint?.data === `function`;
+    return isValid ? mod as JSHintInstance : null;
   };
 
   const candidates: string[] = [];
@@ -107,40 +109,45 @@ export const loadJSHint = (): JSHintInstance | null => {
   try {
     const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
     const extPath = ext?.extensionPath;
-    typeof extPath === `string` && extPath.length > 0 && candidates.push(extPath);
+    if (typeof extPath === `string` && extPath.length > 0) {
+      candidates.push(extPath);
+    }
   }
   catch {}
   try {
-    typeof __dirname === `string` && __dirname.length > 0 && (candidates.push(__dirname), candidates.push(path.resolve(__dirname, `..`)), candidates.push(path.resolve(__dirname, `..`, `..`)));
+    if (typeof __dirname === `string` && __dirname.length > 0) {
+      candidates.push(__dirname, path.resolve(__dirname, `..`), path.resolve(__dirname, `..`, `..`));
+    }
   }
   catch {}
   candidates.push(process.cwd());
 
-  vscode.workspace.workspaceFolders && (() => {
-      for (const f of vscode.workspace.workspaceFolders) {
-        candidates.push(f.uri.fsPath);
-      }
-    })();
+  if (vscode.workspace.workspaceFolders) {
+    for (const f of vscode.workspace.workspaceFolders) {
+      candidates.push(f.uri.fsPath);
+    }
+  }
 
   for (const base of candidates) {
-    result ? void 0 : (
-      (() => {
-        try {
-          const reqPath = path.join(base, `index.js`);
-          const req = createRequire(reqPath);
-          const mod = fnValidate(req(`jshint`));
-
-          mod ? (result = mod) : void 0;
-
-          result && logger(`debug`, `module loaded: ${base}`);
-        }
-        catch {
-          logger(`debug`, `load attempt failed: ${base}`);
-        }
-      })()
-    );
+    if (result) {
+      break;
+    }
+    try {
+      const reqPath = path.join(base, `index.js`);
+      const req = createRequire(reqPath);
+      const mod = fnValidate(req(`jshint`));
+      if (mod) {
+        result = mod;
+        logger(`debug`, `module loaded: ${base}`);
+      }
+    }
+    catch {
+      logger(`debug`, `load attempt failed: ${base}`);
+    }
   }
-  !result && logger(`warn`, `module not loaded - JSHint is optional`);
+  if (!result) {
+    logger(`warn`, `module not loaded - JSHint is optional`);
+  }
 
   return result;
 };
@@ -148,23 +155,43 @@ export const loadJSHint = (): JSHintInstance | null => {
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const parseConfigValue = (value: string): any => {
   const trimmed = value.trim();
-
-  trimmed === `true` ? true : trimmed === `false` ? false : trimmed === `null` ? null : trimmed === `undefined` ? undefined : /^-?\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : /^-?\d+\.\d+$/.test(trimmed) ? Number.parseFloat(trimmed) : trimmed.startsWith(`[`) && trimmed.endsWith(`]`) ? (() => {
-      try {
-        return JSON.parse(trimmed);
-      }
-      catch {
-        return [];
-      }
-    })() : trimmed.startsWith(`{`) && trimmed.endsWith(`}`) ? (() => {
-      try {
-        return JSON.parse(trimmed);
-      }
-      catch {
-        return {};
-      }
-    })() : (trimmed.startsWith(`"`) && trimmed.endsWith(`"`)) || (trimmed.startsWith(`'`) && trimmed.endsWith(`'`)) ? trimmed.slice(1, -1) : trimmed;
-
+  if (trimmed === `true`) {
+    return true;
+  }
+  if (trimmed === `false`) {
+    return false;
+  }
+  if (trimmed === `null`) {
+    return null;
+  }
+  if (trimmed === `undefined`) {
+    return undefined;
+  }
+  if (/^-?\d+$/.test(trimmed)) {
+    return Number.parseInt(trimmed, 10);
+  }
+  if (/^-?\d+\.\d+$/.test(trimmed)) {
+    return Number.parseFloat(trimmed);
+  }
+  if (trimmed.startsWith(`[`) && trimmed.endsWith(`]`)) {
+    try {
+      return JSON.parse(trimmed);
+    }
+    catch {
+      return [];
+    }
+  }
+  if (trimmed.startsWith(`{`) && trimmed.endsWith(`}`)) {
+    try {
+      return JSON.parse(trimmed);
+    }
+    catch {
+      return {};
+    }
+  }
+  if ((trimmed.startsWith(`"`) && trimmed.endsWith(`"`)) || (trimmed.startsWith(`'`) && trimmed.endsWith(`'`))) {
+    return trimmed.slice(1, -1);
+  }
   return trimmed;
 };
 
@@ -177,30 +204,30 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
     const moduleExportsPattern = /module\.exports\s*=\s*({[\S\s]*?});?\s*(?:$|\n)/;
     const moduleExportsMatch = cleanContent.match(moduleExportsPattern);
 
-    moduleExportsMatch && (() => {
+    if (moduleExportsMatch) {
+      try {
+        const objectStr = moduleExportsMatch[1];
+        config = new Function(`"use strict"; return (${objectStr})`)();
+      }
+      catch {
         try {
-          const objectStr = moduleExportsMatch[1];
-          config = new Function(`"use strict"; return (${objectStr})`)();
+          config = JSON.parse(moduleExportsMatch[1]);
         }
         catch {
-          try {
-            config = JSON.parse(moduleExportsMatch[1]);
-          }
-          catch {
-            logger(`error`, `JS config parsing failed - module.exports format`);
-          }
+          logger(`error`, `JS config parsing failed - module.exports format`);
         }
-      })();
+      }
+    }
 
     const exportPatterns = cleanContent.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/g);
     exportPatterns?.forEach((pattern) => {
-        const match = pattern.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/);
-        match && (() => {
-            const key = match[1].trim();
-            const value = match[2].trim();
-            config[key] = parseConfigValue(value);
-          })();
-      });
+      const match = pattern.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        config[key] = parseConfigValue(value);
+      }
+    });
 
     return { ...DEFAULT_JSHINT_CONFIG, ...config };
   }
@@ -220,20 +247,20 @@ const parseJSHintConfigGeneric = (configContent: string): Record<string, any> =>
     const config: Record<string, any> = {};
     const lines = configContent.split(`\n`);
 
-    lines.forEach((line) => {
+    for (const line of lines) {
       const trimmed = line.trim();
-      !trimmed || trimmed.startsWith(`//`) || trimmed.startsWith(`#`) ? void 0 : (() => {
-          const colonMatch = trimmed.match(/^(\w+)\s*:\s*(.+)$/);
-          const equalMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
-          const match = colonMatch || equalMatch;
-
-          match && (() => {
-              const key = match[1].trim();
-              const value = match[2].trim().replace(/[,;]$/, ``);
-              config[key] = parseConfigValue(value);
-            })();
-        })();
-    });
+      if (!trimmed || trimmed.startsWith(`//`) || trimmed.startsWith(`#`)) {
+        continue;
+      }
+      const colonMatch = trimmed.match(/^(\w+)\s*:\s*(.+)$/);
+      const equalMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+      const match = colonMatch || equalMatch;
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/[,;]$/, ``);
+        config[key] = parseConfigValue(value);
+      }
+    }
 
     return { ...DEFAULT_JSHINT_CONFIG, ...config };
   }
@@ -255,26 +282,28 @@ export const loadJSHintConfig = (filePath: string): Record<string, any> => {
       for (const configFile of configFiles) {
         const configPath = path.join(baseDir, configFile);
 
-        fs.existsSync(configPath) && (() => {
+        if (!fs.existsSync(configPath)) {
+          continue;
+        }
+        try {
+          const configContent = fs.readFileSync(configPath, `utf8`);
+          if (configFile.endsWith(`.js`)) {
+            return parseJSHintConfigJS(configContent);
+          }
+          if (configFile.endsWith(`.json`) || configFile === `.jshintrc`) {
             try {
-              const configContent = fs.readFileSync(configPath, `utf8`);
-
-              return (
-                configFile.endsWith(`.js`) ? parseJSHintConfigJS(configContent) : configFile.endsWith(`.json`) || configFile === `.jshintrc` ? (() => {
-                    try {
-                      return JSON.parse(configContent);
-                    }
-                    catch {
-                      return parseJSHintConfigGeneric(configContent);
-                    }
-                  })() : parseJSHintConfigGeneric(configContent)
-              );
+              return JSON.parse(configContent);
             }
-            catch (parseError: any) {
-              logger(`error`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
-              return DEFAULT_JSHINT_CONFIG;
+            catch {
+              return parseJSHintConfigGeneric(configContent);
             }
-          })();
+          }
+          return parseJSHintConfigGeneric(configContent);
+        }
+        catch (parseError: any) {
+          logger(`error`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
+          return DEFAULT_JSHINT_CONFIG;
+        }
       }
       if (baseDir === rootDir) {
       	break;

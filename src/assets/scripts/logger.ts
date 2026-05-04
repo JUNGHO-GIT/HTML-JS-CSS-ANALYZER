@@ -9,31 +9,47 @@ import { vscode } from "@exportLibs";
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAIN = `Html-Js-Css-Analyzer`;
 const logLevelMap = {
-  off: 0,
-  debug: 1,
-  info: 2,
-  hint: 3,
-  warn: 4,
-  error: 5,
+  debug: 0,
+  info: 1,
+  hint: 2,
+  warn: 3,
+  error: 4,
+  off: 5,
 };
 let outputChannel: vscode.OutputChannel | null = null;
+let cachedLogLevel: number | null = null;
+let configWatcher: vscode.Disposable | null = null;
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const initLogger = (): void => {
-  !outputChannel ? (outputChannel = vscode.window.createOutputChannel(MAIN)) : void 0;
+export const initLogger = (context?: vscode.ExtensionContext): void => {
+  if (!outputChannel) {
+    outputChannel = vscode.window.createOutputChannel(MAIN);
+  }
+  if (!configWatcher && typeof vscode.workspace.onDidChangeConfiguration === `function`) {
+    configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration || event.affectsConfiguration(MAIN)) {
+        cachedLogLevel = null;
+      }
+    });
+    context?.subscriptions.push(configWatcher);
+  }
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const getLogLevel = (): number => {
+  if (cachedLogLevel !== null) {
+    return cachedLogLevel;
+  }
   const config = vscode.workspace.getConfiguration(MAIN);
   const level = config.get<string>(`logLevel`, `info`);
-  const rs = logLevelMap[level as keyof typeof logLevelMap] || 2;
+  const rs = logLevelMap[level as keyof typeof logLevelMap] ?? logLevelMap.info;
+  cachedLogLevel = rs;
   return rs;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const appendOutput = (levelKey: keyof typeof logLevelMap, msg: string): void => {
-  outputChannel && getLogLevel() <= logLevelMap[levelKey] && outputChannel.appendLine(msg);
+const appendOutput = (levelKey: keyof typeof logLevelMap, msg: string, activeLevel: number): void => {
+  outputChannel && logLevelMap[levelKey] >= activeLevel && outputChannel.appendLine(msg);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
@@ -41,6 +57,10 @@ const formatLog = (text=``): string => text.trim().replaceAll(/^\s+/gm, ``);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const logger = (type: `debug` | `info` | `hint` | `warn` | `error`, value: string): void => {
+  const activeLevel = getLogLevel();
+  if (logLevelMap[type] < activeLevel) {
+    return;
+  }
   const config = {
     line: {
       str: `―――――――――――――――――――――――――――――――――――――――--`,
@@ -88,24 +108,26 @@ export const logger = (type: `debug` | `info` | `hint` | `warn` | `error`, value
   ${config[type].str} - ${value}
   `);
 
-  type === `debug` && (() => {
+  switch (type) {
+    case `debug`:
       console.debug(logMsg);
-      appendOutput(`debug`, outputMsg);
-    })();
-  type === `info` && (() => {
+      appendOutput(`debug`, outputMsg, activeLevel);
+      break;
+    case `info`:
       console.info(logMsg);
-      appendOutput(`info`, outputMsg);
-    })();
-  type === `hint` && (() => {
+      appendOutput(`info`, outputMsg, activeLevel);
+      break;
+    case `hint`:
       console.log(logMsg);
-      appendOutput(`hint`, outputMsg);
-    })();
-  type === `warn` && (() => {
+      appendOutput(`hint`, outputMsg, activeLevel);
+      break;
+    case `warn`:
       console.warn(logMsg);
-      appendOutput(`warn`, outputMsg);
-    })();
-  type === `error` && (() => {
+      appendOutput(`warn`, outputMsg, activeLevel);
+      break;
+    case `error`:
       console.error(logMsg);
-      appendOutput(`error`, outputMsg);
-    })();
+      appendOutput(`error`, outputMsg, activeLevel);
+      break;
+  }
 };

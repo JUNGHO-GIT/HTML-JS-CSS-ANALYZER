@@ -6,8 +6,7 @@
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	type LogLevel,
-	type UnusedSeverity,
+	clearConfigurationCache,
 	DEFAULT_CSS_EXCLUDE,
 	getAdditionalExtensions,
 	getAnalyzableExtensions,
@@ -16,4 +15,6 @@ export {
 	isCssHintEnabled,
 	isHtmlHintEnabled,
 	isJsHintEnabled,
+	type LogLevel,
+	type UnusedSeverity,
 } from "@consts/ConstsConfig";

@@ -14,17 +14,17 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
 
   provideCodeActions(document: vscode.TextDocument, _range: Range | vscode.Selection, context: vscode.CodeActionContext): CodeAction[] {
     const actions: CodeAction[] = [];
-    const jsHinthintDiagnostics = context.diagnostics.filter((diag) => diag.source === `Html-Js-Css-Analyzer`);
+    const jsHintDiagnostics = context.diagnostics.filter((diag) => diag.source === `JSHint`);
 
-    jsHinthintDiagnostics.forEach((diagnostic) => {
+    jsHintDiagnostics.forEach((diagnostic) => {
       const quickFixes = this.createAdvancedQuickFixes(document, diagnostic);
       actions.push(...quickFixes);
     });
 
-    jsHinthintDiagnostics.length > 0 && (() => {
-        const sourceActions = this.createSourceActions(document, jsHinthintDiagnostics);
-        actions.push(...sourceActions);
-      })();
+    if (jsHintDiagnostics.length > 0) {
+      const sourceActions = this.createSourceActions(document, jsHintDiagnostics);
+      actions.push(...sourceActions);
+    }
 
     return actions;
   }
@@ -35,10 +35,36 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const code = diagnosticData?.ruleId || diagnostic.code?.toString();
     const _evidence = diagnosticData?.evidence || ``;
 
-    !code ? actions : code === `W033` ? actions.push(...this.createSemicolonFixes(document, diagnostic)) : code === `W116` ? actions.push(...this.createEqualityFixes(document, diagnostic)) : code === `W117` ? actions.push(...this.createUndefinedVariableFixes(document, diagnostic)) : code === `W098` ? actions.push(...this.createUnusedVariableFixes(document, diagnostic)) : code === `prefer-let-const` ? actions.push(...this.createVarToLetConstFixes(document, diagnostic)) : code === `missing-strict-mode` ? actions.push(...this.createStrictModeFixes(document, diagnostic)) : (code.startsWith(`complexity-`) ?? code.startsWith(`bug-`)) ? actions.push(...this.createAnalysisFixes(document, diagnostic, code)) : (() => {
-        const genericFix = this.createGenericFix(document, diagnostic, code);
-        genericFix && actions.push(genericFix);
-      })();
+    if (!code) {
+      return actions;
+    }
+    if (code === `W033`) {
+      actions.push(...this.createSemicolonFixes(document, diagnostic));
+    }
+    else if (code === `W116`) {
+      actions.push(...this.createEqualityFixes(document, diagnostic));
+    }
+    else if (code === `W117`) {
+      actions.push(...this.createUndefinedVariableFixes(document, diagnostic));
+    }
+    else if (code === `W098`) {
+      actions.push(...this.createUnusedVariableFixes(document, diagnostic));
+    }
+    else if (code === `prefer-let-const`) {
+      actions.push(...this.createVarToLetConstFixes(document, diagnostic));
+    }
+    else if (code === `missing-strict-mode`) {
+      actions.push(...this.createStrictModeFixes(document, diagnostic));
+    }
+    else if (code.startsWith(`complexity-`) || code.startsWith(`bug-`)) {
+      actions.push(...this.createAnalysisFixes(document, diagnostic, code));
+    }
+    else {
+      const genericFix = this.createGenericFix(document, diagnostic, code);
+      if (genericFix) {
+        actions.push(genericFix);
+      }
+    }
 
     return actions;
   }
@@ -65,17 +91,17 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const lineText = document.lineAt(diagnostic.range.start.line).text;
     const eqIndex = lineText.indexOf(`==`);
 
-    eqIndex >= 0 && lineText.charAt(eqIndex + 2) !== `=` && (() => {
-        const fixEquality = new CodeAction(`Change '==' to '==='`, CodeActionKind.QuickFix);
-        const edit = new vscode.WorkspaceEdit();
-        const range = new vscode.Range(new Position(diagnostic.range.start.line, eqIndex), new Position(diagnostic.range.start.line, eqIndex + 2));
+    if (eqIndex >= 0 && lineText.charAt(eqIndex + 2) !== `=`) {
+      const fixEquality = new CodeAction(`Change '==' to '==='`, CodeActionKind.QuickFix);
+      const edit = new vscode.WorkspaceEdit();
+      const range = new vscode.Range(new Position(diagnostic.range.start.line, eqIndex), new Position(diagnostic.range.start.line, eqIndex + 2));
 
-        edit.replace(document.uri, range, `===`);
-        fixEquality.edit = edit;
-        fixEquality.diagnostics = [diagnostic];
-        fixEquality.isPreferred = true;
-        actions.push(fixEquality);
-      })();
+      edit.replace(document.uri, range, `===`);
+      fixEquality.edit = edit;
+      fixEquality.diagnostics = [diagnostic];
+      fixEquality.isPreferred = true;
+      actions.push(fixEquality);
+    }
 
     return actions;
   }
@@ -114,24 +140,24 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const lineText = document.lineAt(diagnostic.range.start.line).text;
     const varIndex = lineText.indexOf(`var`);
 
-    varIndex >= 0 && (() => {
-        const toConst = new CodeAction(`Change 'var' to 'const'`, CodeActionKind.QuickFix);
-        const edit1 = new vscode.WorkspaceEdit();
-        const range = new vscode.Range(new Position(diagnostic.range.start.line, varIndex), new Position(diagnostic.range.start.line, varIndex + 3));
+    if (varIndex >= 0) {
+      const toConst = new CodeAction(`Change 'var' to 'const'`, CodeActionKind.QuickFix);
+      const edit1 = new vscode.WorkspaceEdit();
+      const range = new vscode.Range(new Position(diagnostic.range.start.line, varIndex), new Position(diagnostic.range.start.line, varIndex + 3));
 
-        edit1.replace(document.uri, range, `const`);
-        toConst.edit = edit1;
-        toConst.diagnostics = [diagnostic];
-        toConst.isPreferred = true;
-        actions.push(toConst);
+      edit1.replace(document.uri, range, `const`);
+      toConst.edit = edit1;
+      toConst.diagnostics = [diagnostic];
+      toConst.isPreferred = true;
+      actions.push(toConst);
 
-        const toLet = new CodeAction(`Change 'var' to 'let'`, CodeActionKind.QuickFix);
-        const edit2 = new vscode.WorkspaceEdit();
-        edit2.replace(document.uri, range, `let`);
-        toLet.edit = edit2;
-        toLet.diagnostics = [diagnostic];
-        actions.push(toLet);
-      })();
+      const toLet = new CodeAction(`Change 'var' to 'let'`, CodeActionKind.QuickFix);
+      const edit2 = new vscode.WorkspaceEdit();
+      edit2.replace(document.uri, range, `let`);
+      toLet.edit = edit2;
+      toLet.diagnostics = [diagnostic];
+      actions.push(toLet);
+    }
 
     return actions;
   }
@@ -156,43 +182,45 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const bugFix = new CodeAction(`Fix ${code} issue`, CodeActionKind.QuickFix);
     const edit = new vscode.WorkspaceEdit();
 
-    code === `bug-console-usage` ? (() => {
-        const removeConsole = new CodeAction(`Remove console statement`, CodeActionKind.QuickFix);
-        const edit1 = new vscode.WorkspaceEdit();
-        const range = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line + 1, 0));
+    if (code === `bug-console-usage`) {
+      const removeConsole = new CodeAction(`Remove console statement`, CodeActionKind.QuickFix);
+      const edit1 = new vscode.WorkspaceEdit();
+      const range = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line + 1, 0));
 
-        edit1.delete(document.uri, range);
-        removeConsole.edit = edit1;
-        removeConsole.diagnostics = [diagnostic];
-        removeConsole.isPreferred = true;
-        actions.push(removeConsole);
+      edit1.delete(document.uri, range);
+      removeConsole.edit = edit1;
+      removeConsole.diagnostics = [diagnostic];
+      removeConsole.isPreferred = true;
+      actions.push(removeConsole);
 
-        const commentConsole = new CodeAction(`Comment out console statement`, CodeActionKind.QuickFix);
-        const edit2 = new vscode.WorkspaceEdit();
-        const lineRange = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
+      const commentConsole = new CodeAction(`Comment out console statement`, CodeActionKind.QuickFix);
+      const edit2 = new vscode.WorkspaceEdit();
+      const lineRange = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
 
-        edit2.replace(document.uri, lineRange, `// ${lineText.trim()}`);
-        commentConsole.edit = edit2;
-        commentConsole.diagnostics = [diagnostic];
-        actions.push(commentConsole);
-      })() : code === `bug-assignment-in-condition` ? (() => {
-        const fixAssignment = new CodeAction(`Change assignment to comparison operator`, CodeActionKind.QuickFix);
-        const edit3 = new vscode.WorkspaceEdit();
-        const newText = lineText.replaceAll(/=(?!=)/g, `===`);
-        const lineRange2 = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
+      edit2.replace(document.uri, lineRange, `// ${lineText.trim()}`);
+      commentConsole.edit = edit2;
+      commentConsole.diagnostics = [diagnostic];
+      actions.push(commentConsole);
+    }
+    else if (code === `bug-assignment-in-condition`) {
+      const fixAssignment = new CodeAction(`Change assignment to comparison operator`, CodeActionKind.QuickFix);
+      const edit3 = new vscode.WorkspaceEdit();
+      const newText = lineText.replaceAll(/=(?!=)/g, `===`);
+      const lineRange2 = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
 
-        edit3.replace(document.uri, lineRange2, newText);
-        fixAssignment.edit = edit3;
-        fixAssignment.diagnostics = [diagnostic];
-        fixAssignment.isPreferred = true;
-        actions.push(fixAssignment);
-      })() : (() => {
-        const insertPos = new Position(diagnostic.range.start.line, 0);
-        edit.insert(document.uri, insertPos, `// FIXME: resolve ${code.replace(`bug-`, ``).replace(`-`, ` `)} issue\n`);
-        bugFix.edit = edit;
-        bugFix.diagnostics = [diagnostic];
-        actions.push(bugFix);
-      })();
+      edit3.replace(document.uri, lineRange2, newText);
+      fixAssignment.edit = edit3;
+      fixAssignment.diagnostics = [diagnostic];
+      fixAssignment.isPreferred = true;
+      actions.push(fixAssignment);
+    }
+    else {
+      const insertPos = new Position(diagnostic.range.start.line, 0);
+      edit.insert(document.uri, insertPos, `// FIXME: resolve ${code.replace(`bug-`, ``).replace(`-`, ` `)} issue\n`);
+      bugFix.edit = edit;
+      bugFix.diagnostics = [diagnostic];
+      actions.push(bugFix);
+    }
 
     return actions;
   }

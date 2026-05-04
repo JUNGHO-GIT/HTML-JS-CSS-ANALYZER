@@ -6,27 +6,15 @@
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	logger,
-	initLogger,
-} from "@scripts/logger";
-export { notify } from "@scripts/notify";
-
+	bindCssSupport,
+	clearAll,
+	clearValidationState,
+	onClosed,
+	scheduleValidate,
+	updateDiagnostics,
+} from "@scripts/diagnostic";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export { validateDocument } from "@scripts/validate";
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export {
-	LineIndexMapper,
-	type LineIndex,
-} from "@scripts/lineIndex";
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export {
-	withPerformanceMonitoring,
-	performanceMonitor,
-	resourceLimiter,
-} from "@scripts/performance";
-
+export { isAnalyzable } from "@scripts/filter";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
 	globToRegExp,
@@ -34,13 +22,21 @@ export {
 } from "@scripts/glob";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export { isAnalyzable } from "@scripts/filter";
-
+export {
+	type LineIndex,
+	LineIndexMapper,
+} from "@scripts/lineIndex";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	scheduleValidate,
-	bindCssSupport,
-	updateDiagnostics,
-	clearAll,
-	onClosed,
-} from "@scripts/diagnostic";
+	initLogger,
+	logger,
+} from "@scripts/logger";
+export { notify } from "@scripts/notify";
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export {
+	performanceMonitor,
+	resourceLimiter,
+	withPerformanceMonitoring,
+} from "@scripts/performance";
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export { validateDocument } from "@scripts/validate";

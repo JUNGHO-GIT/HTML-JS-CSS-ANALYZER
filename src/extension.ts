@@ -4,9 +4,10 @@
  * @description VS Code 확장 진입점 (활성화, 프로바이더 등록)
  */
 
+import { clearConfigurationCache } from "@exportConsts";
 import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
 import { vscode } from "@exportLibs";
-import { bindCssSupport, clearAll, initLogger, logger, onClosed, scheduleValidate, updateDiagnostics } from "@exportScripts";
+import { bindCssSupport, clearAll, clearValidationState, initLogger, logger, onClosed, scheduleValidate, updateDiagnostics } from "@exportScripts";
 import { AutoValidationMode } from "@exportTypes";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
@@ -17,7 +18,7 @@ const CSS_LANGUAGES: vscode.DocumentSelector = [{ language: `html` }, { language
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const deactivate = () => {};
 export const activate = (context: vscode.ExtensionContext) => {
-  initLogger();
+  initLogger(context);
   logger(`info`, `Html-Js-Css-Analyzer is now active!`);
   const cssSupport = new CssSupport();
   bindCssSupport(cssSupport);
@@ -55,6 +56,13 @@ const registerEventHandlers = (context: vscode.ExtensionContext, cssSupport: Css
     }),
     vscode.workspace.onDidChangeTextDocument(async (changeEvent: vscode.TextDocumentChangeEvent) => {
       scheduleValidate(cssSupport, changeEvent.document, AutoValidationMode.ALWAYS);
+    }),
+    vscode.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
+      if (event.affectsConfiguration(`Html-Js-Css-Analyzer`)) {
+        clearConfigurationCache();
+        clearValidationState();
+        cssSupport.clearWorkspaceIndex();
+      }
     }),
     vscode.workspace.onDidCloseTextDocument(onClosed),
   );

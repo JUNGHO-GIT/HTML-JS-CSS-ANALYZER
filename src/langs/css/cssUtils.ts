@@ -30,6 +30,13 @@ const CLASSLIST_METHOD_REGEX = /classlist\.(?:add|remove|toggle|contains|replace
 const STRING_LITERAL_REGEX = /(["'`])((?:(?!\1).)*?)\1/g;
 const QUERYSELECTOR_REGEX = /queryselector(?:all)?\s*\(\s*(["'`])((?:(?!\1)[\S\s])*?)\1\s*\)/gis;
 const JQUERY_SELECTOR_REGEX = /(?:\$|jquery)\s*\(\s*(["'`])((?:(?!\1)[\S\s])*?)\1\s*\)/gis;
+const HTML_FILE_REGEX = /\.html?$/i;
+const WHITESPACE_REGEX = /\s+/;
+const DYNAMIC_TOKEN_SUFFIX_REGEX = /[:_-]$/;
+const EXPRESSION_CLASS_CHARS_REGEX = /[,[\]{}]/;
+const QUOTED_LITERAL_REGEX = /(["'])((?:(?!\1)[^"'`])+)\1/;
+const CLASS_SELECTOR_TOKEN_REGEX = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
+const ID_SELECTOR_TOKEN_REGEX = /(^|[^\\])#((?:\\.|[\w-])+)/g;
 const GETELEMENTBYID_REGEX = /getelementbyid\s*\(\s*(["'])((?:(?!\1)[^"'`])+?)\1\s*\)/gis;
 const GETELEMENTSBYCLASSNAME_REGEX = /getelementsbyclassname\s*\(\s*(["'`])((?:(?!\1)[\S\s])*?)\1\s*\)/gis;
 const SETATTRIBUTE_REGEX = /setattribute\s*\(\s*(["'`])(class|id)\1\s*,\s*([\S\s]*?)\)/gis;
@@ -37,17 +44,25 @@ const CLASSNAME_ASSIGN_REGEX = /\.classname\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/
 const ID_ASSIGN_REGEX = /\.id\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/gis;
 const REMOTE_URL_REGEX = /^https?:\/\//i;
 
+type FetchGlobal = typeof globalThis & {
+  fetch?: (url: string) => Promise<FetchResponse>;
+};
+
 // MODULE STATE ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-let workspaceCssFiles: string[] | null = null;
+let workspaceCssFiles: { files: string[]; key: string } | null = null;
 
 // FETCH UTILITIES ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const fnFetchWithNativeFetch = async (url: string): Promise<string> => {
-  const response = (await (globalThis as any).fetch(url)) as FetchResponse;
+  const fetchFn = (globalThis as FetchGlobal).fetch;
+  if (!fetchFn) {
+    throw new Error(`Native fetch is not available`);
+  }
+  const response = await fetchFn(url);
 
-  !response.ok && (() => {
-      const statusInfo = response?.statusText ?? `HTTP ${response?.status ?? `unknown`}`;
-      throw new Error(statusInfo);
-    })();
+  if (!response.ok) {
+    const statusInfo = response?.statusText ?? `HTTP ${response?.status ?? `unknown`}`;
+    throw new Error(statusInfo);
+  }
 
   return response.text();
 };
@@ -60,19 +75,25 @@ const fnFetchWithNodeHttp = async (url: string, redirectsRemaining=5): Promise<s
     const request = httpLib.get(url, (response) => {
       const status = response.statusCode ?? 0;
 
-      status >= 300 && status < 400 && response.headers?.location && (redirectsRemaining > 0 ? (() => {
-            try {
-              const location = response.headers.location;
-              const newUrl = location.startsWith(`http`) ? location : new URL(location, url).toString();
-              response.resume();
-              resolve(fnFetchWithNodeHttp(newUrl, redirectsRemaining - 1));
-            }
-            catch {
-              response.resume();
-              reject(new Error(`Invalid redirect location: ${response.headers.location}`));
-            }
-          })() : (response.resume(), reject(new Error(`Too many redirects`))),
-        void 0);
+      if (status >= 300 && status < 400 && response.headers?.location) {
+        if (redirectsRemaining > 0) {
+          try {
+            const location = response.headers.location;
+            const newUrl = location.startsWith(`http`) ? location : new URL(location, url).toString();
+            response.resume();
+            resolve(fnFetchWithNodeHttp(newUrl, redirectsRemaining - 1));
+          }
+          catch {
+            response.resume();
+            reject(new Error(`Invalid redirect location: ${response.headers.location}`));
+          }
+        }
+        else {
+          response.resume();
+          reject(new Error(`Too many redirects`));
+        }
+        return;
+      }
 
       let data = ``;
       response.setEncoding?.(`utf8`);
@@ -105,7 +126,8 @@ const fnFetchWithNodeHttp = async (url: string, redirectsRemaining=5): Promise<s
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const fetchCssContent = async (url: string): Promise<string> => {
   try {
-    return typeof (globalThis as any).fetch === `function` ? await fnFetchWithNativeFetch(url) : await fnFetchWithNodeHttp(url);
+    const fetchFn = (globalThis as FetchGlobal).fetch;
+    return typeof fetchFn === `function` ? await fnFetchWithNativeFetch(url) : await fnFetchWithNodeHttp(url);
   }
   catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -120,23 +142,34 @@ export const readSelectorsFromFsPath = async (fsPath: string): Promise<SelectorP
     const stat = await fs.promises.stat(fsPath);
     const key = `fs://${fsPath}`;
     const cached = cacheGet(key);
-    return cached?.version === stat.mtimeMs ? cached.data : (async () => stat.size > MAX_FILE_SIZE ? (logger(`debug`, `file skipped for performance: ${fsPath} (${Math.round((stat.size / 1024 / 1024) * 100) / 100}MB)`), []) : (async () => {
-                const content = await fs.promises.readFile(fsPath, `utf8`);
-                return content.length > MAX_CONTENT_LENGTH ? (logger(`debug`, `content sampled: ${fsPath}`),
-                    (() => {
-                      const parsed = parseSelectors(content.slice(0, Math.max(0, MAX_CONTENT_LENGTH)));
-                      cacheSet(key, { version: stat.mtimeMs, data: parsed });
-                      return parsed;
-                    })()) : (() => {
-                      const parsed = parseSelectors(content);
-                      cacheSet(key, { version: stat.mtimeMs, data: parsed });
-                      return parsed;
-                    })();
-              })())();
+    let selectors: SelectorPos[] = cached?.version === stat.mtimeMs ? cached.data : [];
+    if (cached?.version !== stat.mtimeMs) {
+      if (stat.size > MAX_FILE_SIZE) {
+        logger(`debug`, `file skipped for performance: ${fsPath} (${Math.round((stat.size / 1024 / 1024) * 100) / 100}MB)`);
+      }
+      else {
+        const content = await fs.promises.readFile(fsPath, `utf8`);
+        if (content.length > MAX_CONTENT_LENGTH) {
+          logger(`debug`, `content sampled: ${fsPath}`);
+          selectors = parseSelectors(content.slice(0, Math.max(0, MAX_CONTENT_LENGTH)));
+        }
+        else {
+          selectors = parseSelectors(content);
+        }
+        cacheSet(key, { version: stat.mtimeMs, data: selectors });
+      }
+    }
+    return selectors;
   }
   catch (error: unknown) {
     const err = error as { code?: string; message?: string };
-    return err?.code === `ENOMEM` || err?.message?.includes(`out of memory`) ? (logger(`error`, `limit reached processing: ${fsPath}`), []) : (logger(`error`, `read from file failed: ${fsPath} -> ${err?.message ?? error}`), []);
+    if (err?.code === `ENOMEM` || err?.message?.includes(`out of memory`)) {
+      logger(`error`, `limit reached processing: ${fsPath}`);
+    }
+    else {
+      logger(`error`, `read from file failed: ${fsPath} -> ${err?.message ?? error}`);
+    }
+    return [];
   }
 };
 
@@ -145,7 +178,9 @@ const processSingleCssFile = async (filePath: string, styleMap: Map<string, Sele
     try {
       const uri = vscode.Uri.file(filePath);
       const k = uri.toString();
-      !styleMap.has(k) && styleMap.set(k, await readSelectorsFromFsPath(filePath));
+      if (!styleMap.has(k)) {
+        styleMap.set(k, await readSelectorsFromFsPath(filePath));
+      }
     }
     catch (error: unknown) {
       const err = error as { message?: string };
@@ -166,20 +201,25 @@ export const processCssFilesInBatches = async (filePaths: string[], styleMap: Ma
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const ensureWorkspaceCssFiles = async (folder: vscode.WorkspaceFolder, excludePatterns: string[]): Promise<string[]> => {
-  workspaceCssFiles && void 0;
+  const cacheKey = `${folder.uri.toString()}\n${excludePatterns.join(`\n`)}`;
+  if (workspaceCssFiles?.key === cacheKey) {
+    return workspaceCssFiles.files;
+  }
   const collected: string[] = [];
   try {
     const styleExts = [`css`];
     const configured = getAnalyzableExtensions(folder.uri).filter((e) => styleExts.includes(e));
     const unique = [...new Set(configured.length > 0 ? configured : styleExts)];
     const patterns = unique.map((e) => `**/*.${e}`);
+    const exclude = excludePatterns.length > 0 ? `{${excludePatterns.join(`,`)}}` : undefined;
     for (const glob of patterns) {
       if (collected.length >= MAX_WORKSPACE_FILES) {
         logger(`debug`, `file limit reached (${MAX_WORKSPACE_FILES} files), remaining files ignored`);
         break;
       }
       const include = new vscode.RelativePattern(folder, glob);
-      const uris = await vscode.workspace.findFiles(include);
+      const remaining = MAX_WORKSPACE_FILES - collected.length;
+      const uris = await vscode.workspace.findFiles(include, exclude, remaining);
       for (const uri of uris) {
         if (collected.length >= MAX_WORKSPACE_FILES) {
         	break;
@@ -194,12 +234,12 @@ export const ensureWorkspaceCssFiles = async (folder: vscode.WorkspaceFolder, ex
     logger(`error`, `file check error: ${err?.message ?? error}`);
   }
   logger(`debug`, `files collected: ${collected.length} items`);
-  workspaceCssFiles = collected;
+  workspaceCssFiles = { files: collected, key: cacheKey };
   return collected;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const getWorkspaceCssFiles = (): string[] | null => workspaceCssFiles;
+export const getWorkspaceCssFiles = (): string[] | null => workspaceCssFiles?.files ?? null;
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const clearWorkspaceCssFilesCache = (): void => {
@@ -252,29 +292,50 @@ export const extractCssBodies = (fullText: string): string => {
     const prev = i > 0 ? fullText[i - 1] : ``;
 
     if (inBlockComment) {
-    	prev === `*` && ch === `/` && (inBlockComment = false);
+      if (prev === `*` && ch === `/`) {
+        inBlockComment = false;
+      }
       continue;
     }
     if (inLineComment) {
-    	ch === `\n` && (inLineComment = false);
+      if (ch === `\n`) {
+        inLineComment = false;
+      }
       continue;
     }
     if (inString) {
-    	ch === stringChar && prev !== `\\` && (inString = false);
+      if (ch === stringChar && prev !== `\\`) {
+        inString = false;
+      }
       continue;
     }
-    prev === `/` && ch === `*` && (inBlockComment = true);
-    prev === `/` && ch === `/` && (inLineComment = true);
+    if (prev === `/` && ch === `*`) {
+      inBlockComment = true;
+    }
+    if (prev === `/` && ch === `/`) {
+      inLineComment = true;
+    }
 
-    (ch === `"` || ch === `'` || ch === `\``) && !inBlockComment && !inLineComment && ((inString = true), (stringChar = ch));
+    if ((ch === `"` || ch === `'` || ch === `\``) && !inBlockComment && !inLineComment) {
+      inString = true;
+      stringChar = ch;
+    }
 
-    !inBlockComment && !inString && !inLineComment && (ch === `{` ? (
-	depth === 0 && (start = i + 1),
-	depth++
-) : ch === `}` ? (
-	depth--,
-	depth === 0 && start >= 0 && (bodies.push(fullText.slice(start, i)), (start = -1))
-) : void 0);
+    if (!inBlockComment && !inString && !inLineComment) {
+      if (ch === `{`) {
+        if (depth === 0) {
+          start = i + 1;
+        }
+        depth++;
+      }
+      else if (ch === `}`) {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          bodies.push(fullText.slice(start, i));
+          start = -1;
+        }
+      }
+    }
   }
   return bodies.join(`\n`);
 };
@@ -283,7 +344,7 @@ export const extractCssBodies = (fullText: string): string => {
 export { BACKSLASH_REGEX, CLASS_ATTRIBUTE_REGEX, CLASSLIST_METHOD_REGEX, GETELEMENTBYID_REGEX, QUERYSELECTOR_REGEX, REMOTE_URL_REGEX, STRING_LITERAL_REGEX };
 
 // VALIDATION FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const isHtmlLikeDocument = (document: vscode.TextDocument): boolean => document.languageId === `html` || /\.html?$/i.test(document.fileName);
+const isHtmlLikeDocument = (document: vscode.TextDocument): boolean => document.languageId === `html` || HTML_FILE_REGEX.test(document.fileName);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 type BlockRange = { start: number; end: number };
@@ -292,11 +353,12 @@ type BlockRange = { start: number; end: number };
 const collectHtmlBlockRanges = (fullText: string, tag: `script` | `style`): BlockRange[] => {
   const ranges: BlockRange[] = [];
   const regex = new RegExp(`<${tag}\\b[^>]*>[\\S\\s]*?<\\/${tag}\\s*>`, `gi`);
-  let m: RegExpExecArray | null;
-  while ((m = regex.exec(fullText))) {
+  let m = regex.exec(fullText);
+  while (m) {
     const start = m.index;
     const end = m.index + m[0].length;
     ranges.push({ start, end });
+    m = regex.exec(fullText);
   }
   return ranges;
 };
@@ -324,13 +386,13 @@ const isIndexInRanges = (index: number, ranges: BlockRange[]): boolean => {
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const collectTokensFromWhitespaceList = (raw: string): string[] => {
   const out = new Set<string>();
-  const tokens = raw.split(/\s+/);
+  const tokens = raw.split(WHITESPACE_REGEX);
   for (const token of tokens) {
     const normalizedValue = normalizeToken(token).trim();
     normalizedValue && isValidCssIdentifier(normalizedValue) && out.add(normalizedValue);
   }
   const values = [...out.values()];
-  const filtered = raw.includes(`\${`) ? values.filter((v) => !/[:_-]$/.test(v)) : values;
+  const filtered = raw.includes(`\${`) ? values.filter((v) => !DYNAMIC_TOKEN_SUFFIX_REGEX.test(v)) : values;
   return filtered;
 };
 
@@ -340,30 +402,34 @@ const collectTokensFromExpression = (raw: string): string[] => {
 
   // 1) string literals inside expression: :class="['a', foo]" / :class="{ 'a-b': cond }"
   const localStringLiteralRegex = /(["'`])((?:(?!\1)[\S\s])*?)\1/g;
-  let m: RegExpExecArray | null;
-  while ((m = localStringLiteralRegex.exec(raw))) {
+  let m = localStringLiteralRegex.exec(raw);
+  while (m) {
     const normalizedValue = normalizeToken(m[2]).trim();
     if (!normalizedValue) {
-    	continue;
+      m = localStringLiteralRegex.exec(raw);
+      continue;
     }
-    const parts = normalizedValue.split(/\s+/);
+    const parts = normalizedValue.split(WHITESPACE_REGEX);
     for (const p of parts) {
       const v = p.trim();
       v && isValidCssIdentifier(v) && out.add(v);
     }
+    m = localStringLiteralRegex.exec(raw);
   }
   // 2) unquoted object keys: :class="{ active: isActive }"
   const objectKeyRegex = /(?:^|[,{]\s*)([$A-Z_a-z][\w$-]*)\s*:/g;
-  while ((m = objectKeyRegex.exec(raw))) {
+  m = objectKeyRegex.exec(raw);
+  while (m) {
     const key = m[1];
     key && isValidCssIdentifier(key) && out.add(key);
+    m = objectKeyRegex.exec(raw);
   }
   return [...out.values()];
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const collectClassTokens = (raw: string): string[] => {
-  const hasExpressionChars = /[,[\]{}]/.test(raw);
+  const hasExpressionChars = EXPRESSION_CLASS_CHARS_REGEX.test(raw);
   const rs = hasExpressionChars ? collectTokensFromExpression(raw) : collectTokensFromWhitespaceList(raw);
   return rs;
 };
@@ -401,10 +467,11 @@ const processIdValue = (rawId: string, baseOffset: number, treatAsExpression: bo
   const tokens = treatAsExpression ? ((): string[] => {
         const out = new Set<string>();
         const localStringLiteralRegex = /(["'`])((?:(?!\1)[\S\s])*?)\1/g;
-        let m: RegExpExecArray | null;
-        while ((m = localStringLiteralRegex.exec(rawId))) {
+        let m = localStringLiteralRegex.exec(rawId);
+        while (m) {
           const normalizedValue = normalizeToken(m[2]).trim();
           normalizedValue && isValidCssIdentifier(normalizedValue) && out.add(normalizedValue);
+          m = localStringLiteralRegex.exec(rawId);
         }
         return [...out.values()];
       })() : collectIdTokens(rawId);
@@ -433,21 +500,24 @@ const processClassListCall = (match: RegExpExecArray, document: vscode.TextDocum
   let literalMatch: RegExpExecArray | null;
   const localStringLiteralRegex = /(["'`])((?:(?!\1).)*?)\1/g;
 
-  while ((literalMatch = localStringLiteralRegex.exec(argumentsString))) {
+  literalMatch = localStringLiteralRegex.exec(argumentsString);
+  while (literalMatch) {
     const normalizedValue = normalizeToken(literalMatch[2]).trim();
 
     if (!normalizedValue || !isValidCssIdentifier(normalizedValue)) {
+      literalMatch = localStringLiteralRegex.exec(argumentsString);
     	continue;
     }
     knownClasses.has(normalizedValue) ? usedClasses.add(normalizedValue) : (() => {
         const baseOffset = match.index + match[0].indexOf(literalMatch[0]);
         const innerIdx = literalMatch[0].indexOf(literalMatch[2]);
-        const tokenStart = baseOffset + (innerIdx >= 0 ? innerIdx : 0);
+        const tokenStart = baseOffset + Math.max(innerIdx, 0);
         const d = new vscode.Diagnostic(makeRange(document, tokenStart, literalMatch[2].length), `CSS class '${normalizedValue}' not found`, vscode.DiagnosticSeverity.Warning);
         d.source = `CSS-Analyzer`;
         d.code = `CSS001`;
         diagnostics.push(d);
       })();
+    literalMatch = localStringLiteralRegex.exec(argumentsString);
   }
 };
 
@@ -458,23 +528,28 @@ const collectMarkupDefinitions = (fullText: string, scriptRanges: BlockRange[], 
   const markupIds = new Set<string>();
 
   const classRe = /(?<!:)\b(?:class|classname|ngclass)\b\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/gis;
-  let m: RegExpExecArray | null;
-  while ((m = classRe.exec(fullText))) {
+  let m = classRe.exec(fullText);
+  while (m) {
     if (isIndexInRanges(m.index, scriptRanges) || isIndexInRanges(m.index, styleRanges)) {
+      m = classRe.exec(fullText);
     	continue;
     }
     for (const t of collectClassTokens(m[2])) {
       markupClasses.add(t);
     }
+    m = classRe.exec(fullText);
   }
   const idRe = /(?<!:)\bid\b\s*=\s*(["'`])((?:(?!\1)[\S\s])*?)\1/gis;
-  while ((m = idRe.exec(fullText))) {
+  m = idRe.exec(fullText);
+  while (m) {
     if (isIndexInRanges(m.index, scriptRanges) || isIndexInRanges(m.index, styleRanges)) {
+      m = idRe.exec(fullText);
     	continue;
     }
     for (const t of collectIdTokens(m[2])) {
       markupIds.add(t);
     }
+    m = idRe.exec(fullText);
   }
   return { markupClasses, markupIds };
 };
@@ -517,223 +592,291 @@ export const scanDocumentUsages = (
   CLASSNAME_ASSIGN_REGEX.lastIndex = 0;
   ID_ASSIGN_REGEX.lastIndex = 0;
 
-  isHtml ? (() => {
-      // class / className / ngClass (정적)
-      let classAttributeMatch: RegExpExecArray | null;
-      while ((classAttributeMatch = CLASS_ATTRIBUTE_REGEX.exec(fullText))) {
-        if (isIndexInRanges(classAttributeMatch.index, htmlScriptRanges) || isIndexInRanges(classAttributeMatch.index, htmlStyleRanges)) {
-        	continue;
-        }
+  if (isHtml) {
+    // class / className / ngClass (정적)
+    let classAttributeMatch = CLASS_ATTRIBUTE_REGEX.exec(fullText);
+    while (classAttributeMatch) {
+      if (!isIndexInRanges(classAttributeMatch.index, htmlScriptRanges) && !isIndexInRanges(classAttributeMatch.index, htmlStyleRanges)) {
         const rawClasses = classAttributeMatch[2];
         const baseOffset = classAttributeMatch.index + classAttributeMatch[0].indexOf(rawClasses);
         processClassValue(rawClasses, baseOffset, false, document, knownClasses, diagnostics, usedClassesFromMarkup);
       }
-      // :class / v-bind:class (동적)
-      let boundClassMatch: RegExpExecArray | null;
-      while ((boundClassMatch = BOUND_CLASS_ATTRIBUTE_REGEX.exec(fullText))) {
-        if (isIndexInRanges(boundClassMatch.index, htmlScriptRanges) || isIndexInRanges(boundClassMatch.index, htmlStyleRanges)) {
-        	continue;
-        }
+      classAttributeMatch = CLASS_ATTRIBUTE_REGEX.exec(fullText);
+    }
+
+    // :class / v-bind:class (동적)
+    let boundClassMatch = BOUND_CLASS_ATTRIBUTE_REGEX.exec(fullText);
+    while (boundClassMatch) {
+      if (!isIndexInRanges(boundClassMatch.index, htmlScriptRanges) && !isIndexInRanges(boundClassMatch.index, htmlStyleRanges)) {
         const rawClasses = boundClassMatch[2];
         const baseOffset = boundClassMatch.index + boundClassMatch[0].indexOf(rawClasses);
         processClassValue(rawClasses, baseOffset, true, document, knownClasses, diagnostics, usedClassesFromMarkup);
       }
-      // id (정적)
-      let idAttributeMatch: RegExpExecArray | null;
-      while ((idAttributeMatch = ID_ATTRIBUTE_REGEX.exec(fullText))) {
-        if (isIndexInRanges(idAttributeMatch.index, htmlScriptRanges) || isIndexInRanges(idAttributeMatch.index, htmlStyleRanges)) {
-        	continue;
-        }
+      boundClassMatch = BOUND_CLASS_ATTRIBUTE_REGEX.exec(fullText);
+    }
+
+    // id (정적)
+    let idAttributeMatch = ID_ATTRIBUTE_REGEX.exec(fullText);
+    while (idAttributeMatch) {
+      if (!isIndexInRanges(idAttributeMatch.index, htmlScriptRanges) && !isIndexInRanges(idAttributeMatch.index, htmlStyleRanges)) {
         const rawId = idAttributeMatch[2];
         const baseOffset = idAttributeMatch.index + idAttributeMatch[0].indexOf(rawId);
         processIdValue(rawId, baseOffset, false, document, knownIds, diagnostics, usedIdsFromMarkup);
       }
-      // :id / v-bind:id (동적)
-      let boundIdMatch: RegExpExecArray | null;
-      while ((boundIdMatch = BOUND_ID_ATTRIBUTE_REGEX.exec(fullText))) {
-        if (isIndexInRanges(boundIdMatch.index, htmlScriptRanges) || isIndexInRanges(boundIdMatch.index, htmlStyleRanges)) {
-        	continue;
-        }
+      idAttributeMatch = ID_ATTRIBUTE_REGEX.exec(fullText);
+    }
+
+    // :id / v-bind:id (동적)
+    let boundIdMatch = BOUND_ID_ATTRIBUTE_REGEX.exec(fullText);
+    while (boundIdMatch) {
+      if (!isIndexInRanges(boundIdMatch.index, htmlScriptRanges) && !isIndexInRanges(boundIdMatch.index, htmlStyleRanges)) {
         const rawId = boundIdMatch[2];
         const baseOffset = boundIdMatch.index + boundIdMatch[0].indexOf(rawId);
         processIdValue(rawId, baseOffset, true, document, knownIds, diagnostics, usedIdsFromMarkup);
       }
-    })() : (() => {
-      // JS 문서에서는 <...> 태그 형태에서만 class/id 속성 추출 (JS 객체 class: "..." 오탐 방지)
-      let tagAttrMatch: RegExpExecArray | null;
-      while ((tagAttrMatch = TAG_ATTRIBUTE_REGEX.exec(fullText))) {
-        const attrName = (tagAttrMatch[1] || ``).toLowerCase();
-        const raw = tagAttrMatch[3] || ``;
-        const baseOffset = tagAttrMatch.index + tagAttrMatch[0].indexOf(raw);
-        const isBound = attrName.startsWith(`:`) || attrName.startsWith(`v-bind:`);
-        (attrName.includes(`class`) || attrName === `ngclass`) && processClassValue(raw, baseOffset, isBound, document, knownClasses, diagnostics, usedClassesFromMarkup);
-        attrName.includes(`id`) && processIdValue(raw, baseOffset, isBound, document, knownIds, diagnostics, usedIdsFromMarkup);
+      boundIdMatch = BOUND_ID_ATTRIBUTE_REGEX.exec(fullText);
+    }
+  }
+  else {
+    // JS 문서에서는 <...> 태그 형태에서만 class/id 속성 추출 (JS 객체 class: "..." 오탐 방지)
+    let tagAttrMatch = TAG_ATTRIBUTE_REGEX.exec(fullText);
+    while (tagAttrMatch) {
+      const attrName = (tagAttrMatch[1] || ``).toLowerCase();
+      const raw = tagAttrMatch[3] || ``;
+      const baseOffset = tagAttrMatch.index + tagAttrMatch[0].indexOf(raw);
+      const isBound = attrName.startsWith(`:`) || attrName.startsWith(`v-bind:`);
+      if (attrName.includes(`class`) || attrName === `ngclass`) {
+        processClassValue(raw, baseOffset, isBound, document, knownClasses, diagnostics, usedClassesFromMarkup);
       }
-    })();
+      if (attrName.includes(`id`)) {
+        processIdValue(raw, baseOffset, isBound, document, knownIds, diagnostics, usedIdsFromMarkup);
+      }
+      tagAttrMatch = TAG_ATTRIBUTE_REGEX.exec(fullText);
+    }
+  }
 
   // classList 메서드 호출 처리
-  let classListMatch: RegExpExecArray | null;
-  while ((classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText))) {
+  let classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText);
+  while (classListMatch) {
     if (isHtml && !isIndexInRanges(classListMatch.index, htmlScriptRanges)) {
-    	continue;
+      classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText);
+      continue;
     }
     processClassListCall(classListMatch, document, allKnownClasses, diagnostics, usedClassesFromMarkup);
+    classListMatch = CLASSLIST_METHOD_REGEX.exec(fullText);
   }
   // querySelector* / jQuery selectors (unified loop) ―――-
   for (const selectorRegex of [QUERYSELECTOR_REGEX, JQUERY_SELECTOR_REGEX]) {
     selectorRegex.lastIndex = 0;
-    let selectorMatch: RegExpExecArray | null;
-    while ((selectorMatch = selectorRegex.exec(fullText))) {
+    let selectorMatch = selectorRegex.exec(fullText);
+    while (selectorMatch) {
       if (isHtml && !isIndexInRanges(selectorMatch.index, htmlScriptRanges)) {
-      	continue;
+        selectorMatch = selectorRegex.exec(fullText);
+        continue;
       }
       const q = selectorMatch[2];
       if (q.includes(`\${`)) {
-      	continue;
+        selectorMatch = selectorRegex.exec(fullText);
+        continue;
       }
       const base = selectorMatch.index + selectorMatch[0].indexOf(q);
-      const clsTok = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
-      const idTok = /(^|[^\\])#((?:\\.|[\w-])+)/g;
-      let m: RegExpExecArray | null;
-      while ((m = clsTok.exec(q))) {
+      CLASS_SELECTOR_TOKEN_REGEX.lastIndex = 0;
+      ID_SELECTOR_TOKEN_REGEX.lastIndex = 0;
+      let m = CLASS_SELECTOR_TOKEN_REGEX.exec(q);
+      while (m) {
         const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-        val && (allKnownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
-              const start = base + m.index + (m[1] ? 1 : 0) + 1;
-              const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
-              d.source = `CSS-Analyzer`;
-              d.code = `CSS001`;
-              diagnostics.push(d);
-            })());
+        if (val) {
+          if (allKnownClasses.has(val)) {
+            usedClassesFromMarkup.add(val);
+          }
+          else {
+            const start = base + m.index + (m[1] ? 1 : 0) + 1;
+            const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
+            d.source = `CSS-Analyzer`;
+            d.code = `CSS001`;
+            diagnostics.push(d);
+          }
+        }
+        m = CLASS_SELECTOR_TOKEN_REGEX.exec(q);
       }
-      while ((m = idTok.exec(q))) {
+      m = ID_SELECTOR_TOKEN_REGEX.exec(q);
+      while (m) {
         const val = m[2].replaceAll(BACKSLASH_REGEX, ``);
-        val && (allKnownIds.has(val) ? usedIdsFromMarkup.add(val) : (() => {
-              const start = base + m.index + (m[1] ? 1 : 0) + 1;
-              const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
-              d.source = `CSS-Analyzer`;
-              d.code = `CSS002`;
-              diagnostics.push(d);
-            })());
+        if (val) {
+          if (allKnownIds.has(val)) {
+            usedIdsFromMarkup.add(val);
+          }
+          else {
+            const start = base + m.index + (m[1] ? 1 : 0) + 1;
+            const d = new vscode.Diagnostic(makeRange(document, start, val.length + 1), `CSS id '#${val}' not found`, vscode.DiagnosticSeverity.Warning);
+            d.source = `CSS-Analyzer`;
+            d.code = `CSS002`;
+            diagnostics.push(d);
+          }
+        }
+        m = ID_SELECTOR_TOKEN_REGEX.exec(q);
       }
+      selectorMatch = selectorRegex.exec(fullText);
     }
   }
   // getElementById
-  let gebi: RegExpExecArray | null;
-  while ((gebi = GETELEMENTBYID_REGEX.exec(fullText))) {
+  let gebi = GETELEMENTBYID_REGEX.exec(fullText);
+  while (gebi) {
     if (isHtml && !isIndexInRanges(gebi.index, htmlScriptRanges)) {
-    	continue;
+      gebi = GETELEMENTBYID_REGEX.exec(fullText);
+      continue;
     }
     const id = gebi[2];
-    id && (allKnownIds.has(id) ? usedIdsFromMarkup.add(id) : (() => {
-          const m = gebi[0].match(/(["'])((?:(?!\1)[^"'`])+)\1/);
-          const litLen = m ? m[0].length : id.length + 2;
-          const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
-          const d = new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning);
-          d.source = `CSS-Analyzer`;
-          d.code = `CSS002`;
-          diagnostics.push(d);
-        })());
+    if (id) {
+      if (allKnownIds.has(id)) {
+        usedIdsFromMarkup.add(id);
+      }
+      else {
+        const m = gebi[0].match(QUOTED_LITERAL_REGEX);
+        const litLen = m ? m[0].length : id.length + 2;
+        const start = gebi.index + (m ? gebi[0].indexOf(m[0]) : 0);
+        const d = new vscode.Diagnostic(makeRange(document, start, litLen), `CSS id '#${id}' not found`, vscode.DiagnosticSeverity.Warning);
+        d.source = `CSS-Analyzer`;
+        d.code = `CSS002`;
+        diagnostics.push(d);
+      }
+    }
+    gebi = GETELEMENTBYID_REGEX.exec(fullText);
   }
   // getElementsByClassName
-  let gebc: RegExpExecArray | null;
-  while ((gebc = GETELEMENTSBYCLASSNAME_REGEX.exec(fullText))) {
+  let gebc = GETELEMENTSBYCLASSNAME_REGEX.exec(fullText);
+  while (gebc) {
     if (isHtml && !isIndexInRanges(gebc.index, htmlScriptRanges)) {
-    	continue;
+      gebc = GETELEMENTSBYCLASSNAME_REGEX.exec(fullText);
+      continue;
     }
     const raw = gebc[2];
     const base = gebc.index + gebc[0].indexOf(raw);
     const tokens = collectClassTokens(raw);
     for (const val of tokens) {
-      val && (allKnownClasses.has(val) ? usedClassesFromMarkup.add(val) : (() => {
-            const start = base + raw.indexOf(val);
-            const d = new vscode.Diagnostic(makeRange(document, start, val.length), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
-            d.source = `CSS-Analyzer`;
-            d.code = `CSS001`;
-            diagnostics.push(d);
-          })());
+      if (val) {
+        if (allKnownClasses.has(val)) {
+          usedClassesFromMarkup.add(val);
+        }
+        else {
+          const start = base + raw.indexOf(val);
+          const d = new vscode.Diagnostic(makeRange(document, start, val.length), `CSS class '${val}' not found`, vscode.DiagnosticSeverity.Warning);
+          d.source = `CSS-Analyzer`;
+          d.code = `CSS001`;
+          diagnostics.push(d);
+        }
+      }
     }
+    gebc = GETELEMENTSBYCLASSNAME_REGEX.exec(fullText);
   }
   // setAttribute("class"|"id", ...)
-  let sa: RegExpExecArray | null;
-  while ((sa = SETATTRIBUTE_REGEX.exec(fullText))) {
+  let sa = SETATTRIBUTE_REGEX.exec(fullText);
+  while (sa) {
     if (isHtml && !isIndexInRanges(sa.index, htmlScriptRanges)) {
-    	continue;
+      sa = SETATTRIBUTE_REGEX.exec(fullText);
+      continue;
     }
     const attr = (sa[2] || ``).toLowerCase();
     const args = sa[3] || ``;
     STRING_LITERAL_REGEX.lastIndex = 0;
-    let lit: RegExpExecArray | null;
-    while ((lit = STRING_LITERAL_REGEX.exec(args))) {
+    let lit = STRING_LITERAL_REGEX.exec(args);
+    while (lit) {
       const raw = lit[2];
       const absBase = sa.index + sa[0].indexOf(lit[0]) + lit[0].indexOf(raw);
-      attr === `class` && (() => {
-          const classTokens = collectClassTokens(raw);
-          for (const v of classTokens) {
-            v && (allKnownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
-                  const rel = raw.indexOf(v);
-                  const start = rel >= 0 ? absBase + rel : absBase;
-                  const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
-                  d.source = `CSS-Analyzer`;
-                  d.code = `CSS001`;
-                  diagnostics.push(d);
-                })());
+      if (attr === `class`) {
+        const classTokens = collectClassTokens(raw);
+        for (const v of classTokens) {
+          if (v) {
+            if (allKnownClasses.has(v)) {
+              usedClassesFromMarkup.add(v);
+            }
+            else {
+              const rel = raw.indexOf(v);
+              const start = rel >= 0 ? absBase + rel : absBase;
+              const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
+              d.source = `CSS-Analyzer`;
+              d.code = `CSS001`;
+              diagnostics.push(d);
+            }
           }
-        })();
+        }
+      }
 
-      attr === `id` && (() => {
-          const idTokens = collectIdTokens(raw);
-          for (const v of idTokens) {
-            v && (allKnownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
-                  const rel = raw.indexOf(v);
-                  const start = rel >= 0 ? absBase + rel : absBase;
-                  const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);
-                  d.source = `CSS-Analyzer`;
-                  d.code = `CSS002`;
-                  diagnostics.push(d);
-                })());
+      if (attr === `id`) {
+        const idTokens = collectIdTokens(raw);
+        for (const v of idTokens) {
+          if (v) {
+            if (allKnownIds.has(v)) {
+              usedIdsFromMarkup.add(v);
+            }
+            else {
+              const rel = raw.indexOf(v);
+              const start = rel >= 0 ? absBase + rel : absBase;
+              const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);
+              d.source = `CSS-Analyzer`;
+              d.code = `CSS002`;
+              diagnostics.push(d);
+            }
           }
-        })();
+        }
+      }
+      lit = STRING_LITERAL_REGEX.exec(args);
     }
+    sa = SETATTRIBUTE_REGEX.exec(fullText);
   }
   // element.className = "..."
-  let cna: RegExpExecArray | null;
-  while ((cna = CLASSNAME_ASSIGN_REGEX.exec(fullText))) {
+  let cna = CLASSNAME_ASSIGN_REGEX.exec(fullText);
+  while (cna) {
     if (isHtml && !isIndexInRanges(cna.index, htmlScriptRanges)) {
-    	continue;
+      cna = CLASSNAME_ASSIGN_REGEX.exec(fullText);
+      continue;
     }
     const raw = cna[2];
     const base = cna.index + cna[0].indexOf(raw);
     const tokens = collectClassTokens(raw);
     for (const v of tokens) {
-      v && (allKnownClasses.has(v) ? usedClassesFromMarkup.add(v) : (() => {
-            const rel = raw.indexOf(v);
-            const start = rel >= 0 ? base + rel : base;
-            const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
-            d.source = `CSS-Analyzer`;
-            d.code = `CSS001`;
-            diagnostics.push(d);
-          })());
+      if (v) {
+        if (allKnownClasses.has(v)) {
+          usedClassesFromMarkup.add(v);
+        }
+        else {
+          const rel = raw.indexOf(v);
+          const start = rel >= 0 ? base + rel : base;
+          const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS class '${v}' not found`, vscode.DiagnosticSeverity.Warning);
+          d.source = `CSS-Analyzer`;
+          d.code = `CSS001`;
+          diagnostics.push(d);
+        }
+      }
     }
+    cna = CLASSNAME_ASSIGN_REGEX.exec(fullText);
   }
   // element.id = "..."
-  let ida: RegExpExecArray | null;
-  while ((ida = ID_ASSIGN_REGEX.exec(fullText))) {
+  let ida = ID_ASSIGN_REGEX.exec(fullText);
+  while (ida) {
     if (isHtml && !isIndexInRanges(ida.index, htmlScriptRanges)) {
-    	continue;
+      ida = ID_ASSIGN_REGEX.exec(fullText);
+      continue;
     }
     const raw = ida[2];
     const base = ida.index + ida[0].indexOf(raw);
     const tokens = collectIdTokens(raw);
     for (const v of tokens) {
-      v && (allKnownIds.has(v) ? usedIdsFromMarkup.add(v) : (() => {
-            const rel = raw.indexOf(v);
-            const start = rel >= 0 ? base + rel : base;
-            const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);
-            d.source = `CSS-Analyzer`;
-            d.code = `CSS002`;
-            diagnostics.push(d);
-          })());
+      if (v) {
+        if (allKnownIds.has(v)) {
+          usedIdsFromMarkup.add(v);
+        }
+        else {
+          const rel = raw.indexOf(v);
+          const start = rel >= 0 ? base + rel : base;
+          const d = new vscode.Diagnostic(makeRange(document, start, v.length), `CSS id '#${v}' not found`, vscode.DiagnosticSeverity.Warning);
+          d.source = `CSS-Analyzer`;
+          d.code = `CSS002`;
+          diagnostics.push(d);
+        }
+      }
     }
+    ida = ID_ASSIGN_REGEX.exec(fullText);
   }
   return { diagnostics, usedClassesFromMarkup, usedIdsFromMarkup };
 };
@@ -745,14 +888,17 @@ export const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupp
   const bodyOnly = extractCssBodies(fullText);
   const usedClasses = new Set<string>();
   const usedIds = new Set<string>();
-  let m: RegExpExecArray | null;
-  const clsUse = /(^|[^\\])\.((?:\\.|[\w-])+)/g;
-  while ((m = clsUse.exec(bodyOnly))) {
+  CLASS_SELECTOR_TOKEN_REGEX.lastIndex = 0;
+  ID_SELECTOR_TOKEN_REGEX.lastIndex = 0;
+  let m = CLASS_SELECTOR_TOKEN_REGEX.exec(bodyOnly);
+  while (m) {
     usedClasses.add(m[2].replaceAll(BACKSLASH_REGEX, ``));
+    m = CLASS_SELECTOR_TOKEN_REGEX.exec(bodyOnly);
   }
-  const idUse = /(^|[^\\])#((?:\\.|[\w-])+)/g;
-  while ((m = idUse.exec(bodyOnly))) {
+  m = ID_SELECTOR_TOKEN_REGEX.exec(bodyOnly);
+  while (m) {
     usedIds.add(m[2].replaceAll(BACKSLASH_REGEX, ``));
+    m = ID_SELECTOR_TOKEN_REGEX.exec(bodyOnly);
   }
   for (const s of sels) {
     const used = s.type === SelectorType.CLASS ? usedClasses.has(s.selector) : usedIds.has(s.selector);
@@ -772,9 +918,9 @@ export const scanLocalUnused = async (doc: vscode.TextDocument, support: CssSupp
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportLike, usedClassesFromMarkup: Set<string>, usedIdsFromMarkup: Set<string>): Promise<vscode.Diagnostic[]> => {
+export const scanEmbeddedUnused = async (doc: vscode.TextDocument, support: CssSupportLike, usedClassesFromMarkup: Set<string>, usedIdsFromMarkup: Set<string>, fullText?: string): Promise<vscode.Diagnostic[]> => {
   const diagnostics: vscode.Diagnostic[] = [];
-  const localDefs = await support.getLocalDoc(doc);
+  const localDefs = await support.getLocalDoc(doc, fullText);
   for (const s of localDefs) {
     const used = s.type === SelectorType.CLASS ? usedClassesFromMarkup.has(s.selector) : usedIdsFromMarkup.has(s.selector);
     !used && (() => {

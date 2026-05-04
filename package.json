@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -27,7 +27,6 @@
     "selectors"
   ],
   "activationEvents": [
-    "onStartupFinished",
     "onLanguage:html",
     "onLanguage:css",
     "onLanguage:javascript",
@@ -140,7 +139,7 @@
     }
   },
   "engines": {
-    "vscode": ">=1.118.0",
+    "vscode": ">=1.116.0",
     "node": ">=21.0.0",
     "npm": ">=10.0.0",
     "pnpm": ">=9.0.0"
@@ -165,7 +164,7 @@
     "@types/htmlhint": "^1.1.5",
     "@types/jshint": "^2.12.4",
     "@types/node": "25.6.0",
-    "@types/vscode": "^1.118.0",
+    "@types/vscode": "^1.116.0",
     "@vscode/vsce": "^3.9.1",
     "esbuild": "0.28.0",
     "ts-morph": "28.0.0",

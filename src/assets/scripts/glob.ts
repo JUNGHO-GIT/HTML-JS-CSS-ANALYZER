@@ -6,15 +6,24 @@
 
 import type { vscode } from "@exportLibs";
 
+// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+const globRegExpCache = new Map<string, RegExp>();
+
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const globToRegExp = (glob: string): RegExp => {
+  const cachedRegExp = globRegExpCache.get(glob);
+  if (cachedRegExp) {
+    return cachedRegExp;
+  }
   let s = glob.replaceAll(`\\`, `/`);
   s = s.replaceAll(/[$()+.[\\\]^{|}]/g, `\\$&`);
   s = s.replaceAll(`**`, `§§DS§§`);
   s = s.replaceAll(`*`, `[^/]*`);
   s = s.replaceAll(`§§DS§§`, `.*`);
   s = s.replaceAll(`?`, `[^/]`);
-  return new RegExp(`^${s}$`);
+  const rs = new RegExp(`^${s}$`);
+  globRegExpCache.set(glob, rs);
+  return rs;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-

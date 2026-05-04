@@ -8,9 +8,15 @@ import type { vscode } from "@exportLibs";
 import type { SelectorPos } from "@exportTypes";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export declare type CssStyleLoadOptions = {
+  fullText?: string;
+  includeWorkspace?: boolean;
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export declare type CssSupportLike = {
-  getStyles: (doc: vscode.TextDocument) => Promise<Map<string, SelectorPos[]>>;
-  getLocalDoc: (doc: vscode.TextDocument) => Promise<SelectorPos[]>;
+  getStyles: (doc: vscode.TextDocument, options?: CssStyleLoadOptions) => Promise<Map<string, SelectorPos[]>>;
+  getLocalDoc: (doc: vscode.TextDocument, fullText?: string) => Promise<SelectorPos[]>;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-

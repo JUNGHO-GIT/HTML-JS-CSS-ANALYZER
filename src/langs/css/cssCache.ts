@@ -116,11 +116,11 @@ const ensureLimit = (): void => {
 export const cacheGet = (key: string): CacheVal | undefined => {
   const val = styleCache.get(key);
   if (!val) {
-  	return ;
+    return undefined;
   }
   if (isExpired(val)) {
   	removeEntry(key);
-    return ;
+    return undefined;
   }
   touch(key);
   return val;

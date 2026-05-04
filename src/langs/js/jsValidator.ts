@@ -4,7 +4,7 @@
  * @description JSHint 검증 및 진단 생성
  */
 
-import type { ComplexityIssue, FunctionInfo, JSHintInstance, PotentialBug, SourceAnalysis, VariableInfo } from "@exportLangs";
+import type { ComplexityIssue, FunctionInfo, JSHintError, JSHintInstance, PotentialBug, SourceAnalysis, VariableInfo } from "@exportLangs";
 import { analyzeSourceCode, loadJSHint, loadJSHintConfig } from "@exportLangs";
 import { Position, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
@@ -19,16 +19,10 @@ let jsHintCache: JSHintInstance | null | undefined;
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const getJSHint = (): JSHintInstance | null => {
-  let result: JSHintInstance | null;
-
-  jsHintCache === undefined ? (
-    (jsHintCache = loadJSHint()),
-    (result = jsHintCache)
-  ) : (
-    result = jsHintCache
-  );
-
-  return result;
+  if (jsHintCache === undefined) {
+    jsHintCache = loadJSHint();
+  }
+  return jsHintCache;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
@@ -72,24 +66,25 @@ export const generateAdditionalDiagnostics = (document: vscode.TextDocument, ana
   });
 
   analysis.functions.forEach((func: FunctionInfo) => {
-    func.parameters > MAX_FUNCTION_PARAMS && (() => {
-        const line = Math.max(func.line - 1, 0);
-        const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
-        const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
-        const diagnostic = new vscode.Diagnostic(range, `Function '${func.name}' has too many parameters (${func.parameters}): consider using an object or config parameter`, vscode.DiagnosticSeverity.Information);
+    if (func.parameters <= MAX_FUNCTION_PARAMS) {
+      return;
+    }
+    const line = Math.max(func.line - 1, 0);
+    const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
+    const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
+    const diagnostic = new vscode.Diagnostic(range, `Function '${func.name}' has too many parameters (${func.parameters}): consider using an object or config parameter`, vscode.DiagnosticSeverity.Information);
 
-        diagnostic.source = `JSHint`;
-        diagnostic.code = `function-too-many-params`;
-        (diagnostic as any).data = {
-          ruleId: `function-too-many-params`,
-          line: func.line,
-          analysisType: `function-complexity`,
-          functionName: func.name,
-          parameterCount: func.parameters,
-        };
+    diagnostic.source = `JSHint`;
+    diagnostic.code = `function-too-many-params`;
+    (diagnostic as any).data = {
+      ruleId: `function-too-many-params`,
+      line: func.line,
+      analysisType: `function-complexity`,
+      functionName: func.name,
+      parameterCount: func.parameters,
+    };
 
-        diagnostics.push(diagnostic);
-      })();
+    diagnostics.push(diagnostic);
   });
 
   const varUsages = analysis.variables.filter((v: VariableInfo) => v.type === `var`);
@@ -112,19 +107,19 @@ export const generateAdditionalDiagnostics = (document: vscode.TextDocument, ana
     diagnostics.push(diagnostic);
   });
 
-  !analysis.hasStrictMode && !analysis.isModule && (() => {
-      const diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), `Recommend using 'use strict' directive`, vscode.DiagnosticSeverity.Information);
+  if (!analysis.hasStrictMode && !analysis.isModule) {
+    const diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), `Recommend using 'use strict' directive`, vscode.DiagnosticSeverity.Information);
 
-      diagnostic.source = `JSHint`;
-      diagnostic.code = `missing-strict-mode`;
-      (diagnostic as any).data = {
-        ruleId: `missing-strict-mode`,
-        line: 1,
-        analysisType: `best-practice`,
-      };
+    diagnostic.source = `JSHint`;
+    diagnostic.code = `missing-strict-mode`;
+    (diagnostic as any).data = {
+      ruleId: `missing-strict-mode`,
+      line: 1,
+      analysisType: `best-practice`,
+    };
 
-      diagnostics.push(diagnostic);
-    })();
+    diagnostics.push(diagnostic);
+  }
 
   return diagnostics;
 };
@@ -133,91 +128,93 @@ export const generateAdditionalDiagnostics = (document: vscode.TextDocument, ana
 export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] => {
   const jsHint = getJSHint();
 
-  return !jsHint ? (
-	logger(`warn`, `module not loaded - JSHint is optional`),
-	[]
-) : (() => {
-        try {
-          logger(`debug`, `starting analysis for: ${document.fileName} (languageId: ${document.languageId})`);
+  if (!jsHint) {
+    logger(`warn`, `module not loaded - JSHint is optional`);
+    return [];
+  }
+  try {
+    logger(`debug`, `starting analysis for: ${document.fileName} (languageId: ${document.languageId})`);
 
-          const config = { ...loadJSHintConfig(document.uri.fsPath) };
-          const fileName = document.fileName.toLowerCase();
-          const sourceText = document.getText();
+    const config = { ...loadJSHintConfig(document.uri.fsPath) };
+    const fileName = document.fileName.toLowerCase();
+    const sourceText = document.getText();
+    const isModule = MODULE_EXTENSIONS.some((ext) => fileName.endsWith(ext)) || sourceText.includes(`import `) || sourceText.includes(`export `);
 
-          const isModule = MODULE_EXTENSIONS.some((ext) => fileName.endsWith(ext)) || sourceText.includes(`import `) || sourceText.includes(`export `);
+    if (isModule) {
+      config.module = true;
+      config.esversion = Math.max(config.esversion || 6, 6);
+    }
+    const { processedCode, analysis } = analyzeSourceCode(sourceText, document);
 
-          isModule && ((config.module = true), (config.esversion = Math.max(config.esversion || 6, 6)));
+    logger(`debug`, `analysis started: ${document.fileName}`);
 
-          const { processedCode, analysis } = analyzeSourceCode(sourceText, document);
+    const isValid = jsHint.JSHINT(processedCode, config);
+    if (isValid) {
+      logger(`debug`, `analysis completed: no errors (${document.fileName})`);
+      return [];
+    }
+    type JSHintDataMethod = () => { errors?: Array<JSHintError | null | undefined> };
+    const instanceData = jsHint as JSHintInstance & { data?: JSHintDataMethod };
+    const functionData = jsHint.JSHINT as unknown as { data?: JSHintDataMethod };
+    const dataMethod = instanceData.data ?? functionData.data;
+    if (typeof dataMethod !== `function`) {
+      logger(`error`, `data() method not available in JSHint instance`);
+      return [];
+    }
+    const result = dataMethod.call(jsHint.JSHINT || jsHint);
+    const diagnostics: vscode.Diagnostic[] = [];
 
-          logger(`debug`, `analysis started: ${document.fileName}`);
+    if (result && Array.isArray(result.errors)) {
+      let errorCount = 0;
+      let warningCount = 0;
+      let infoCount = 0;
 
-          const isValid = jsHint.JSHINT(processedCode, config);
-
-          return isValid ? (
-	logger(`debug`, `analysis completed: no errors (${document.fileName})`),
-	[]
-) : (() => {
-                const dataMethod = (jsHint as any).data || (jsHint.JSHINT as any)?.data;
-                const hasDataMethod = typeof dataMethod === `function`;
-
-                return !hasDataMethod ? (
-	logger(`error`, `data() method not available in JSHint instance`),
-	[]
-) : (() => {
-                      const result = dataMethod.call(jsHint.JSHINT || jsHint);
-                      const diagnostics: vscode.Diagnostic[] = [];
-
-                      if (result && Array.isArray(result.errors)) {
-                        let errorCount = 0;
-                        let warningCount = 0;
-                        let infoCount = 0;
-
-                        for (const error of result.errors) {
-                          if (!error || error.line === null || error.line === undefined) {
-                          	continue;
-                          }
-                          const range = calculateErrorRange(document, error);
-                          const severity = calculateSeverity(error);
-                          const message = error.reason || `JSHint error`;
-                          const diagnostic = new vscode.Diagnostic(range, message, severity);
-
-                          diagnostic.source = `JSHint`;
-                          diagnostic.code = error.code;
-                          (diagnostic as any).data = {
-                            ruleId: error.code,
-                            line: error.line,
-                            character: error.character,
-                            evidence: error.evidence,
-                            reason: error.reason,
-                            originalRange: range,
-                          };
-
-                          diagnostics.push(diagnostic);
-
-                          severity === vscode.DiagnosticSeverity.Error ? errorCount++ : severity === vscode.DiagnosticSeverity.Warning ? warningCount++ : infoCount++;
-                        }
-                        logger(`debug`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
-                      }
-                      const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
-                      diagnostics.push(...additionalDiagnostics);
-
-                      const totalIssues = diagnostics.length;
-                      const additionalIssues = additionalDiagnostics.length;
-
-                      additionalIssues > 0 && logger(`debug`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
-                      logger(`debug`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
-
-                      return diagnostics;
-                    })();
-              })();
+      for (const error of result.errors) {
+        if (!error || error.line === null || error.line === undefined) {
+          continue;
         }
-        catch (error: any) {
-          const errorMessage = error?.message || String(error);
-          const errorStack = error?.stack || ``;
-          logger(`error`, `execution error: ${errorMessage} (${document.fileName})`);
-          errorStack && logger(`debug`, `stack trace: ${errorStack}`);
-          return [];
-        }
-      })();
+        const range = calculateErrorRange(document, error);
+        const severity = calculateSeverity(error);
+        const message = error.reason || `JSHint error`;
+        const diagnostic = new vscode.Diagnostic(range, message, severity);
+
+        diagnostic.source = `JSHint`;
+        diagnostic.code = error.code;
+        (diagnostic as any).data = {
+          ruleId: error.code,
+          line: error.line,
+          character: error.character,
+          evidence: error.evidence,
+          reason: error.reason,
+          originalRange: range,
+        };
+
+        diagnostics.push(diagnostic);
+
+        severity === vscode.DiagnosticSeverity.Error ? errorCount++ : severity === vscode.DiagnosticSeverity.Warning ? warningCount++ : infoCount++;
+      }
+      logger(`debug`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
+    }
+    const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
+    diagnostics.push(...additionalDiagnostics);
+
+    const totalIssues = diagnostics.length;
+    const additionalIssues = additionalDiagnostics.length;
+
+    if (additionalIssues > 0) {
+      logger(`debug`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
+    }
+    logger(`debug`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
+
+    return diagnostics;
+  }
+  catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack ?? `` : ``;
+    logger(`error`, `execution error: ${errorMessage} (${document.fileName})`);
+    if (errorStack) {
+      logger(`debug`, `stack trace: ${errorStack}`);
+    }
+    return [];
+  }
 };

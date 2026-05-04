@@ -21,7 +21,7 @@ export const getRuleId = (diagnostic: Diagnostic): string | undefined => {
     return diagnosticData?.ruleId ?? diagnostic.code?.toString();
   }
   catch {
-    return ;
+    return undefined;
   }
 };
 

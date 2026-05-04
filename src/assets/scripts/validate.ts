@@ -8,6 +8,7 @@ import { isCssHintEnabled, isHtmlHintEnabled, isJsHintEnabled } from "@exportCon
 import { analyzeCssCode, generateCssAnalysisDiagnostics, runHtmlHint, runJSHint } from "@exportLangs";
 import type { vscode } from "@exportLibs";
 import { isAnalyzable, logger } from "@exportScripts";
+import type { SelectorPos } from "@exportTypes";
 import type { CssSupportLike } from "@langs/css/cssType";
 import { collectKnownSelectors, scanDocumentUsages, scanEmbeddedUnused } from "@langs/css/cssUtils";
 
@@ -38,27 +39,34 @@ const isJsLikeDoc = (doc: vscode.TextDocument) => {
 export type { CssSupportLike } from "@langs/css/cssType";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike): Promise<vscode.Diagnostic[]> => {
+export const validateDocument = async (doc: vscode.TextDocument, support: CssSupportLike, text?: string): Promise<vscode.Diagnostic[]> => {
   if (!isAnalyzable(doc)) {
   	return [];
   }
   logger(`debug`, `started: ${doc.fileName}`);
-  const allStyles = await support.getStyles(doc);
-  const { knownClasses, knownIds } = collectKnownSelectors(allStyles);
-  const fullText = doc.getText();
+  const fullText = text ?? doc.getText();
   const isHtml = isHtmlDoc(doc);
   const isJs = isJsLikeDoc(doc);
 
   const shouldCheckCssUsage = isCssHintEnabled(doc.uri) && (isHtml || isJs);
-  const {
-    diagnostics: usageDiagnostics,
-    usedClassesFromMarkup,
-    usedIdsFromMarkup,
-  } = shouldCheckCssUsage ? scanDocumentUsages(fullText, doc, knownClasses, knownIds) : {
+  let allStyles = shouldCheckCssUsage ? await support.getStyles(doc, { fullText, includeWorkspace: false }) : new Map<string, SelectorPos[]>();
+  let { knownClasses, knownIds } = collectKnownSelectors(allStyles);
+  let usageResult = shouldCheckCssUsage ? scanDocumentUsages(fullText, doc, knownClasses, knownIds) : {
         diagnostics: [],
         usedClassesFromMarkup: new Set<string>(),
         usedIdsFromMarkup: new Set<string>(),
       };
+
+  if (shouldCheckCssUsage && usageResult.diagnostics.length > 0) {
+    allStyles = await support.getStyles(doc, { fullText, includeWorkspace: true });
+    ({ knownClasses, knownIds } = collectKnownSelectors(allStyles));
+    usageResult = scanDocumentUsages(fullText, doc, knownClasses, knownIds);
+  }
+  const {
+    diagnostics: usageDiagnostics,
+    usedClassesFromMarkup,
+    usedIdsFromMarkup,
+  } = usageResult;
 
   let unusedDiagnostics: vscode.Diagnostic[] = [];
   const lintDiagnostics: vscode.Diagnostic[] = [];
@@ -77,7 +85,9 @@ export const validateDocument = async (doc: vscode.TextDocument, support: CssSup
   }
   // HTML 파일 검사
   if (isHtml) {
-    isCssHintEnabled(doc.uri) && (unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup));
+    if (shouldCheckCssUsage) {
+      unusedDiagnostics = await scanEmbeddedUnused(doc, support, usedClassesFromMarkup, usedIdsFromMarkup, fullText);
+    }
     if (isHtmlHintEnabled(doc.uri)) {
       try {
         const htmlHintDiagnostics = runHtmlHint(doc);

@@ -51,6 +51,8 @@ export type UnusedSeverity = never;
 const EXTENSION_CONFIG_SECTION = `Html-Js-Css-Analyzer`;
 const DEFAULT_ANALYZABLE_EXTENSIONS = [`html`, `htm`, `js`, `mjs`, `css`];
 const EXTENSION_VALIDATION_REGEX = /^[\d_a-z-]{1,16}$/;
+const EXTENSION_PREFIX_REGEX = /^\./;
+const configValueCache = new Map<string, unknown>();
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const getConfiguration = (
@@ -59,12 +61,37 @@ const getConfiguration = (
 	vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION, resource);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+const getConfigCacheKey = (resource: vscode.Uri | undefined, key: string): string =>
+	`${resource?.toString() ?? `window`}::${key}`;
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+const getCachedConfigValue = <T>(
+	resource: vscode.Uri | undefined,
+	key: string,
+	fallback: T,
+): T => {
+	const cacheKey = getConfigCacheKey(resource, key);
+	if (configValueCache.has(cacheKey)) {
+		return configValueCache.get(cacheKey) as T;
+	}
+	const rs = getConfiguration(resource).get<T>(key, fallback);
+	configValueCache.set(cacheKey, rs);
+	return rs;
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export const clearConfigurationCache = (): void => {
+	configValueCache.clear();
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const getLogLevel = (resource?: vscode.Uri): LogLevel =>
-	getConfiguration(resource).get<LogLevel>(`logLevel`, `off`);
+	getCachedConfigValue<LogLevel>(resource, `logLevel`, `off`);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const getCssExcludePatterns = (resource?: vscode.Uri): string[] => {
-	const patterns = getConfiguration(resource).get<string[]>(
+	const patterns = getCachedConfigValue<string[]>(
+		resource,
 		`exclude`,
 		DEFAULT_CSS_EXCLUDE,
 	);
@@ -83,11 +110,14 @@ export const getAnalyzableExtensions = (resource?: vscode.Uri): string[] => {
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const getAdditionalExtensions = (resource?: vscode.Uri): string[] => {
-	const extensions =
-		getConfiguration(resource).get<string[]>(`additionalExtensions`, []) || [];
+	const extensions = getCachedConfigValue<string[]>(
+		resource,
+		`additionalExtensions`,
+		[],
+	);
 	const rs = extensions
 		.filter((ext: string): ext is string => typeof ext === `string`)
-		.map((ext: string) => ext.trim().replace(/^\./, ``).toLowerCase())
+		.map((ext: string) => ext.trim().replace(EXTENSION_PREFIX_REGEX, ``).toLowerCase())
 		.filter((ext: string) => EXTENSION_VALIDATION_REGEX.test(ext))
 		.filter(
 			(ext: string, index: number, array: string[]) =>
@@ -98,12 +128,12 @@ export const getAdditionalExtensions = (resource?: vscode.Uri): string[] => {
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const isHtmlHintEnabled = (resource?: vscode.Uri): boolean =>
-	getConfiguration(resource).get<boolean>(`htmlHint.enabled`, true);
+	getCachedConfigValue<boolean>(resource, `htmlHint.enabled`, true);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const isCssHintEnabled = (resource?: vscode.Uri): boolean =>
-	getConfiguration(resource).get<boolean>(`cssHint.enabled`, true);
+	getCachedConfigValue<boolean>(resource, `cssHint.enabled`, true);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const isJsHintEnabled = (resource?: vscode.Uri): boolean =>
-	getConfiguration(resource).get<boolean>(`jsHint.enabled`, true);
+	getCachedConfigValue<boolean>(resource, `jsHint.enabled`, true);

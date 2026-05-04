@@ -46,7 +46,12 @@ const lineAtOffset = (offsets: number[], offset: number): number => {
   let hi = offsets.length - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    offsets[mid] <= offset ? (lo = mid) : (hi = mid - 1);
+    if (offsets[mid] <= offset) {
+      lo = mid;
+    }
+    else {
+      hi = mid - 1;
+    }
   }
   return lo + 1;
 };

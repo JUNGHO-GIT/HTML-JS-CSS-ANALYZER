@@ -36,15 +36,26 @@ export const calculateErrorRange = (document: vscode.TextDocument, error: JSHint
   let startColumn = columnNumber;
   let endColumn = columnNumber + 1;
 
-  error.code && (() => {
-    const match = ERROR_W033_CODES.has(error.code) ? (
-      (endColumn = lineText.trimEnd().length),
-      (startColumn = Math.max(endColumn - 1, 0)),
-      null
-    ) : ERROR_W116_W117_CODES.has(error.code) ? W116_W117_REGEX.exec(lineText.slice(columnNumber)) : ERROR_W030_CODES.has(error.code) ? W030_REGEX.exec(lineText.slice(columnNumber)) : DEFAULT_TOKEN_REGEX.exec(lineText.slice(columnNumber));
-
-      match && ((startColumn = columnNumber), (endColumn = columnNumber + match[0].length));
-  })();
+  if (error.code) {
+    let match: RegExpExecArray | null = null;
+    if (ERROR_W033_CODES.has(error.code)) {
+      endColumn = lineText.trimEnd().length;
+      startColumn = Math.max(endColumn - 1, 0);
+    }
+    else if (ERROR_W116_W117_CODES.has(error.code)) {
+      match = W116_W117_REGEX.exec(lineText.slice(columnNumber));
+    }
+    else if (ERROR_W030_CODES.has(error.code)) {
+      match = W030_REGEX.exec(lineText.slice(columnNumber));
+    }
+    else {
+      match = DEFAULT_TOKEN_REGEX.exec(lineText.slice(columnNumber));
+    }
+    if (match) {
+      startColumn = columnNumber;
+      endColumn = columnNumber + match[0].length;
+    }
+  }
 
   startColumn = clamp(startColumn, 0, lineText.length);
   endColumn = clamp(endColumn, startColumn + 1, lineText.length);
@@ -53,9 +64,18 @@ export const calculateErrorRange = (document: vscode.TextDocument, error: JSHint
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const calculateSeverity = (error: JSHintError): vscode.DiagnosticSeverity => (
-    !error.code ? vscode.DiagnosticSeverity.Warning : error.code.startsWith(`E`) && ERROR_CODES.has(error.code) ? vscode.DiagnosticSeverity.Error : WARNING_CODES.has(error.code) ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information
-  );
+export const calculateSeverity = (error: JSHintError): vscode.DiagnosticSeverity => {
+  if (!error.code) {
+    return vscode.DiagnosticSeverity.Warning;
+  }
+  if (error.code.startsWith(`E`) && ERROR_CODES.has(error.code)) {
+    return vscode.DiagnosticSeverity.Error;
+  }
+  if (WARNING_CODES.has(error.code)) {
+    return vscode.DiagnosticSeverity.Warning;
+  }
+  return vscode.DiagnosticSeverity.Information;
+};
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const isJsLikeDocument = (doc: vscode.TextDocument): boolean => {

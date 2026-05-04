@@ -13,6 +13,14 @@ import { AutoValidationMode } from "@exportTypes";
 const BASE_VALIDATION_DELAY_MS = 250;
 const MAX_VALIDATION_DELAY_MS = 1000;
 const RAPID_CHANGE_THRESHOLD = 5;
+const MAX_VALIDATION_TEXT_CACHE_CHARS = 500_000;
+
+type ValidationSnapshot = {
+  cssDiagnostics: vscode.Diagnostic[];
+  htmlHintDiagnostics: vscode.Diagnostic[];
+  jsHintDiagnostics: vscode.Diagnostic[];
+  text: string;
+};
 
 // DIAGNOSTIC MANAGER CLASS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 class DiagnosticManager {
@@ -21,6 +29,7 @@ class DiagnosticManager {
   private readonly jsHintCollection: vscode.DiagnosticCollection;
   private readonly debounceTimers: Map<string, NodeJS.Timeout>;
   private readonly lastValidatedVersions: Map<string, number>;
+  private readonly lastValidationSnapshots: Map<string, ValidationSnapshot>;
   private readonly changeCounters: Map<string, number>;
   private readonly lastChangeTimestamps: Map<string, number>;
   private cssSupportInstance: CssSupport | null = null;
@@ -30,12 +39,34 @@ class DiagnosticManager {
     this.jsHintCollection = vscode.languages.createDiagnosticCollection(`JSHint`);
     this.debounceTimers = new Map();
     this.lastValidatedVersions = new Map();
+    this.lastValidationSnapshots = new Map();
     this.changeCounters = new Map();
     this.lastChangeTimestamps = new Map();
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   bindCssSupport(cssSupport: CssSupport): void {
     this.cssSupportInstance = cssSupport;
+  }
+  // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+  private applySnapshot(document: vscode.TextDocument, snapshot: ValidationSnapshot): void {
+    this.cssCollection.set(document.uri, snapshot.cssDiagnostics);
+    this.htmlHintCollection.set(document.uri, snapshot.htmlHintDiagnostics);
+    this.jsHintCollection.set(document.uri, snapshot.jsHintDiagnostics);
+    this.lastValidatedVersions.set(document.uri.toString(), document.version);
+  }
+  // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+  private storeSnapshot(documentKey: string, text: string, cssDiagnostics: vscode.Diagnostic[], htmlHintDiagnostics: vscode.Diagnostic[], jsHintDiagnostics: vscode.Diagnostic[]): void {
+    text.length <= MAX_VALIDATION_TEXT_CACHE_CHARS ? this.lastValidationSnapshots.set(documentKey, {
+        cssDiagnostics,
+        htmlHintDiagnostics,
+        jsHintDiagnostics,
+        text,
+      }) : this.lastValidationSnapshots.delete(documentKey);
+  }
+  // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+  clearValidationState(): void {
+    this.lastValidatedVersions.clear();
+    this.lastValidationSnapshots.clear();
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void {
@@ -68,43 +99,60 @@ class DiagnosticManager {
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> {
-    !isAnalyzable(document) ? (
-	this.cssCollection.delete(document.uri),
-	this.htmlHintCollection.delete(document.uri),
-	this.jsHintCollection.delete(document.uri)
-) : await (async () => {
-        try {
-          const isForceMode = triggerMode === AutoValidationMode.FORCE;
-          const documentKey = document.uri.toString();
-          const lastVersion = this.lastValidatedVersions.get(documentKey);
-          !isForceMode && lastVersion === document.version ? void 0 : await (async () => {
-              const result = await cssSupport.validate(document);
-              const cssDiagnostics = result.filter((d) => d.source === `CSS-Analyzer`);
-              const htmlHintDiagnostics = result.filter((d) => d.source === `HTMLHint`);
-              const jsHintDiagnostics = result.filter((d) => d.source === `JSHint`);
-              this.cssCollection.set(document.uri, cssDiagnostics);
-              this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
-              this.jsHintCollection.set(document.uri, jsHintDiagnostics);
-              this.lastValidatedVersions.set(documentKey, document.version);
-              logger(`debug`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
-            })();
-        }
-        catch (error: any) {
-          const errorMessage = error?.stack || error?.message || String(error);
-          logger(`error`, `update error: ${errorMessage}`);
-        }
-      })();
+    const documentKey = document.uri.toString();
+    const isForceMode = triggerMode === AutoValidationMode.FORCE;
+    const lastVersion = this.lastValidatedVersions.get(documentKey);
+    if (!isForceMode && lastVersion === document.version) {
+      return;
+    }
+    let currentText: string | undefined;
+    const snapshot = this.lastValidationSnapshots.get(documentKey);
+    if (!isForceMode && snapshot) {
+      currentText = document.getText();
+      if (snapshot.text === currentText) {
+        this.applySnapshot(document, snapshot);
+        return;
+      }
+    }
+    if (!isAnalyzable(document)) {
+      this.cssCollection.delete(document.uri);
+      this.htmlHintCollection.delete(document.uri);
+      this.jsHintCollection.delete(document.uri);
+      this.lastValidationSnapshots.delete(documentKey);
+      return;
+    }
+    try {
+      currentText ??= document.getText();
+      const result = await cssSupport.validate(document, currentText);
+      const cssDiagnostics = result.filter((d) => d.source === `CSS-Analyzer`);
+      const htmlHintDiagnostics = result.filter((d) => d.source === `HTMLHint`);
+      const jsHintDiagnostics = result.filter((d) => d.source === `JSHint`);
+      this.cssCollection.set(document.uri, cssDiagnostics);
+      this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
+      this.jsHintCollection.set(document.uri, jsHintDiagnostics);
+      this.lastValidatedVersions.set(documentKey, document.version);
+      this.storeSnapshot(documentKey, currentText, cssDiagnostics, htmlHintDiagnostics, jsHintDiagnostics);
+      logger(`debug`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
+    }
+    catch (error: unknown) {
+      const errorMessage = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      logger(`error`, `update error: ${errorMessage}`);
+    }
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   handleDocumentClosed(document: vscode.TextDocument): void {
     const documentKey = document.uri.toString();
     const timer = this.debounceTimers.get(documentKey);
-    timer && (clearTimeout(timer), this.debounceTimers.delete(documentKey));
+    if (timer) {
+      clearTimeout(timer);
+      this.debounceTimers.delete(documentKey);
+    }
     this.cssCollection.delete(document.uri);
     this.htmlHintCollection.delete(document.uri);
     this.jsHintCollection.delete(document.uri);
     cacheDelete(documentKey);
     this.lastValidatedVersions.delete(documentKey);
+    this.lastValidationSnapshots.delete(documentKey);
     this.changeCounters.delete(documentKey);
     this.lastChangeTimestamps.delete(documentKey);
   }
@@ -113,7 +161,7 @@ class DiagnosticManager {
     const cacheCountBefore = cacheSize();
 
     cacheClear();
-    this.lastValidatedVersions.clear();
+    this.clearValidationState();
     this.cssSupportInstance?.clearWorkspaceIndex();
 
     vscode.window.showInformationMessage(`Style cache cleared: ${cacheCountBefore}`);
@@ -145,4 +193,9 @@ export const bindCssSupport = (cssSupport: CssSupport): void => {
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const clearAll = (): void => {
   diagnosticManager.clearAllCache();
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export const clearValidationState = (): void => {
+  diagnosticManager.clearValidationState();
 };
