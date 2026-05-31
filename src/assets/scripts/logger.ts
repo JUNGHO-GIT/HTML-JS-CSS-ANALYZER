@@ -6,128 +6,124 @@
 
 import { vscode } from "@exportLibs";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+const TLR024 = /^\s+/gm;
 const MAIN = `Html-Js-Css-Analyzer`;
-const logLevelMap = {
-  debug: 0,
-  info: 1,
-  hint: 2,
-  warn: 3,
-  error: 4,
-  off: 5,
-};
-let outputChannel: vscode.OutputChannel | null = null;
-let cachedLogLevel: number | null = null;
-let configWatcher: vscode.Disposable | null = null;
+const LOG_LEVEL_MAP = {
+  "off": 0,
+  "debug": 10,
+  "info": 20,
+  "hint": 30,
+  "warn": 40,
+  "error": 50,
+} as const;
+const LOG_CONFIG = {
+  "line": {
+    "str": `―――――――――――――――――――――――――――――――――――――――――`,
+    "color": `\u001B[38;2;255;162;0m`,
+  },
+  "debug": {
+    "str": `[D]`,
+    "color": `\u001B[38;5;141m`,
+  },
+  "info": {
+    "str": `[I]`,
+    "color": `\u001B[38;5;111m`,
+  },
+  "hint": {
+    "str": `[H]`,
+    "color": `\u001B[38;5;45m`,
+  },
+  "warn": {
+    "str": `[W]`,
+    "color": `\u001B[38;5;220m`,
+  },
+  "error": {
+    "str": `[E]`,
+    "color": `\u001B[38;5;196m`,
+  },
+  "reset": {
+    "str": ``,
+    "color": `\u001B[0m`,
+  },
+} as const;
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+type LogType = Exclude<keyof typeof LOG_LEVEL_MAP, `off`>;
+
+let otptChnn: vscode.OutputChannel | null = null;
+let cchdLgLvl: number | null = null;
+let cfgWtch: vscode.Disposable | null = null;
+
+// 1. Init logger ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const initLogger = (context?: vscode.ExtensionContext): void => {
-  if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel(MAIN);
-  }
-  if (!configWatcher && typeof vscode.workspace.onDidChangeConfiguration === `function`) {
-    configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
+  otptChnn ??= vscode.window.createOutputChannel(MAIN);
+
+  if (!cfgWtch && typeof vscode.workspace.onDidChangeConfiguration === `function`) {
+    cfgWtch = vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration || event.affectsConfiguration(MAIN)) {
-        cachedLogLevel = null;
+        cchdLgLvl = null;
       }
     });
-    context?.subscriptions.push(configWatcher);
+    context?.subscriptions.push(cfgWtch);
   }
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// 2. Get log level ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const getLogLevel = (): number => {
-  if (cachedLogLevel !== null) {
-    return cachedLogLevel;
+  if (cchdLgLvl !== null) {
+    return cchdLgLvl;
   }
   const config = vscode.workspace.getConfiguration(MAIN);
   const level = config.get<string>(`logLevel`, `info`);
-  const rs = logLevelMap[level as keyof typeof logLevelMap] ?? logLevelMap.info;
-  cachedLogLevel = rs;
-  return rs;
+  const result = LOG_LEVEL_MAP[level as keyof typeof LOG_LEVEL_MAP] ?? LOG_LEVEL_MAP.info;
+  cchdLgLvl = result;
+  return result;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const appendOutput = (levelKey: keyof typeof logLevelMap, msg: string, activeLevel: number): void => {
-  outputChannel && logLevelMap[levelKey] >= activeLevel && outputChannel.appendLine(msg);
-};
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const formatLog = (text=``): string => text.trim().replaceAll(/^\s+/gm, ``);
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const logger = (type: `debug` | `info` | `hint` | `warn` | `error`, value: string): void => {
+// 3. Should log ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+const shouldLog = (type: LogType): boolean => {
   const activeLevel = getLogLevel();
-  if (logLevelMap[type] < activeLevel) {
+  return activeLevel !== LOG_LEVEL_MAP.off && LOG_LEVEL_MAP[type] >= activeLevel;
+};
+
+// 4. Format log ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+const formatLog = (text = ``): string => text.trim().replaceAll(TLR024, ``);
+
+// 5. Append output ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+const appendOutput = (message: string): void => {
+  otptChnn?.appendLine(message);
+};
+
+// 6. Logger ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+export const logger = (type: LogType, value: string): void => {
+  if (!shouldLog(type)) {
     return;
   }
-  const config = {
-    line: {
-      str: `―――――――――――――――――――――――――――――――――――――――--`,
-      color: `\u001B[38;2;255;162;0m`,
-    },
-    title: {
-      str: `[${MAIN}]`,
-      color: `\u001B[38;2;78;201;176m`,
-    },
-    debug: {
-      str: `[DEBUG]`,
-      color: `\u001B[38;5;141m`,
-    },
-    info: {
-      str: `[INFO]`,
-      color: `\u001B[38;5;46m`,
-    },
-    hint: {
-      str: `[HINT]`,
-      color: `\u001B[38;5;39m`,
-    },
-    warn: {
-      str: `[WARN]`,
-      color: `\u001B[38;5;214m`,
-    },
-    error: {
-      str: `[ERROR]`,
-      color: `\u001B[38;5;196m`,
-    },
-    reset: {
-      str: ``,
-      color: `\u001B[0m`,
-    },
-  };
-  const separator = `${config.reset.color}${config.line.color}${config.line.str}${config.reset.color}`;
-  const title = `${config.reset.color}${config.title.color}${config.title.str}${config.reset.color}`;
-  const level = `${config.reset.color}${config[type].color}${config[type].str}${config.reset.color}`;
+
+  const levelConfig = LOG_CONFIG[type];
+  const level = `${LOG_CONFIG.reset.color}${levelConfig.color}${levelConfig.str}${LOG_CONFIG.reset.color}`;
+  const text = `${levelConfig.color}${value}${LOG_CONFIG.reset.color}`;
   const logMsg = formatLog(`
-  ${separator}
-  ${title} ${level}
-  ${value}
+    ${level} ${text}
   `);
   const outputMsg = formatLog(`
-  ${config.line.str}
-  ${config[type].str} - ${value}
+    ${levelConfig.str} ${value}
   `);
 
-  switch (type) {
-    case `debug`:
-      console.debug(logMsg);
-      appendOutput(`debug`, outputMsg, activeLevel);
-      break;
-    case `info`:
-      console.info(logMsg);
-      appendOutput(`info`, outputMsg, activeLevel);
-      break;
-    case `hint`:
-      console.log(logMsg);
-      appendOutput(`hint`, outputMsg, activeLevel);
-      break;
-    case `warn`:
-      console.warn(logMsg);
-      appendOutput(`warn`, outputMsg, activeLevel);
-      break;
-    case `error`:
-      console.error(logMsg);
-      appendOutput(`error`, outputMsg, activeLevel);
-      break;
+  if (type === `debug`) {
+    console.debug(logMsg);
   }
+  else if (type === `info`) {
+    console.info(logMsg);
+  }
+  else if (type === `hint`) {
+    console.log(logMsg);
+  }
+  else if (type === `warn`) {
+    console.warn(logMsg);
+  }
+  else if (type === `error`) {
+    console.error(logMsg);
+  }
+
+  appendOutput(outputMsg);
 };

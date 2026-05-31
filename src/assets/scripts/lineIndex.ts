@@ -21,12 +21,12 @@ export type LineIndex = {
 };
 
 // HELPERS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-const objectToString = {}.toString;
-const isArray = Array.isArray || ((value: unknown) => objectToString.call(value) === `[object Array]`);
-const isPlainObject = (value: unknown) => value != null && typeof value === `object` && !1 === isArray(value);
+const objcTStr = {}.toString;
+const isArray = Array.isArray || ((value: unknown) => objcTStr.call(value) === `[object Array]`);
+const isPlnObjc = (value: unknown) => value != null && typeof value === `object` && !1 === isArray(value);
 
 // MAIN FUNCTION ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-export const LineIndexMapper: LineIndexMapperOverload = ((text: string, options?: { origin?: number } | number): LineIndex | FromIndexPos => {
+export const LnIdxMap: LineIndexMapperOverload = ((text: string, options?: { origin?: number } | number): LineIndex | FromIndexPos => {
   const fnCreate = (sourceText: string, opts?: { origin?: number }): LineIndex => {
     const str = sourceText || ``;
     const lines = str.split(`\n`);
@@ -53,7 +53,7 @@ export const LineIndexMapper: LineIndexMapperOverload = ((text: string, options?
     };
 
     const toIndex = (line: number | number[] | { line: number; col?: number; column?: number }, col?: number): number => {
-      const rs = void 0 === col ? isArray(line) && line.length >= 2 ? toIndex(line[0], line[1]) : isPlainObject(line) && `line` in (line as any) ? (() => {
+      const rs = void 0 === col ? isArray(line) && line.length >= 2 ? toIndex(line[0], line[1]) : isPlnObjc(line) && `line` in (line as any) ? (() => {
               const obj = line as { line: number; col?: number; column?: number };
               const v = `col` in obj ? (obj.col as number) : (obj.column as number);
               return toIndex(obj.line, v);

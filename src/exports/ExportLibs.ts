@@ -7,17 +7,17 @@
 import * as fs from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
-import { createRequire } from "node:module";
+import { createRequire as crtRqr } from "node:module";
 import * as path from "node:path";
 import { TextDecoder, TextEncoder } from "node:util";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 import * as vscode from "vscode";
 
-const { CodeAction, CodeActionKind, Diagnostic, DiagnosticSeverity, Position, Range } = vscode;
+const { CodeAction, CodeActionKind: CdActnKnd, Diagnostic, DiagnosticSeverity: DiagSvrt, Position, Range } = vscode;
 
 type CodeAction = vscode.CodeAction;
 type Diagnostic = vscode.Diagnostic;
 type Position = vscode.Position;
 type Range = vscode.Range;
 
-export { CodeAction, CodeActionKind, createRequire, Diagnostic, DiagnosticSeverity, fs, http, https, Position, path, Range, TextDecoder, TextEncoder, vscode };
+export { CodeAction, CdActnKnd as CodeActionKind, crtRqr as createRequire, Diagnostic, DiagSvrt as DiagnosticSeverity, fs, http, https, Position, path, Range, TextDecoder, TextEncoder, vscode };

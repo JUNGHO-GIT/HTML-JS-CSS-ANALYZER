@@ -4,26 +4,26 @@
  * @description JS 코드 액션 및 Quick Fix 제공
  */
 
-import { CodeAction, CodeActionKind, type Diagnostic, Position, type Range, vscode } from "@exportLibs";
+import { CodeAction, CodeActionKind as CdActnKnd, type Diagnostic, Position, type Range, vscode } from "@exportLibs";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   static readonly metadata: vscode.CodeActionProviderMetadata = {
-    providedCodeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.Source],
+    providedCodeActionKinds: [CdActnKnd.QuickFix, CdActnKnd.Source],
   };
 
   provideCodeActions(document: vscode.TextDocument, _range: Range | vscode.Selection, context: vscode.CodeActionContext): CodeAction[] {
     const actions: CodeAction[] = [];
-    const jsHintDiagnostics = context.diagnostics.filter((diag) => diag.source === `JSHint`);
+    const jsHntDiags = context.diagnostics.filter((diag) => diag.source === `JSHint`);
 
-    jsHintDiagnostics.forEach((diagnostic) => {
+    jsHntDiags.forEach((diagnostic) => {
       const quickFixes = this.createAdvancedQuickFixes(document, diagnostic);
       actions.push(...quickFixes);
     });
 
-    if (jsHintDiagnostics.length > 0) {
-      const sourceActions = this.createSourceActions(document, jsHintDiagnostics);
-      actions.push(...sourceActions);
+    if (jsHntDiags.length > 0) {
+      const srcActn = this.createSourceActions(document, jsHntDiags);
+      actions.push(...srcActn);
     }
 
     return actions;
@@ -31,9 +31,9 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createAdvancedQuickFixes(document: vscode.TextDocument, diagnostic: Diagnostic): CodeAction[] {
     const actions: CodeAction[] = [];
-    const diagnosticData = (diagnostic as any).data;
-    const code = diagnosticData?.ruleId || diagnostic.code?.toString();
-    const _evidence = diagnosticData?.evidence || ``;
+    const diagDt = (diagnostic as any).data;
+    const code = diagDt?.ruleId || diagnostic.code?.toString();
+    const _evidence = diagDt?.evidence || ``;
 
     if (!code) {
       return actions;
@@ -73,7 +73,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const actions: CodeAction[] = [];
     const line = diagnostic.range.end.line;
     const lineText = document.lineAt(line).text;
-    const addSemicolon = new CodeAction(`Add semicolon`, CodeActionKind.QuickFix);
+    const addSemicolon = new CodeAction(`Add semicolon`, CdActnKnd.QuickFix);
     const edit1 = new vscode.WorkspaceEdit();
     const endOfLine = new Position(line, lineText.trimEnd().length);
 
@@ -92,7 +92,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const eqIndex = lineText.indexOf(`==`);
 
     if (eqIndex >= 0 && lineText.charAt(eqIndex + 2) !== `=`) {
-      const fixEquality = new CodeAction(`Change '==' to '==='`, CodeActionKind.QuickFix);
+      const fixEquality = new CodeAction(`Change '==' to '==='`, CdActnKnd.QuickFix);
       const edit = new vscode.WorkspaceEdit();
       const range = new vscode.Range(new Position(diagnostic.range.start.line, eqIndex), new Position(diagnostic.range.start.line, eqIndex + 2));
 
@@ -108,7 +108,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createUndefinedVariableFixes(document: vscode.TextDocument, diagnostic: Diagnostic): CodeAction[] {
     const actions: CodeAction[] = [];
-    const addComment = new CodeAction(`Mark with comment`, CodeActionKind.QuickFix);
+    const addComment = new CodeAction(`Mark with comment`, CdActnKnd.QuickFix);
     const edit = new vscode.WorkspaceEdit();
     const insertPos = new Position(diagnostic.range.start.line, 0);
 
@@ -122,7 +122,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createUnusedVariableFixes(document: vscode.TextDocument, diagnostic: Diagnostic): CodeAction[] {
     const actions: CodeAction[] = [];
-    const removeVar = new CodeAction(`Remove unused variable`, CodeActionKind.QuickFix);
+    const removeVar = new CodeAction(`Remove unused variable`, CdActnKnd.QuickFix);
     const edit = new vscode.WorkspaceEdit();
     const range = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line + 1, 0));
 
@@ -141,7 +141,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
     const varIndex = lineText.indexOf(`var`);
 
     if (varIndex >= 0) {
-      const toConst = new CodeAction(`Change 'var' to 'const'`, CodeActionKind.QuickFix);
+      const toConst = new CodeAction(`Change 'var' to 'const'`, CdActnKnd.QuickFix);
       const edit1 = new vscode.WorkspaceEdit();
       const range = new vscode.Range(new Position(diagnostic.range.start.line, varIndex), new Position(diagnostic.range.start.line, varIndex + 3));
 
@@ -151,7 +151,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
       toConst.isPreferred = true;
       actions.push(toConst);
 
-      const toLet = new CodeAction(`Change 'var' to 'let'`, CodeActionKind.QuickFix);
+      const toLet = new CodeAction(`Change 'var' to 'let'`, CdActnKnd.QuickFix);
       const edit2 = new vscode.WorkspaceEdit();
       edit2.replace(document.uri, range, `let`);
       toLet.edit = edit2;
@@ -164,7 +164,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createStrictModeFixes(document: vscode.TextDocument, diagnostic: Diagnostic): CodeAction[] {
     const actions: CodeAction[] = [];
-    const addStrict = new CodeAction(`Add 'use strict' at file start`, CodeActionKind.QuickFix);
+    const addStrict = new CodeAction(`Add 'use strict' at file start`, CdActnKnd.QuickFix);
     const edit = new vscode.WorkspaceEdit();
 
     edit.insert(document.uri, new Position(0, 0), `'use strict';\n\n`);
@@ -179,40 +179,40 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   private createAnalysisFixes(document: vscode.TextDocument, diagnostic: Diagnostic, code: string): CodeAction[] {
     const actions: CodeAction[] = [];
     const lineText = document.lineAt(diagnostic.range.start.line).text;
-    const bugFix = new CodeAction(`Fix ${code} issue`, CodeActionKind.QuickFix);
+    const bugFix = new CodeAction(`Fix ${code} issue`, CdActnKnd.QuickFix);
     const edit = new vscode.WorkspaceEdit();
 
     if (code === `bug-console-usage`) {
-      const removeConsole = new CodeAction(`Remove console statement`, CodeActionKind.QuickFix);
+      const rmvCnsl = new CodeAction(`Remove console statement`, CdActnKnd.QuickFix);
       const edit1 = new vscode.WorkspaceEdit();
       const range = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line + 1, 0));
 
       edit1.delete(document.uri, range);
-      removeConsole.edit = edit1;
-      removeConsole.diagnostics = [diagnostic];
-      removeConsole.isPreferred = true;
-      actions.push(removeConsole);
+      rmvCnsl.edit = edit1;
+      rmvCnsl.diagnostics = [diagnostic];
+      rmvCnsl.isPreferred = true;
+      actions.push(rmvCnsl);
 
-      const commentConsole = new CodeAction(`Comment out console statement`, CodeActionKind.QuickFix);
+      const cmtCnsl = new CodeAction(`Comment out console statement`, CdActnKnd.QuickFix);
       const edit2 = new vscode.WorkspaceEdit();
       const lineRange = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
 
       edit2.replace(document.uri, lineRange, `// ${lineText.trim()}`);
-      commentConsole.edit = edit2;
-      commentConsole.diagnostics = [diagnostic];
-      actions.push(commentConsole);
+      cmtCnsl.edit = edit2;
+      cmtCnsl.diagnostics = [diagnostic];
+      actions.push(cmtCnsl);
     }
     else if (code === `bug-assignment-in-condition`) {
-      const fixAssignment = new CodeAction(`Change assignment to comparison operator`, CodeActionKind.QuickFix);
+      const fxAssg = new CodeAction(`Change assignment to comparison operator`, CdActnKnd.QuickFix);
       const edit3 = new vscode.WorkspaceEdit();
       const newText = lineText.replaceAll(/=(?!=)/g, `===`);
       const lineRange2 = new vscode.Range(new Position(diagnostic.range.start.line, 0), new Position(diagnostic.range.start.line, lineText.length));
 
       edit3.replace(document.uri, lineRange2, newText);
-      fixAssignment.edit = edit3;
-      fixAssignment.diagnostics = [diagnostic];
-      fixAssignment.isPreferred = true;
-      actions.push(fixAssignment);
+      fxAssg.edit = edit3;
+      fxAssg.diagnostics = [diagnostic];
+      fxAssg.isPreferred = true;
+      actions.push(fxAssg);
     }
     else {
       const insertPos = new Position(diagnostic.range.start.line, 0);
@@ -226,7 +226,7 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createGenericFix(document: vscode.TextDocument, diagnostic: Diagnostic, code: string): CodeAction | null {
-    const action = new CodeAction(`Fix ${code}`, CodeActionKind.QuickFix);
+    const action = new CodeAction(`Fix ${code}`, CdActnKnd.QuickFix);
     const edit = new vscode.WorkspaceEdit();
     const insertPos = new Position(diagnostic.range.start.line, 0);
 
@@ -239,14 +239,14 @@ export class JSHintCodeActionProvider implements vscode.CodeActionProvider {
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private createSourceActions(_document: vscode.TextDocument, _diagnostics: Diagnostic[]): CodeAction[] {
     const actions: CodeAction[] = [];
-    const organizeImports = new CodeAction(`Attempt to fix all JSHint issues`, CodeActionKind.Source);
+    const orgnImpr = new CodeAction(`Attempt to fix all JSHint issues`, CdActnKnd.Source);
 
-    organizeImports.command = {
+    orgnImpr.command = {
       title: `Fix JSHint issues`,
       command: `Html-Js-Css-Analyzer.fixAll`,
     };
 
-    actions.push(organizeImports);
+    actions.push(orgnImpr);
 
     return actions;
   }

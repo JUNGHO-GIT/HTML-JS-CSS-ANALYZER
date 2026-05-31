@@ -5,36 +5,36 @@
  */
 
 import type { FixFactory } from "@exportLangs";
-import { getDocumentLine, getHeadMatch, getRuleId, makeQuickFix } from "@exportLangs";
-import { type CodeAction, CodeActionKind, Position, Range, type vscode } from "@exportLibs";
+import { getDocumentLine as gtDocLn, getHeadMatch, getRuleId, makeQuickFix } from "@exportLangs";
+import { type CodeAction, CodeActionKind as CdActnKnd, Position, Range, type vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 // CONSTANTS
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const VOID_TAGS = new Set([`br`, `hr`, `img`, `meta`, `link`, `input`, `source`, `embed`, `param`, `track`, `area`, `col`, `base`]);
-const OBSOLETE_TAGS = new Set([`center`, `font`, `big`, `strike`, `tt`, `acronym`, `applet`, `basefont`, `bgsound`, `blink`, `marquee`]);
+const OBSL_TGS = new Set([`center`, `font`, `big`, `strike`, `tt`, `acronym`, `applet`, `basefont`, `bgsound`, `blink`, `marquee`]);
 
 // REGEX PATTERNS
-const _HTML_TAG_PATTERN = /<html(\s[^>]*)?>/i;
-const _HEAD_TITLE_PATTERN = /<title(\s[^>]*)?>/i;
-const _DOCTYPE_PATTERN = /<!doctype/i;
-const _SINGLE_QUOTE_ATTR_PATTERN = /(\w[\w:-]*)='([^']*)'/g;
-const _UPPERCASE_TAG_PATTERN = /<\/?([A-Z][\dA-Za-z]*)\b/g;
-const _UPPERCASE_ATTR_PATTERN = /\s([A-Z][\w-]*)\s*=/g;
-const _META_CHARSET_PATTERN = /<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i;
-const _META_VIEWPORT_PATTERN = /<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i;
-const _META_DESCRIPTION_PATTERN = /<meta\s+name\s*=\s*["']description["'][^/>]*>/i;
-const _IMG_AREA_TAG_PATTERN = /<(img|area)([^>]*)>/gi;
-const _BUTTON_TAG_PATTERN = /<button([^>]*)>/gi;
-const _ATTR_WHITESPACE_PATTERN = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
-const _ATTR_SPACING_PATTERN = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
-const _VOID_TAG_OPEN_PATTERN = /<([A-Za-z][\dA-Za-z-]*)([^>]*)>/g;
-const _BAD_CLOSE_PATTERN = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
-const _ALL_TAG_PATTERN = /<\/?.+?>/g;
+const HTML_TG_PAT = /<html(\s[^>]*)?>/i;
+const HD_TTL_PAT = /<title(\s[^>]*)?>/i;
+const DCTY_PAT = /<!doctype/i;
+const SQAP = /(\w[\w:-]*)='([^']*)'/g;
+const UPPR_TG_PAT = /<\/?([A-Z][\dA-Za-z]*)\b/g;
+const UPP_ATT_PAT = /\s([A-Z][\w-]*)\s*=/g;
+const MT_CHRS_PAT = /<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i;
+const MT_VWPR_PAT = /<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i;
+const MT_DSCR_PAT = /<meta\s+name\s*=\s*["']description["'][^/>]*>/i;
+const IATP = /<(img|area)([^>]*)>/gi;
+const BTTN_TG_PAT = /<button([^>]*)>/gi;
+const ATT_WHT_PAT = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
+const ATT_SPC_PAT = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
+const VTOP = /<([A-Za-z][\dA-Za-z-]*)([^>]*)>/g;
+const BD_CLS_PAT = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
+const ALL_TG_PAT = /<\/?.+?>/g;
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createLangFix: FixFactory = (doc, diagnostic) => {
+const crtLngFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `html-lang-require`) {
   	return null;
   }
@@ -54,7 +54,7 @@ const createLangFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createTitleFix: FixFactory = (doc, diagnostic) => {
+const crtTtlFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `title-require`) {
   	return null;
   }
@@ -78,7 +78,7 @@ const createTitleFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createDoctypeFix: FixFactory = (doc, diagnostic) => {
+const crtDctyFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `doctype-first`) {
   	return null;
   }
@@ -97,7 +97,7 @@ const createDoctypeFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
+const crtAtVaDbQtF: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-value-double-quotes`) {
   	return null;
   }
@@ -105,13 +105,13 @@ const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
-  const singleQuotePattern = /(\w[\w:-]*)='([^']*)'/g;
+  const snglQtPat = /(\w[\w:-]*)='([^']*)'/g;
   let m: RegExpExecArray | null;
-  while ((m = singleQuotePattern.exec(lineStr))) {
+  while ((m = snglQtPat.exec(lineStr))) {
     const startCol = m.index;
     const endCol = startCol + m[0].length;
     const col = info.col ? info.col - 1 : 0;
@@ -132,12 +132,12 @@ const createAttrValueDoubleQuotesFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createTagnameLowercaseFix: FixFactory = (doc, diagnostic) => {
+const crtTgLwFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tagname-lowercase`) {
   	return null;
   }
   const info = (diagnostic as any).data;
-  const lineStr = getDocumentLine(doc, info?.line);
+  const lineStr = gtDocLn(doc, info?.line);
   if (!lineStr) {
   	return null;
   }
@@ -164,12 +164,12 @@ const createTagnameLowercaseFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createAttrLowercaseFix: FixFactory = (doc, diagnostic) => {
+const crtAtLwFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-lowercase`) {
   	return null;
   }
   const info = (diagnostic as any).data;
-  const lineStr = getDocumentLine(doc, info?.line);
+  const lineStr = gtDocLn(doc, info?.line);
   if (!lineStr) {
   	return null;
   }
@@ -196,7 +196,7 @@ const createAttrLowercaseFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createMetaCharsetRequireFix: FixFactory = (doc, diagnostic) => {
+const crtMtChRqFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-charset-require`) {
   	return null;
   }
@@ -220,7 +220,7 @@ const createMetaCharsetRequireFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createMetaViewportRequireFix: FixFactory = (doc, diagnostic) => {
+const crtMtVwRqFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-viewport-require`) {
   	return null;
   }
@@ -246,7 +246,7 @@ const createMetaViewportRequireFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createMetaDescriptionRequireFix: FixFactory = (doc, diagnostic) => {
+const crtMtDsRqFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-description-require`) {
   	return null;
   }
@@ -279,7 +279,7 @@ const createMetaDescriptionRequireFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createAltRequireFix: FixFactory = (doc, diagnostic) => {
+const crtAltRqrFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `alt-require`) {
   	return null;
   }
@@ -287,7 +287,7 @@ const createAltRequireFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -315,7 +315,7 @@ const createAltRequireFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createButtonTypeRequireFix: FixFactory = (doc, diagnostic) => {
+const crtBtTyRqFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `button-type-require`) {
   	return null;
   }
@@ -323,7 +323,7 @@ const createButtonTypeRequireFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -351,7 +351,7 @@ const createButtonTypeRequireFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createAttrNoUnnecessaryWhitespaceFix: FixFactory = (doc, diagnostic) => {
+const crtAtNUnWhFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-no-unnecessary-whitespace`) {
   	return null;
   }
@@ -359,7 +359,7 @@ const createAttrNoUnnecessaryWhitespaceFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -385,7 +385,7 @@ const createAttrNoUnnecessaryWhitespaceFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createAttrWhitespaceFix: FixFactory = (doc, diagnostic) => {
+const crtAtWhFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-whitespace`) {
   	return null;
   }
@@ -393,7 +393,7 @@ const createAttrWhitespaceFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -422,7 +422,7 @@ const createAttrWhitespaceFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createTagSelfCloseFix: FixFactory = (doc, diagnostic) => {
+const crtTgSlClFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tag-self-close`) {
   	return null;
   }
@@ -430,7 +430,7 @@ const createTagSelfCloseFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -481,7 +481,7 @@ const createTagSelfCloseFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createTagNoObsoleteFix: FixFactory = (doc, diagnostic) => {
+const crtTgNObslFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tag-no-obsolete`) {
   	return null;
   }
@@ -489,7 +489,7 @@ const createTagNoObsoleteFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -498,7 +498,7 @@ const createTagNoObsoleteFix: FixFactory = (doc, diagnostic) => {
   const col = info.col ? info.col - 1 : 0;
   while ((m = pattern.exec(lineStr))) {
     const tagName = m[0].replace(/<\/?\s*([\dA-Za-z-]+).*/, `$1`).toLowerCase();
-    if (OBSOLETE_TAGS.has(tagName)) {
+    if (OBSL_TGS.has(tagName)) {
       const startCol = m.index;
       if (Math.abs(startCol - col) <= 30) {
         const start = new Position(info.line - 1, startCol);
@@ -517,7 +517,7 @@ const createTagNoObsoleteFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createSpecCharEscapeFix: FixFactory = (doc, diagnostic) => {
+const crtSpChEsFx: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `spec-char-escape`) {
   	return null;
   }
@@ -525,7 +525,7 @@ const createSpecCharEscapeFix: FixFactory = (doc, diagnostic) => {
   if (typeof info?.line !== `number`) {
   	return null;
   }
-  const lineStr = getDocumentLine(doc, info.line);
+  const lineStr = gtDocLn(doc, info.line);
   if (!lineStr) {
   	return null;
   }
@@ -570,7 +570,7 @@ const createSpecCharEscapeFix: FixFactory = (doc, diagnostic) => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const factories: FixFactory[] = [createLangFix, createTitleFix, createDoctypeFix, createAttrValueDoubleQuotesFix, createTagnameLowercaseFix, createAttrLowercaseFix, createMetaCharsetRequireFix, createMetaViewportRequireFix, createMetaDescriptionRequireFix, createAltRequireFix, createButtonTypeRequireFix, createAttrNoUnnecessaryWhitespaceFix, createAttrWhitespaceFix, createTagSelfCloseFix, createTagNoObsoleteFix, createSpecCharEscapeFix];
+const factories: FixFactory[] = [crtLngFx, crtTtlFx, crtDctyFx, crtAtVaDbQtF, crtTgLwFx, crtAtLwFx, crtMtChRqFx, crtMtVwRqFx, crtMtDsRqFx, crtAltRqrFx, crtBtTyRqFx, crtAtNUnWhFx, crtAtWhFx, crtTgSlClFx, crtTgNObslFx, crtSpChEsFx];
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
@@ -593,6 +593,6 @@ export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
     return list;
   }
   static readonly metadata: vscode.CodeActionProviderMetadata = {
-    providedCodeActionKinds: [CodeActionKind.QuickFix],
+    providedCodeActionKinds: [CdActnKnd.QuickFix],
   };
 }

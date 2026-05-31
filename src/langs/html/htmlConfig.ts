@@ -4,9 +4,9 @@
  * @description HTMLHint 모듈 로드 및 설정 파일 로드
  */
 
-import { createRequire, fs, path, vscode } from "@exportLibs";
+import { createRequire as crtRqr, fs, path, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import type { HtmlHintInstance } from "@langs/html/htmlType";
+import type { HtmlHintInstance as HtmlHntInst } from "@langs/html/htmlType";
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const getBaseUrl = (): string => {
@@ -28,10 +28,10 @@ const getBaseUrl = (): string => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const loadHtmlHint = (): HtmlHintInstance | null => {
-  let result: HtmlHintInstance | null = null;
+export const loadHtmlHint = (): HtmlHntInst | null => {
+  let result: HtmlHntInst | null = null;
 
-  const fnValidate = (mod: unknown): HtmlHintInstance | null => {
+  const fnValidate = (mod: unknown): HtmlHntInst | null => {
     const m = mod as
       | {
           default?: { verify?: unknown };
@@ -40,12 +40,12 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
         }
       | undefined;
     const raw = (m?.default ?? m?.HTMLHint ?? m) as { verify?: unknown } | undefined;
-    return raw && typeof raw.verify === `function` ? (raw as HtmlHintInstance) : null;
+    return raw && typeof raw.verify === `function` ? (raw as HtmlHntInst) : null;
   };
 
   try {
     const primaryUrl = getBaseUrl();
-    const primaryReq = createRequire(primaryUrl);
+    const primaryReq = crtRqr(primaryUrl);
     const primaryMod = fnValidate(primaryReq(`htmlhint`));
     if (primaryMod) {
       result = primaryMod;
@@ -84,7 +84,7 @@ export const loadHtmlHint = (): HtmlHintInstance | null => {
         	break;
         }
         try {
-          const req = createRequire(path.join(base, `index.js`));
+          const req = crtRqr(path.join(base, `index.js`));
           const mod = fnValidate(req(`htmlhint`));
           if (mod) {
             result = mod;

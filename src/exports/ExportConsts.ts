@@ -6,15 +6,15 @@
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	clearConfigurationCache,
-	DEFAULT_CSS_EXCLUDE,
-	getAdditionalExtensions,
-	getAnalyzableExtensions,
-	getCssExcludePatterns,
+	clrCfgCch as clearConfigurationCache,
+	DEF_CSS_EXCL as DEFAULT_CSS_EXCLUDE,
+	gtAddExts as getAdditionalExtensions,
+	gtAnlyExts as getAnalyzableExtensions,
+	gtCsExPa as getCssExcludePatterns,
 	getLogLevel,
-	isCssHintEnabled,
-	isHtmlHintEnabled,
-	isJsHintEnabled,
+	isCssHntOn as isCssHintEnabled,
+	isHtmlHntOn as isHtmlHintEnabled,
+	isJsHntOn as isJsHintEnabled,
 	type LogLevel,
 	type UnusedSeverity,
 } from "@consts/ConstsConfig";

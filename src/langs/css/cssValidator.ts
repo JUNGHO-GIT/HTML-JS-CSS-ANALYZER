@@ -4,38 +4,38 @@
  * @description CSS 검증 및 Provider 클래스
  */
 
-import { getCssExcludePatterns } from "@exportConsts";
-import { cacheGet, cacheSet, clearWorkspaceCssFilesCache, ensureWorkspaceCssFiles, fetchCssContent, getWorkspaceCssFiles, parseSelectors, processCssFilesInBatches, readSelectorsFromFsPath } from "@exportLangs";
+import { getCssExcludePatterns as gtCsExPa } from "@exportConsts";
+import { cacheGet, cacheSet, clearWorkspaceCssFilesCache as clrWsCsFlCc, ensureWorkspaceCssFiles as ensrWsCssFls, fetchCssContent as ftchCssCont, getWorkspaceCssFiles as gtWsCssFls, parseSelectors as prsSels, processCssFilesInBatches as proCsFlInBt, readSelectorsFromFsPath as rdSeFrFsPt } from "@exportLangs";
 import { fs, path, vscode } from "@exportLibs";
-import { isAnalyzable, logger, validateDocument, withPerformanceMonitoring } from "@exportScripts";
+import { isAnalyzable, logger, validateDocument as valDoc, withPerformanceMonitoring as wthPerfMon } from "@exportScripts";
 import { type SelectorPos, SelectorType } from "@exportTypes";
-import type { CssStyleLoadOptions, CssSupportLike } from "@langs/css/cssType";
+import type { CssStyleLoadOptions as CssStLdOp, CssSupportLike as CssSupLk } from "@langs/css/cssType";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const REMOTE_URL_REGEX = /^https?:\/\//i;
-const WORD_RANGE_REGEX = /[\w-]+/;
-const HTML_FILE_REGEX = /\.html?$/i;
-const STYLE_TAG_REGEX = /<style(?:\s[^>]*)?>([\S\s]*?)<\/style>/gi;
-const LINK_STYLESHEET_REGEX = /<link\s+[^/>]*\brel\s*=\s*["']stylesheet["'][^>]*>/gi;
-const HREF_ATTRIBUTE_REGEX = /\bhref\s*=\s*(["'])([^"']+)\1/i;
-const ROOT_RELATIVE_PREFIX_REGEX = /^[/\\]+/;
-const ID_ATTRIBUTE_CONTEXT_REGEX = /id\s*=\s*["'][^"']*$/;
-const GET_ELEMENT_BY_ID_CONTEXT_REGEX = /getElementById\s*\(\s*["'][^"']*$/;
-const ID_SELECTOR_CONTEXT_REGEX = /#[\w-]*$/;
-const CLASS_ATTRIBUTE_CONTEXT_REGEX = /(?:class|className)\s*=\s*["'][^"']*$/;
-const CLASS_LIST_CONTEXT_REGEX = /classList\.(?:add|remove|toggle|contains|replace)\s*\(\s*["'][^"']*$/;
-const GET_ELEMENTS_BY_CLASS_CONTEXT_REGEX = /getElementsByClassName\s*\(\s*["'][^"']*$/;
-const CLASS_SELECTOR_CONTEXT_REGEX = /\.[\w-]*$/;
-const QUERY_SELECTOR_CONTEXT_REGEX = /(?:querySelector(?:All)?|\$)\s*\(\s*["'][^"']*$/;
+const RMT_URL_RE = /^https?:\/\//i;
+const WRD_RNG_RE = /[\w-]+/;
+const HTML_FL_RE = /\.html?$/i;
+const STYL_TG_RE = /<style(?:\s[^>]*)?>([\S\s]*?)<\/style>/gi;
+const LNK_STYL_RE = /<link\s+[^/>]*\brel\s*=\s*["']stylesheet["'][^>]*>/gi;
+const HRF_ATTR_RE = /\bhref\s*=\s*(["'])([^"']+)\1/i;
+const RRPR = /^[/\\]+/;
+const IACR = /id\s*=\s*["'][^"']*$/;
+const GEBICR = /getElementById\s*\(\s*["'][^"']*$/;
+const ISCR = /#[\w-]*$/;
+const CACR = /(?:class|className)\s*=\s*["'][^"']*$/;
+const CLCR = /classList\.(?:add|remove|toggle|contains|replace)\s*\(\s*["'][^"']*$/;
+const GEBCCR = /getElementsByClassName\s*\(\s*["'][^"']*$/;
+const CSCR = /\.[\w-]*$/;
+const QSCR = /(?:querySelector(?:All)?|\$)\s*\(\s*["'][^"']*$/;
 
 // CSS PROVIDER CLASS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export class CssSupport implements vscode.CompletionItemProvider, vscode.DefinitionProvider, CssSupportLike {
+export class CssSupport implements vscode.CompletionItemProvider, vscode.DefinitionProvider, CssSupLk {
   // 정규식 패턴 접근자들
   private get isRemoteUrl(): RegExp {
-    return REMOTE_URL_REGEX;
+    return RMT_URL_RE;
   }
   private get wordRange(): RegExp {
-    return WORD_RANGE_REGEX;
+    return WRD_RNG_RE;
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private readonly pendingStyles: Map<string, Promise<Map<string, SelectorPos[]>>> = new Map();
@@ -45,8 +45,8 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     const cached = cacheGet(url);
     return cached ? cached.data : (async () => {
           try {
-            const cssText = await fetchCssContent(url);
-            const data = parseSelectors(cssText);
+            const cssText = await ftchCssCont(url);
+            const data = prsSels(cssText);
             cacheSet(url, { version: -1, data });
             return data;
           }
@@ -65,18 +65,18 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     let data: SelectorPos[] = cached?.version === ver ? cached.data : [];
     if (cached?.version !== ver) {
       const txt = fullText ?? doc.getText();
-      const isHtml = HTML_FILE_REGEX.test(doc.fileName) || doc.languageId === `html`;
+      const isHtml = HTML_FL_RE.test(doc.fileName) || doc.languageId === `html`;
       if (isHtml) {
-        STYLE_TAG_REGEX.lastIndex = 0;
-        let m = STYLE_TAG_REGEX.exec(txt);
+        STYL_TG_RE.lastIndex = 0;
+        let m = STYL_TG_RE.exec(txt);
         while (m) {
           const fullMatch = m[0];
           const cssContent = m[1] || ``;
 
           if (cssContent.trim().length > 0) {
-            const local = parseSelectors(cssContent);
-            const openingTagEnd = fullMatch.indexOf(`>`) + 1;
-            const bodyStartIdx = m.index + openingTagEnd;
+            const local = prsSels(cssContent);
+            const opnnTgEnd = fullMatch.indexOf(`>`) + 1;
+            const bodyStartIdx = m.index + opnnTgEnd;
 
             for (const sel of local) {
               const absIndex = bodyStartIdx + sel.index;
@@ -90,12 +90,12 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
               });
             }
           }
-          m = STYLE_TAG_REGEX.exec(txt);
+          m = STYL_TG_RE.exec(txt);
         }
         logger(`debug`, `style selectors: ${data.length} found`);
       }
       else {
-        data = parseSelectors(txt);
+        data = prsSels(txt);
       }
       cacheSet(key, { version: ver, data });
     }
@@ -105,15 +105,15 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   private readonly fnGetLinkedStyles = async (doc: vscode.TextDocument, fullText?: string): Promise<Map<string, SelectorPos[]>> => {
     const map = new Map<string, SelectorPos[]>();
-    if (!HTML_FILE_REGEX.test(doc.fileName) && doc.languageId !== `html`) {
+    if (!HTML_FL_RE.test(doc.fileName) && doc.languageId !== `html`) {
     	return map;
     }
     const text = fullText ?? doc.getText();
-    LINK_STYLESHEET_REGEX.lastIndex = 0;
-    let m = LINK_STYLESHEET_REGEX.exec(text);
+    LNK_STYL_RE.lastIndex = 0;
+    let m = LNK_STYL_RE.exec(text);
     while (m) {
       const tag = m[0];
-      const hrefMatch = HREF_ATTRIBUTE_REGEX.exec(tag);
+      const hrefMatch = HRF_ATTR_RE.exec(tag);
       const href = hrefMatch?.[2]?.trim() ?? ``;
       if (href) {
         try {
@@ -130,9 +130,9 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
             }
             targetPath = path.normalize(targetPath);
             if (!fs.existsSync(targetPath)) {
-              const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
-              if (workspaceFolder && (targetPath.startsWith(path.sep) || targetPath.startsWith(`/`))) {
-                const candidate = path.join(workspaceFolder.uri.fsPath, targetPath.replace(ROOT_RELATIVE_PREFIX_REGEX, ``));
+              const wsFldr = vscode.workspace.getWorkspaceFolder(doc.uri);
+              if (wsFldr && (targetPath.startsWith(path.sep) || targetPath.startsWith(`/`))) {
+                const candidate = path.join(wsFldr.uri.fsPath, targetPath.replace(RRPR, ``));
                 if (fs.existsSync(candidate)) {
                   targetPath = path.normalize(candidate);
                 }
@@ -140,7 +140,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
             }
             if (fs.existsSync(targetPath)) {
               try {
-                const sels = await readSelectorsFromFsPath(targetPath);
+                const sels = await rdSeFrFsPt(targetPath);
                 map.set(vscode.Uri.file(targetPath).toString(), sels);
               }
               catch (error: unknown) {
@@ -155,16 +155,16 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
           logger(`error`, `parsing error: ${href} -> ${errorMessage}`);
         }
       }
-      m = LINK_STYLESHEET_REGEX.exec(text);
+      m = LNK_STYL_RE.exec(text);
     }
     logger(`debug`, `parsing: ${map.size} entries found for ${doc.fileName}`);
     return map;
   };
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-  getStyles = async (doc: vscode.TextDocument, options?: CssStyleLoadOptions): Promise<Map<string, SelectorPos[]>> => {
-    const includeWorkspace = options?.includeWorkspace ?? true;
-    const key = `${doc.uri.toString()}::${includeWorkspace ? `workspace` : `local`}`;
+  getStyles = async (doc: vscode.TextDocument, options?: CssStLdOp): Promise<Map<string, SelectorPos[]>> => {
+    const incWs = options?.includeWorkspace ?? true;
+    const key = `${doc.uri.toString()}::${incWs ? `workspace` : `local`}`;
     const pending = this.pendingStyles.get(key);
     if (pending) {
       return pending;
@@ -174,8 +174,8 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     	return styleMap;
     }
     const promise = (async () => {
-      const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
-      const excludePatterns = getCssExcludePatterns(doc.uri);
+      const wsFldr = vscode.workspace.getWorkspaceFolder(doc.uri);
+      const exclPats = gtCsExPa(doc.uri);
 
       styleMap.set(doc.uri.toString(), await this.getLocalDoc(doc, options?.fullText));
 
@@ -185,13 +185,13 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
         	styleMap.set(k, v);
         }
       }
-      if (includeWorkspace && workspaceFolder) {
-        const files = await ensureWorkspaceCssFiles(workspaceFolder, excludePatterns);
+      if (incWs && wsFldr) {
+        const files = await ensrWsCssFls(wsFldr, exclPats);
         if (files.length > 0) {
-        	await processCssFilesInBatches(files, styleMap);
+        	await proCsFlInBt(files, styleMap);
         }
       }
-      logger(`debug`, `collected: ${styleMap.size} entries (workspace files: ${getWorkspaceCssFiles()?.length ?? 0}) for ${doc.fileName}`);
+      logger(`debug`, `collected: ${styleMap.size} entries (workspace files: ${gtWsCssFls()?.length ?? 0}) for ${doc.fileName}`);
 
       return styleMap;
     })();
@@ -238,7 +238,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     // id="...", id='...', id=...
     // getElementById('...')
     // #...
-    const isIdContext = ID_ATTRIBUTE_CONTEXT_REGEX.test(prefix) || GET_ELEMENT_BY_ID_CONTEXT_REGEX.test(prefix) || ID_SELECTOR_CONTEXT_REGEX.test(prefix);
+    const isIdContext = IACR.test(prefix) || GEBICR.test(prefix) || ISCR.test(prefix);
 
     // 2. Check for Class context
     // class="...", class='...', class=...
@@ -246,21 +246,21 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     // classList.add('...'), .remove('...'), .toggle('...'), .contains('...')
     // getElementsByClassName('...')
     // .class...
-    const isClassContext = CLASS_ATTRIBUTE_CONTEXT_REGEX.test(prefix) || CLASS_LIST_CONTEXT_REGEX.test(prefix) || GET_ELEMENTS_BY_CLASS_CONTEXT_REGEX.test(prefix) || CLASS_SELECTOR_CONTEXT_REGEX.test(prefix);
+    const isClssCtx = CACR.test(prefix) || CLCR.test(prefix) || GEBCCR.test(prefix) || CSCR.test(prefix);
 
     // 3. Check for QuerySelector context (can be both)
     // querySelector('...'), querySelectorAll('...')
     // $ ('...') (jQuery)
-    const isQuerySelectorContext = QUERY_SELECTOR_CONTEXT_REGEX.test(prefix);
+    const isQrySelCtx = QSCR.test(prefix);
 
-    if (!isIdContext && !isClassContext && !isQuerySelectorContext) {
+    if (!isIdContext && !isClssCtx && !isQrySelCtx) {
       return undefined;
     }
     let kind = SelectorType.CLASS;
     if (isIdContext) {
     	kind = SelectorType.ID;
     }
-    else if (isQuerySelectorContext) {
+    else if (isQrySelCtx) {
     	// If querySelector, check the last character before cursor
       // If it's #, then ID. If ., then Class. Default to both? // For now, let's try to infer from the last char.
       kind = prefix.endsWith(`#`) ? SelectorType.ID : SelectorType.CLASS;
@@ -282,7 +282,7 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
     const locations: vscode.Location[] = [];
 
     for (const [uriString, selectors] of allStyles) {
-      if (REMOTE_URL_REGEX.test(uriString)) {
+      if (RMT_URL_RE.test(uriString)) {
       	continue;
       }
       for (const s of selectors) {
@@ -303,10 +303,10 @@ export class CssSupport implements vscode.CompletionItemProvider, vscode.Definit
   };
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-  validate = async (doc: vscode.TextDocument, fullText?: string): Promise<vscode.Diagnostic[]> => withPerformanceMonitoring(`Document validation: ${path.basename(doc.fileName)}`, () => validateDocument(doc, this, fullText));
+  validate = async (doc: vscode.TextDocument, fullText?: string): Promise<vscode.Diagnostic[]> => wthPerfMon(`Document validation: ${path.basename(doc.fileName)}`, () => valDoc(doc, this, fullText));
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   clearWorkspaceIndex = (): void => {
-    clearWorkspaceCssFilesCache();
+    clrWsCsFlCc();
   };
 }

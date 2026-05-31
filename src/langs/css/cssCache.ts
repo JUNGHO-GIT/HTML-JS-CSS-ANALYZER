@@ -20,7 +20,7 @@ interface CacheConfig {
   ttlMs: number;
 }
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const DEFAULT_CONFIG: CacheConfig = {
+const DEF_CFG: CacheConfig = {
   maxEntries: 300,
   ttlMs: 30 * 60 * 1000,
   maxMemoryMb: 50,
@@ -28,8 +28,8 @@ const DEFAULT_CONFIG: CacheConfig = {
 
 // CACHE STATE ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const styleCache: Map<string, CacheVal> = new Map();
-let config = { ...DEFAULT_CONFIG };
-let totalMemoryBytes = 0;
+let config = { ...DEF_CFG };
+let ttlMmryByts = 0;
 
 // HELPER FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
 const estimateSize = (data: SelectorPos[]): number => {
@@ -39,7 +39,7 @@ const estimateSize = (data: SelectorPos[]): number => {
 
 const isExpired = (cacheVal: CacheVal): boolean => Date.now() - cacheVal.timestamp > config.ttlMs;
 
-const isMemoryExceeded = (): boolean => totalMemoryBytes > config.maxMemoryMb * 1024 * 1024;
+const isMmryExcd = (): boolean => ttlMmryByts > config.maxMemoryMb * 1024 * 1024;
 
 const touch = (key: string): void => {
   const val = styleCache.get(key);
@@ -56,7 +56,7 @@ const touch = (key: string): void => {
 
 const removeEntry = (key: string): void => {
   const val = styleCache.get(key);
-  val && (totalMemoryBytes -= val.size);
+  val && (ttlMmryByts -= val.size);
   styleCache.delete(key);
 };
 
@@ -73,8 +73,8 @@ const cleanExpired = (): number => {
 const ensureLimit = (): void => {
   cleanExpired();
 
-  const needsEviction = styleCache.size > config.maxEntries || isMemoryExceeded();
-  if (!needsEviction) {
+  const ndsEvct = styleCache.size > config.maxEntries || isMmryExcd();
+  if (!ndsEvct) {
   	return;
   }
   const overCount = Math.max(styleCache.size - config.maxEntries, 0) + 1;
@@ -95,7 +95,7 @@ const ensureLimit = (): void => {
         }
         minKey && removeEntry(minKey);
         evicted++;
-        !isMemoryExceeded() && styleCache.size <= config.maxEntries && (evicted = overCount);
+        !isMmryExcd() && styleCache.size <= config.maxEntries && (evicted = overCount);
       }
     })() : (() => {
       // Large eviction: fall back to full sort O(n log n)
@@ -105,7 +105,7 @@ const ensureLimit = (): void => {
       });
 
       let i = 0;
-      while ((styleCache.size > config.maxEntries || isMemoryExceeded()) && i < entries.length) {
+      while ((styleCache.size > config.maxEntries || isMmryExcd()) && i < entries.length) {
         removeEntry(entries[i][0]);
         i++;
       }
@@ -133,15 +133,15 @@ export const cacheSet = (key: string, value: Omit<CacheVal, `timestamp` | `acces
   ensureLimit();
 
   const size = estimateSize(value.data);
-  const enrichedValue: CacheVal = {
+  const enrcVal: CacheVal = {
     ...value,
     timestamp: Date.now(),
     accessCount: 1,
     size,
   };
 
-  styleCache.set(key, enrichedValue);
-  totalMemoryBytes += size;
+  styleCache.set(key, enrcVal);
+  ttlMmryByts += size;
 };
 
 export const cacheDelete = (key: string): boolean => {
@@ -152,7 +152,7 @@ export const cacheDelete = (key: string): boolean => {
 
 export const cacheClear = (): void => {
   styleCache.clear();
-  totalMemoryBytes = 0;
+  ttlMmryByts = 0;
 };
 
 export const cacheSize = (): number => styleCache.size;
@@ -167,7 +167,7 @@ export const cacheStats = (): {
 } => ({
   entries: styleCache.size,
   maxEntries: config.maxEntries,
-  memoryMb: Math.round((totalMemoryBytes / 1024 / 1024) * 100) / 100,
+  memoryMb: Math.round((ttlMmryByts / 1024 / 1024) * 100) / 100,
   maxMemoryMb: config.maxMemoryMb,
   ttlMs: config.ttlMs,
 });

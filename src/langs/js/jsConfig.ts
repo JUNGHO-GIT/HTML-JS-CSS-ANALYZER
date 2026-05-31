@@ -4,12 +4,12 @@
  * @description JSHint 모듈 로드 및 설정 파일 로드
  */
 
-import { createRequire, fs, path, vscode } from "@exportLibs";
+import { createRequire as crtRqr, fs, path, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import type { JSHintInstance } from "@langs/js/jsType";
+import type { JSHintInstance as JsHntInst } from "@langs/js/jsType";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
+export const DEF_JSHN_CFG: Record<string, any> = {
   esversion: 2022,
   moz: false,
   bitwise: false,
@@ -94,14 +94,14 @@ export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
 };
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const loadJSHint = (): JSHintInstance | null => {
-  let result: JSHintInstance | null = null;
+export const loadJSHint = (): JsHntInst | null => {
+  let result: JsHntInst | null = null;
 
-  const fnValidate = (mod: unknown): JSHintInstance | null => {
+  const fnValidate = (mod: unknown): JsHntInst | null => {
     const candidate = mod as { JSHINT?: unknown } | undefined;
     const jshint = candidate?.JSHINT as { data?: unknown } | undefined;
     const isValid = typeof candidate?.JSHINT === `function` && typeof jshint?.data === `function`;
-    return isValid ? mod as JSHintInstance : null;
+    return isValid ? mod as JsHntInst : null;
   };
 
   const candidates: string[] = [];
@@ -134,7 +134,7 @@ export const loadJSHint = (): JSHintInstance | null => {
     }
     try {
       const reqPath = path.join(base, `index.js`);
-      const req = createRequire(reqPath);
+      const req = crtRqr(reqPath);
       const mod = fnValidate(req(`jshint`));
       if (mod) {
         result = mod;
@@ -153,7 +153,7 @@ export const loadJSHint = (): JSHintInstance | null => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const parseConfigValue = (value: string): any => {
+const prsCfgVal = (value: string): any => {
   const trimmed = value.trim();
   if (trimmed === `true`) {
     return true;
@@ -196,22 +196,22 @@ const parseConfigValue = (value: string): any => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
+const prsJsHnCfJs = (cfgCont: string): Record<string, any> => {
   try {
     let config: Record<string, any> = {};
-    const cleanContent = configContent.replaceAll(/\/\*[\S\s]*?\*\//g, ``).replaceAll(/\/\/.*$/gm, ``);
+    const cleanContent = cfgCont.replaceAll(/\/\*[\S\s]*?\*\//g, ``).replaceAll(/\/\/.*$/gm, ``);
 
-    const moduleExportsPattern = /module\.exports\s*=\s*({[\S\s]*?});?\s*(?:$|\n)/;
-    const moduleExportsMatch = cleanContent.match(moduleExportsPattern);
+    const modExprPat = /module\.exports\s*=\s*({[\S\s]*?});?\s*(?:$|\n)/;
+    const modExprMtch = cleanContent.match(modExprPat);
 
-    if (moduleExportsMatch) {
+    if (modExprMtch) {
       try {
-        const objectStr = moduleExportsMatch[1];
+        const objectStr = modExprMtch[1];
         config = new Function(`"use strict"; return (${objectStr})`)();
       }
       catch {
         try {
-          config = JSON.parse(moduleExportsMatch[1]);
+          config = JSON.parse(modExprMtch[1]);
         }
         catch {
           logger(`error`, `JS config parsing failed - module.exports format`);
@@ -219,33 +219,33 @@ const parseJSHintConfigJS = (configContent: string): Record<string, any> => {
       }
     }
 
-    const exportPatterns = cleanContent.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/g);
-    exportPatterns?.forEach((pattern) => {
+    const exprPats = cleanContent.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/g);
+    exprPats?.forEach((pattern) => {
       const match = pattern.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/);
       if (match) {
         const key = match[1].trim();
         const value = match[2].trim();
-        config[key] = parseConfigValue(value);
+        config[key] = prsCfgVal(value);
       }
     });
 
-    return { ...DEFAULT_JSHINT_CONFIG, ...config };
+    return { ...DEF_JSHN_CFG, ...config };
   }
   catch (error: any) {
     logger(`error`, `JS config file parsing failed: ${error?.message || error}`);
-    return DEFAULT_JSHINT_CONFIG;
+    return DEF_JSHN_CFG;
   }
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const parseJSHintConfigGeneric = (configContent: string): Record<string, any> => {
+const prsJsHnCfGn = (cfgCont: string): Record<string, any> => {
   try {
     try {
-      return JSON.parse(configContent);
+      return JSON.parse(cfgCont);
     }
     catch {}
     const config: Record<string, any> = {};
-    const lines = configContent.split(`\n`);
+    const lines = cfgCont.split(`\n`);
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -258,20 +258,20 @@ const parseJSHintConfigGeneric = (configContent: string): Record<string, any> =>
       if (match) {
         const key = match[1].trim();
         const value = match[2].trim().replace(/[,;]$/, ``);
-        config[key] = parseConfigValue(value);
+        config[key] = prsCfgVal(value);
       }
     }
 
-    return { ...DEFAULT_JSHINT_CONFIG, ...config };
+    return { ...DEF_JSHN_CFG, ...config };
   }
   catch (error: any) {
     logger(`error`, `file parsing failed: ${error?.message || error}`);
-    return DEFAULT_JSHINT_CONFIG;
+    return DEF_JSHN_CFG;
   }
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const loadJSHintConfig = (filePath: string): Record<string, any> => {
+export const ldJsHntCfg = (filePath: string): Record<string, any> => {
   try {
     let baseDir = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
     const rootDir = path.parse(baseDir).root;
@@ -286,23 +286,23 @@ export const loadJSHintConfig = (filePath: string): Record<string, any> => {
           continue;
         }
         try {
-          const configContent = fs.readFileSync(configPath, `utf8`);
+          const cfgCont = fs.readFileSync(configPath, `utf8`);
           if (configFile.endsWith(`.js`)) {
-            return parseJSHintConfigJS(configContent);
+            return prsJsHnCfJs(cfgCont);
           }
           if (configFile.endsWith(`.json`) || configFile === `.jshintrc`) {
             try {
-              return JSON.parse(configContent);
+              return JSON.parse(cfgCont);
             }
             catch {
-              return parseJSHintConfigGeneric(configContent);
+              return prsJsHnCfGn(cfgCont);
             }
           }
-          return parseJSHintConfigGeneric(configContent);
+          return prsJsHnCfGn(cfgCont);
         }
         catch (parseError: any) {
           logger(`error`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
-          return DEFAULT_JSHINT_CONFIG;
+          return DEF_JSHN_CFG;
         }
       }
       if (baseDir === rootDir) {
@@ -318,5 +318,5 @@ export const loadJSHintConfig = (filePath: string): Record<string, any> => {
   catch (error: any) {
     logger(`debug`, `search error: ${error?.message || error}`);
   }
-  return DEFAULT_JSHINT_CONFIG;
+  return DEF_JSHN_CFG;
 };

@@ -4,35 +4,35 @@
  * @description JS 소스코드 분석 및 품질 검사
  */
 
-import type { AnalyzeResult, SourceAnalysis } from "@exportLangs";
+import type { AnalyzeResult as AnlyRes, SourceAnalysis as SrcAnly } from "@exportLangs";
 import type { vscode } from "@exportLibs";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 const MAX_NESTING = 8;
-const MAX_LINE_LENGTH = 200;
-const MAX_REGEX_LENGTH = 80;
-const MAX_REGEX_COMPLEXITY = 15;
+const MX_LN_LEN = 200;
+const MX_RE_LEN = 80;
+const MX_RE_CMPL = 15;
 
 // REGEX PATTERNS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 const INDENT_REGEX = /^\s*/;
-const REGEX_PATTERN = /\/(?![*/])(?:[^\n/\\]|\\.)+\/[gimsuvy]*/g;
-const COMPLEX_CHARS_REGEX = /[()*+?[\]{|}]/g;
-const COMMENT_LINE_REGEX = /^\s*\/\//;
-const STRING_CONTENT_REGEX = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
-const ASSIGNMENT_IN_IF_REGEX = /\bif\s*\([^)]*[^!<=>]=(?!=)[^=]/;
-const EMPTY_CATCH_REGEX = /\bcatch\s*\([^)]*\)\s*{\s*}/;
-const EVAL_USAGE_REGEX = /\beval\s*\(/;
-const WITH_STATEMENT_REGEX = /\bwith\s*\(/;
-const LOOP_START_REGEX = /\b(for|while)\s*\(/;
+const RE_PAT = /\/(?![*/])(?:[^\n/\\]|\\.)+\/[gimsuvy]*/g;
+const CMPL_CHRS_RE = /[()*+?[\]{|}]/g;
+const CMT_LN_RE = /^\s*\/\//;
+const STR_CONT_RE = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
+const ASS_IN_IF_RE = /\bif\s*\([^)]*[^!<=>]=(?!=)[^=]/;
+const EMPT_CTCH_RE = /\bcatch\s*\([^)]*\)\s*{\s*}/;
+const EVL_USG_RE = /\beval\s*\(/;
+const WTH_STTM_RE = /\bwith\s*\(/;
+const LP_STRT_RE = /\b(for|while)\s*\(/;
 
 // HELPERS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-const stripStringsAndComments = (line: string): string => line
-    .replaceAll(STRING_CONTENT_REGEX, `""`)
+const strStAnCm = (line: string): string => line
+    .replaceAll(STR_CONT_RE, `""`)
     .replace(/\/\/.*$/, ``)
     .replaceAll(/\/\*.*?\*\//g, ``);
 
 // Helper: Build line offset index for O(log n) line lookups ――――――
-const buildLineOffsets = (text: string): number[] => {
+const bldLnOffs = (text: string): number[] => {
   const offsets = [0];
   for (const [i, ch] of [...text].entries()) {
     ch === `\n` && offsets.push(i + 1);
@@ -57,7 +57,7 @@ const lineAtOffset = (offsets: number[], offset: number): number => {
 };
 
 // Helper: Precompute block comment state per line ―――――――――――――――-
-const precomputeBlockCommentState = (lines: string[]): boolean[] => {
+const prcBlCmSt = (lines: string[]): boolean[] => {
   const state = Array.from<boolean>({ length: lines.length });
   let inBlock = false;
   for (const [i, line] of lines.entries()) {
@@ -69,7 +69,7 @@ const precomputeBlockCommentState = (lines: string[]): boolean[] => {
 };
 
 // ANALYSIS FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const analyzeComplexity = (lines: string[], analysis: SourceAnalysis): void => {
+const anlyCmpl = (lines: string[], analysis: SrcAnly): void => {
   for (const [i, line] of lines.entries()) {
     const lineNum = i + 1;
     const trimmed = line.trim();
@@ -86,16 +86,16 @@ const analyzeComplexity = (lines: string[], analysis: SourceAnalysis): void => {
         message: `Excessive nesting (${indentLevel} levels): consider refactoring`,
       });
 
-    line.length > MAX_LINE_LENGTH && analysis.complexityIssues.push({
+    line.length > MX_LN_LEN && analysis.complexityIssues.push({
         type: `long-line`,
         line: lineNum,
         message: `Long line (${line.length} chars): consider line break for readability`,
       });
 
-    const regexMatches = line.match(REGEX_PATTERN);
+    const regexMatches = line.match(RE_PAT);
     regexMatches?.forEach((regex) => {
-      const complexity = (regex.match(COMPLEX_CHARS_REGEX) ?? []).length;
-      (regex.length > MAX_REGEX_LENGTH || complexity > MAX_REGEX_COMPLEXITY) && analysis.complexityIssues.push({
+      const complexity = (regex.match(CMPL_CHRS_RE) ?? []).length;
+      (regex.length > MX_RE_LEN || complexity > MX_RE_CMPL) && analysis.complexityIssues.push({
           type: `complex-regex`,
           line: lineNum,
           message: `Complex regex: consider splitting or adding comments for readability`,
@@ -105,7 +105,7 @@ const analyzeComplexity = (lines: string[], analysis: SourceAnalysis): void => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const analyzePotentialBugs = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
+const anlyPtntBgs = (lines: string[], blckCmtSt: boolean[], analysis: SrcAnly): void => {
   for (const [i, line] of lines.entries()) {
     const lineNum = i + 1;
     const trimmed = line.trim();
@@ -114,31 +114,31 @@ const analyzePotentialBugs = (lines: string[], blockCommentState: boolean[], ana
     	continue;
     }
     // Skip comments (precomputed block comment state)
-    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(trimmed)) {
+    if (blckCmtSt[i] || CMT_LN_RE.test(trimmed)) {
     	continue;
     }
     // Strip strings for accurate detection
-    const strippedLine = stripStringsAndComments(line);
+    const strippedLine = strStAnCm(line);
 
-    ASSIGNMENT_IN_IF_REGEX.test(strippedLine) && analysis.potentialBugs.push({
+    ASS_IN_IF_RE.test(strippedLine) && analysis.potentialBugs.push({
         type: `assignment-in-condition`,
         line: lineNum,
         message: `Assignment in condition: did you mean comparison operator (===)?`,
       });
 
-    EMPTY_CATCH_REGEX.test(strippedLine) && analysis.potentialBugs.push({
+    EMPT_CTCH_RE.test(strippedLine) && analysis.potentialBugs.push({
         type: `empty-catch`,
         line: lineNum,
         message: `Empty catch block: error handling required`,
       });
 
-    EVAL_USAGE_REGEX.test(strippedLine) && analysis.potentialBugs.push({
+    EVL_USG_RE.test(strippedLine) && analysis.potentialBugs.push({
         type: `eval-usage`,
         line: lineNum,
         message: `Use of eval: security risk`,
       });
 
-    WITH_STATEMENT_REGEX.test(strippedLine) && analysis.potentialBugs.push({
+    WTH_STTM_RE.test(strippedLine) && analysis.potentialBugs.push({
         type: `with-statement`,
         line: lineNum,
         message: `Use of with statement: forbidden in strict mode and has performance issues`,
@@ -147,15 +147,15 @@ const analyzePotentialBugs = (lines: string[], blockCommentState: boolean[], ana
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const analyzeModernJs = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
+const anlyMdrnJs = (lines: string[], blckCmtSt: boolean[], analysis: SrcAnly): void => {
   for (const [i, line] of lines.entries()) {
     const lineNum = i + 1;
 
-    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blckCmtSt[i] || CMT_LN_RE.test(line.trim())) {
     	continue;
     }
     // Strip strings for accurate detection
-    const strippedLine = stripStringsAndComments(line);
+    const strippedLine = strStAnCm(line);
 
     /\bvar\s+/.test(strippedLine) && analysis.potentialBugs.push({
         type: `var-usage`,
@@ -166,15 +166,15 @@ const analyzeModernJs = (lines: string[], blockCommentState: boolean[], analysis
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const analyzeSecurity = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
+const anlyScrt = (lines: string[], blckCmtSt: boolean[], analysis: SrcAnly): void => {
   for (const [i, line] of lines.entries()) {
     const lineNum = i + 1;
 
-    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blckCmtSt[i] || CMT_LN_RE.test(line.trim())) {
     	continue;
     }
     // Strip strings for accurate detection
-    const strippedLine = stripStringsAndComments(line);
+    const strippedLine = strStAnCm(line);
 
     strippedLine.includes(`.innerHTML`) && /\.innerHTML\s*=/.test(strippedLine) && analysis.potentialBugs.push({
         type: `innerhtml-usage`,
@@ -191,20 +191,20 @@ const analyzeSecurity = (lines: string[], blockCommentState: boolean[], analysis
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const analyzePerformance = (lines: string[], blockCommentState: boolean[], analysis: SourceAnalysis): void => {
+const anlyPerf = (lines: string[], blckCmtSt: boolean[], analysis: SrcAnly): void => {
   const loopStack: number[] = []; // Stack of brace depths where loops started
   let braceDepth = 0;
 
   for (const [i, line] of lines.entries()) {
     const lineNum = i + 1;
 
-    if (blockCommentState[i] || COMMENT_LINE_REGEX.test(line.trim())) {
+    if (blckCmtSt[i] || CMT_LN_RE.test(line.trim())) {
     	continue;
     }
-    const strippedLine = stripStringsAndComments(line);
+    const strippedLine = strStAnCm(line);
 
     // Detect loop start
-    LOOP_START_REGEX.test(strippedLine) && (() => {
+    LP_STRT_RE.test(strippedLine) && (() => {
         loopStack.push(braceDepth);
         loopStack.length > 2 && analysis.potentialBugs.push({
             type: `large-loop`,
@@ -220,8 +220,8 @@ const analyzePerformance = (lines: string[], blockCommentState: boolean[], analy
 
     // Pop loop stack when we exit a loop's brace level
     while (loopStack.length > 0) {
-      const lastLoopDepth = loopStack[loopStack.length - 1];
-      if (lastLoopDepth === undefined || braceDepth > lastLoopDepth) {
+      const lstLpDpth = loopStack[loopStack.length - 1];
+      if (lstLpDpth === undefined || braceDepth > lstLpDpth) {
         break;
       }
       loopStack.pop();
@@ -230,8 +230,8 @@ const analyzePerformance = (lines: string[], blockCommentState: boolean[], analy
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocument): AnalyzeResult => {
-  const analysis: SourceAnalysis = {
+export const anlySrcCd = (sourceCode: string, document: vscode.TextDocument): AnlyRes => {
+  const analysis: SrcAnly = {
     isModule: false,
     hasStrictMode: false,
     functions: [],
@@ -245,11 +245,11 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   analysis.isModule = sourceCode.includes(`import `) || sourceCode.includes(`export `) || document.fileName.endsWith(`.mjs`);
   analysis.hasStrictMode = sourceCode.includes(`"use strict"`) || sourceCode.includes(`'use strict'`);
 
-  const lineOffsets = buildLineOffsets(sourceCode);
+  const lineOffsets = bldLnOffs(sourceCode);
 
   // 함수 선언 분석 (최적화된 정규식)
-  const functionMatches = sourceCode.matchAll(/\bfunction\s+(\w+)\s*\([^)]*\)\s*{/g);
-  [...functionMatches].forEach((match) => {
+  const fnMtch = sourceCode.matchAll(/\bfunction\s+(\w+)\s*\([^)]*\)\s*{/g);
+  [...fnMtch].forEach((match) => {
     const paramsText = /\(([^)]*)\)/.exec(match[0])?.[1] ?? ``;
     analysis.functions.push({
       name: match[1],
@@ -270,8 +270,8 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   });
 
   // 변수 선언 분석
-  const variableMatches = sourceCode.matchAll(/\b(let|const|var)\s+(\w+)/g);
-  [...variableMatches].forEach((match) => {
+  const varMtch = sourceCode.matchAll(/\b(let|const|var)\s+(\w+)/g);
+  [...varMtch].forEach((match) => {
     analysis.variables.push({
       name: match[2],
       type: match[1] as `let` | `const` | `var`,
@@ -280,8 +280,8 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   });
 
   // import 문 분석
-  const importMatches = sourceCode.matchAll(/\bimport\s+.*?from\s+["'`]([^"'`]+)["'`]/g);
-  [...importMatches].forEach((match) => {
+  const imprMtch = sourceCode.matchAll(/\bimport\s+.*?from\s+["'`]([^"'`]+)["'`]/g);
+  [...imprMtch].forEach((match) => {
     analysis.imports.push({
       module: match[1],
       line: lineAtOffset(lineOffsets, match.index),
@@ -289,8 +289,8 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   });
 
   // export 문 분석
-  const exportMatches = sourceCode.matchAll(/\bexport\s+(.*?)(?=\n|$)/g);
-  [...exportMatches].forEach((match) => {
+  const exprMtch = sourceCode.matchAll(/\bexport\s+(.*?)(?=\n|$)/g);
+  [...exprMtch].forEach((match) => {
     analysis.exports.push({
       declaration: match[1],
       line: lineAtOffset(lineOffsets, match.index),
@@ -298,14 +298,14 @@ export const analyzeSourceCode = (sourceCode: string, document: vscode.TextDocum
   });
 
   const lines = sourceCode.split(`\n`);
-  const blockCommentState = precomputeBlockCommentState(lines);
-  analyzeComplexity(lines, analysis);
-  analyzePotentialBugs(lines, blockCommentState, analysis);
-  analyzeModernJs(lines, blockCommentState, analysis);
-  analyzeSecurity(lines, blockCommentState, analysis);
-  analyzePerformance(lines, blockCommentState, analysis);
+  const blckCmtSt = prcBlCmSt(lines);
+  anlyCmpl(lines, analysis);
+  anlyPtntBgs(lines, blckCmtSt, analysis);
+  anlyMdrnJs(lines, blckCmtSt, analysis);
+  anlyScrt(lines, blckCmtSt, analysis);
+  anlyPerf(lines, blckCmtSt, analysis);
 
-  const processedCode = sourceCode;
+  const procdCd = sourceCode;
 
-  return { processedCode, analysis };
+  return { processedCode: procdCd, analysis };
 };

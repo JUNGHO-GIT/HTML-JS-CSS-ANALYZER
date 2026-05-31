@@ -20,28 +20,28 @@ export {
 	cacheStats,
 } from "@langs/css/cssCache";
 
-export { parseSelectors } from "@langs/css/cssParser";
+export { prsSels as parseSelectors } from "@langs/css/cssParser";
 
 export {
-	fetchCssContent,
-	readSelectorsFromFsPath,
-	processCssFilesInBatches,
-	ensureWorkspaceCssFiles,
-	getWorkspaceCssFiles,
-	clearWorkspaceCssFilesCache,
-	normalizeToken,
+	ftchCssCont as fetchCssContent,
+	rdSeFrFsPt as readSelectorsFromFsPath,
+	proCsFlInBt as processCssFilesInBatches,
+	ensrWsCssFls as ensureWorkspaceCssFiles,
+	gtWsCssFls as getWorkspaceCssFiles,
+	clrWsCsFlCc as clearWorkspaceCssFilesCache,
+	nrmlTok as normalizeToken,
 	makeRange,
-	collectKnownSelectors,
-	isValidCssIdentifier,
+	cllcKnwnSels as collectKnownSelectors,
+	isVldCssId as isValidCssIdentifier,
 	isRemoteUrl,
-	extractCssBodies,
+	extrCssBds as extractCssBodies,
 } from "@langs/css/cssUtils";
 
 export { CssSupport } from "@langs/css/cssValidator";
 
 export {
-	analyzeCssCode,
-	generateCssAnalysisDiagnostics,
+	anlyCssCd as analyzeCssCode,
+	gnrCsAnDi as generateCssAnalysisDiagnostics,
 } from "@langs/css/cssAnalyzer";
 
 // 2. HTML ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
@@ -59,16 +59,16 @@ export {
 
 export {
 	clamp,
-	HEAD_TAG_REGEX,
+	HD_TG_RE as HEAD_TAG_REGEX,
 	getRuleId,
-	getDocumentLine,
+	gtDocLn as getDocumentLine,
 	getHeadMatch,
 	makeQuickFix,
 } from "@langs/html/htmlUtils";
 
 export {
 	runHtmlHint,
-	isHtmlDocument,
+	isHtmlDoc2 as isHtmlDocument,
 } from "@langs/html/htmlValidator";
 
 export { HtmlHintCodeActionProvider } from "@langs/html/htmlCodeActions";
@@ -79,8 +79,8 @@ export type {
 } from "@langs/html/htmlAnalyzer";
 
 export {
-	analyzeHtmlCode,
-	generateHtmlAnalysisDiagnostics,
+	anlyHtmlCd as analyzeHtmlCode,
+	gnrHtAnDi as generateHtmlAnalysisDiagnostics,
 } from "@langs/html/htmlAnalyzer";
 
 // 3. JS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
@@ -100,22 +100,22 @@ export type {
 
 export {
 	loadJSHint,
-	loadJSHintConfig,
+	ldJsHntCfg as loadJSHintConfig,
 } from "@langs/js/jsConfig";
 
 export {
 	clamp as jsClamp,
-	calculateErrorRange,
-	calculateSeverity,
-	isJsLikeDocument,
+	clclErrRng as calculateErrorRange,
+	clclSvrt as calculateSeverity,
+	isJsLkDoc as isJsLikeDocument,
 } from "@langs/js/jsUtils";
 
 export {
 	runJSHint,
 	getJSHint,
-	generateAdditionalDiagnostics,
+	gnrtAddDiags as generateAdditionalDiagnostics,
 } from "@langs/js/jsValidator";
 
-export { analyzeSourceCode } from "@langs/js/jsAnalyzer";
+export { anlySrcCd as analyzeSourceCode } from "@langs/js/jsAnalyzer";
 
 export { JSHintCodeActionProvider } from "@langs/js/jsCodeActions";

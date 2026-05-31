@@ -7,13 +7,13 @@
 import { type CssSupport, cacheClear, cacheDelete, cacheSize } from "@exportLangs";
 import { vscode } from "@exportLibs";
 import { isAnalyzable, logger } from "@exportScripts";
-import { AutoValidationMode } from "@exportTypes";
+import { AutoValidationMode as AtValMd } from "@exportTypes";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const BASE_VALIDATION_DELAY_MS = 250;
-const MAX_VALIDATION_DELAY_MS = 1000;
-const RAPID_CHANGE_THRESHOLD = 5;
-const MAX_VALIDATION_TEXT_CACHE_CHARS = 500_000;
+const BVDM = 250;
+const MVDM = 1000;
+const RPD_CHG_THRS = 5;
+const MVTCC = 500_000;
 
 type ValidationSnapshot = {
   cssDiagnostics: vscode.Diagnostic[];
@@ -55,11 +55,11 @@ class DiagnosticManager {
     this.lastValidatedVersions.set(document.uri.toString(), document.version);
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-  private storeSnapshot(documentKey: string, text: string, cssDiagnostics: vscode.Diagnostic[], htmlHintDiagnostics: vscode.Diagnostic[], jsHintDiagnostics: vscode.Diagnostic[]): void {
-    text.length <= MAX_VALIDATION_TEXT_CACHE_CHARS ? this.lastValidationSnapshots.set(documentKey, {
-        cssDiagnostics,
-        htmlHintDiagnostics,
-        jsHintDiagnostics,
+  private storeSnapshot(documentKey: string, text: string, cssDiags: vscode.Diagnostic[], htmlHntDiags: vscode.Diagnostic[], jsHntDiags: vscode.Diagnostic[]): void {
+    text.length <= MVTCC ? this.lastValidationSnapshots.set(documentKey, {
+        cssDiagnostics: cssDiags,
+        htmlHintDiagnostics: htmlHntDiags,
+        jsHintDiagnostics: jsHntDiags,
         text,
       }) : this.lastValidationSnapshots.delete(documentKey);
   }
@@ -69,23 +69,23 @@ class DiagnosticManager {
     this.lastValidationSnapshots.clear();
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-  scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void {
+  scheduleValidation(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AtValMd): void {
     !isAnalyzable(document) ? void 0 : (
       (() => {
         const documentKey = document.uri.toString();
         const now = Date.now();
         const lastChange = this.lastChangeTimestamps.get(documentKey) || 0;
         const changeCount = this.changeCounters.get(documentKey) || 0;
-        const isRapidChange = now - lastChange < 1000;
-        const newChangeCount = isRapidChange ? changeCount + 1 : 1;
+        const isRpdChg = now - lastChange < 1000;
+        const nwChgCnt = isRpdChg ? changeCount + 1 : 1;
 
-        this.changeCounters.set(documentKey, newChangeCount);
+        this.changeCounters.set(documentKey, nwChgCnt);
         this.lastChangeTimestamps.set(documentKey, now);
 
-        const existingTimer = this.debounceTimers.get(documentKey);
-        existingTimer && clearTimeout(existingTimer);
+        const exstTmr = this.debounceTimers.get(documentKey);
+        exstTmr && clearTimeout(exstTmr);
 
-        const delay = newChangeCount >= RAPID_CHANGE_THRESHOLD ? Math.min(BASE_VALIDATION_DELAY_MS * Math.log2(newChangeCount), MAX_VALIDATION_DELAY_MS) : BASE_VALIDATION_DELAY_MS;
+        const delay = nwChgCnt >= RPD_CHG_THRS ? Math.min(BVDM * Math.log2(nwChgCnt), MVDM) : BVDM;
 
         const fnUpdate = async () => {
           this.debounceTimers.delete(documentKey);
@@ -98,9 +98,9 @@ class DiagnosticManager {
     );
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-  async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> {
+  async updateDiagnostics(cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AtValMd): Promise<void> {
     const documentKey = document.uri.toString();
-    const isForceMode = triggerMode === AutoValidationMode.FORCE;
+    const isForceMode = triggerMode === AtValMd.FORCE;
     const lastVersion = this.lastValidatedVersions.get(documentKey);
     if (!isForceMode && lastVersion === document.version) {
       return;
@@ -124,15 +124,15 @@ class DiagnosticManager {
     try {
       currentText ??= document.getText();
       const result = await cssSupport.validate(document, currentText);
-      const cssDiagnostics = result.filter((d) => d.source === `CSS-Analyzer`);
-      const htmlHintDiagnostics = result.filter((d) => d.source === `HTMLHint`);
-      const jsHintDiagnostics = result.filter((d) => d.source === `JSHint`);
-      this.cssCollection.set(document.uri, cssDiagnostics);
-      this.htmlHintCollection.set(document.uri, htmlHintDiagnostics);
-      this.jsHintCollection.set(document.uri, jsHintDiagnostics);
+      const cssDiags = result.filter((d) => d.source === `CSS-Analyzer`);
+      const htmlHntDiags = result.filter((d) => d.source === `HTMLHint`);
+      const jsHntDiags = result.filter((d) => d.source === `JSHint`);
+      this.cssCollection.set(document.uri, cssDiags);
+      this.htmlHintCollection.set(document.uri, htmlHntDiags);
+      this.jsHintCollection.set(document.uri, jsHntDiags);
       this.lastValidatedVersions.set(documentKey, document.version);
-      this.storeSnapshot(documentKey, currentText, cssDiagnostics, htmlHintDiagnostics, jsHintDiagnostics);
-      logger(`debug`, `${document.fileName} -> CSS: ${cssDiagnostics.length}, HTML: ${htmlHintDiagnostics.length}, JS: ${jsHintDiagnostics.length}`);
+      this.storeSnapshot(documentKey, currentText, cssDiags, htmlHntDiags, jsHntDiags);
+      logger(`debug`, `${document.fileName} -> CSS: ${cssDiags.length}, HTML: ${htmlHntDiags.length}, JS: ${jsHntDiags.length}`);
     }
     catch (error: unknown) {
       const errorMessage = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -158,44 +158,44 @@ class DiagnosticManager {
   }
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
   clearAllCache(): void {
-    const cacheCountBefore = cacheSize();
+    const cchCntBfr = cacheSize();
 
     cacheClear();
     this.clearValidationState();
     this.cssSupportInstance?.clearWorkspaceIndex();
 
-    vscode.window.showInformationMessage(`Style cache cleared: ${cacheCountBefore}`);
+    vscode.window.showInformationMessage(`Style cache cleared: ${cchCntBfr}`);
   }
 }
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const diagnosticManager = new DiagnosticManager();
+const diagMgr = new DiagnosticManager();
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const scheduleValidate = (cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): void => {
-  diagnosticManager.scheduleValidation(cssSupport, document, triggerMode);
+export const schedVal = (cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AtValMd): void => {
+  diagMgr.scheduleValidation(cssSupport, document, triggerMode);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const updateDiagnostics = async (cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AutoValidationMode): Promise<void> => {
-  await diagnosticManager.updateDiagnostics(cssSupport, document, triggerMode);
+export const updtDiags = async (cssSupport: CssSupport, document: vscode.TextDocument, triggerMode: AtValMd): Promise<void> => {
+  await diagMgr.updateDiagnostics(cssSupport, document, triggerMode);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const onClosed = (document: vscode.TextDocument): void => {
-  diagnosticManager.handleDocumentClosed(document);
+  diagMgr.handleDocumentClosed(document);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const bindCssSupport = (cssSupport: CssSupport): void => {
-  diagnosticManager.bindCssSupport(cssSupport);
+export const bndCssSup = (cssSupport: CssSupport): void => {
+  diagMgr.bindCssSupport(cssSupport);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const clearAll = (): void => {
-  diagnosticManager.clearAllCache();
+  diagMgr.clearAllCache();
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const clearValidationState = (): void => {
-  diagnosticManager.clearValidationState();
+export const clrValSt = (): void => {
+  diagMgr.clearValidationState();
 };

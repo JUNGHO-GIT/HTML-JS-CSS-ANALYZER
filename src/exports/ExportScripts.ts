@@ -6,25 +6,25 @@
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	bindCssSupport,
+	bndCssSup as bindCssSupport,
 	clearAll,
-	clearValidationState,
+	clrValSt as clearValidationState,
 	onClosed,
-	scheduleValidate,
-	updateDiagnostics,
+	schedVal as scheduleValidate,
+	updtDiags as updateDiagnostics,
 } from "@scripts/diagnostic";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export { isAnalyzable } from "@scripts/filter";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
 	globToRegExp,
-	isUriExcludedByGlob,
+	isUrExByGl as isUriExcludedByGlob,
 } from "@scripts/glob";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
 	type LineIndex,
-	LineIndexMapper,
+	LineIndex as LineIndexMapper,
 } from "@scripts/lineIndex";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
@@ -34,9 +34,9 @@ export {
 export { notify } from "@scripts/notify";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export {
-	performanceMonitor,
-	resourceLimiter,
-	withPerformanceMonitoring,
+	perfMntr as performanceMonitor,
+	resLmtr as resourceLimiter,
+	wthPerfMon as withPerformanceMonitoring,
 } from "@scripts/performance";
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export { validateDocument } from "@scripts/validate";
+export { valDoc as validateDocument } from "@scripts/validate";

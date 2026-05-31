@@ -4,21 +4,21 @@
  * @description JSHint 검증 및 진단 생성
  */
 
-import type { ComplexityIssue, FunctionInfo, JSHintError, JSHintInstance, PotentialBug, SourceAnalysis, VariableInfo } from "@exportLangs";
-import { analyzeSourceCode, loadJSHint, loadJSHintConfig } from "@exportLangs";
+import type { ComplexityIssue as CmplIss, FunctionInfo, JSHintError, JSHintInstance as JsHntInst, PotentialBug, SourceAnalysis as SrcAnly, VariableInfo } from "@exportLangs";
+import { analyzeSourceCode as anlySrcCd, loadJSHint, loadJSHintConfig as ldJsHntCfg } from "@exportLangs";
 import { Position, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
-import { calculateErrorRange, calculateSeverity } from "@langs/js/jsUtils";
+import { clclErrRng, clclSvrt } from "@langs/js/jsUtils";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const ERROR_SEVERITY_TYPES = new Set([`eval-usage`, `with-statement`, `assignment-in-condition`, `innerhtml-usage`, `document-write`]);
-const WARNING_SEVERITY_TYPES = new Set([`empty-catch`, `var-usage`]);
-const MAX_FUNCTION_PARAMS = 6;
-const MODULE_EXTENSIONS = [`.mjs`, `.cjs`];
-let jsHintCache: JSHintInstance | null | undefined;
+const ERR_SVR_TYP = new Set([`eval-usage`, `with-statement`, `assignment-in-condition`, `innerhtml-usage`, `document-write`]);
+const WRN_SVR_TYP = new Set([`empty-catch`, `var-usage`]);
+const MX_FN_PRMS = 6;
+const MOD_EXTS = [`.mjs`, `.cjs`];
+let jsHintCache: JsHntInst | null | undefined;
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const getJSHint = (): JSHintInstance | null => {
+export const getJSHint = (): JsHntInst | null => {
   if (jsHintCache === undefined) {
     jsHintCache = loadJSHint();
   }
@@ -26,10 +26,10 @@ export const getJSHint = (): JSHintInstance | null => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const generateAdditionalDiagnostics = (document: vscode.TextDocument, analysis: SourceAnalysis): vscode.Diagnostic[] => {
+export const gnrtAddDiags = (document: vscode.TextDocument, analysis: SrcAnly): vscode.Diagnostic[] => {
   const diagnostics: vscode.Diagnostic[] = [];
 
-  analysis.complexityIssues.forEach((issue: ComplexityIssue) => {
+  analysis.complexityIssues.forEach((issue: CmplIss) => {
     const line = Math.max(issue.line - 1, 0);
     const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
     const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
@@ -51,7 +51,7 @@ export const generateAdditionalDiagnostics = (document: vscode.TextDocument, ana
     const line = Math.max(bug.line - 1, 0);
     const lineText = document.lineAt(Math.min(line, document.lineCount - 1)).text;
     const range = new vscode.Range(new Position(line, 0), new Position(line, lineText.length));
-    const severity = ERROR_SEVERITY_TYPES.has(bug.type) ? vscode.DiagnosticSeverity.Error : WARNING_SEVERITY_TYPES.has(bug.type) ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information;
+    const severity = ERR_SVR_TYP.has(bug.type) ? vscode.DiagnosticSeverity.Error : WRN_SVR_TYP.has(bug.type) ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information;
     const diagnostic = new vscode.Diagnostic(range, bug.message, severity);
 
     diagnostic.source = `JSHint`;
@@ -66,7 +66,7 @@ export const generateAdditionalDiagnostics = (document: vscode.TextDocument, ana
   });
 
   analysis.functions.forEach((func: FunctionInfo) => {
-    if (func.parameters <= MAX_FUNCTION_PARAMS) {
+    if (func.parameters <= MX_FN_PRMS) {
       return;
     }
     const line = Math.max(func.line - 1, 0);
@@ -135,26 +135,26 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
   try {
     logger(`debug`, `starting analysis for: ${document.fileName} (languageId: ${document.languageId})`);
 
-    const config = { ...loadJSHintConfig(document.uri.fsPath) };
+    const config = { ...ldJsHntCfg(document.uri.fsPath) };
     const fileName = document.fileName.toLowerCase();
     const sourceText = document.getText();
-    const isModule = MODULE_EXTENSIONS.some((ext) => fileName.endsWith(ext)) || sourceText.includes(`import `) || sourceText.includes(`export `);
+    const isModule = MOD_EXTS.some((ext) => fileName.endsWith(ext)) || sourceText.includes(`import `) || sourceText.includes(`export `);
 
     if (isModule) {
       config.module = true;
       config.esversion = Math.max(config.esversion || 6, 6);
     }
-    const { processedCode, analysis } = analyzeSourceCode(sourceText, document);
+    const { processedCode: procdCd, analysis } = anlySrcCd(sourceText, document);
 
     logger(`debug`, `analysis started: ${document.fileName}`);
 
-    const isValid = jsHint.JSHINT(processedCode, config);
+    const isValid = jsHint.JSHINT(procdCd, config);
     if (isValid) {
       logger(`debug`, `analysis completed: no errors (${document.fileName})`);
       return [];
     }
     type JSHintDataMethod = () => { errors?: Array<JSHintError | null | undefined> };
-    const instanceData = jsHint as JSHintInstance & { data?: JSHintDataMethod };
+    const instanceData = jsHint as JsHntInst & { data?: JSHintDataMethod };
     const functionData = jsHint.JSHINT as unknown as { data?: JSHintDataMethod };
     const dataMethod = instanceData.data ?? functionData.data;
     if (typeof dataMethod !== `function`) {
@@ -173,8 +173,8 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
         if (!error || error.line === null || error.line === undefined) {
           continue;
         }
-        const range = calculateErrorRange(document, error);
-        const severity = calculateSeverity(error);
+        const range = clclErrRng(document, error);
+        const severity = clclSvrt(error);
         const message = error.reason || `JSHint error`;
         const diagnostic = new vscode.Diagnostic(range, message, severity);
 
@@ -195,14 +195,14 @@ export const runJSHint = (document: vscode.TextDocument): vscode.Diagnostic[] =>
       }
       logger(`debug`, `analysis completed: ${errorCount} errors, ${warningCount} warnings, ${infoCount} info (${document.fileName})`);
     }
-    const additionalDiagnostics = generateAdditionalDiagnostics(document, analysis);
-    diagnostics.push(...additionalDiagnostics);
+    const addDiags = gnrtAddDiags(document, analysis);
+    diagnostics.push(...addDiags);
 
     const totalIssues = diagnostics.length;
-    const additionalIssues = additionalDiagnostics.length;
+    const addIsss = addDiags.length;
 
-    if (additionalIssues > 0) {
-      logger(`debug`, `analysis completed: ${additionalIssues} code quality issues found (${document.fileName})`);
+    if (addIsss > 0) {
+      logger(`debug`, `analysis completed: ${addIsss} code quality issues found (${document.fileName})`);
     }
     logger(`debug`, `analysis finished: total ${totalIssues} issues (${document.fileName})`);
 

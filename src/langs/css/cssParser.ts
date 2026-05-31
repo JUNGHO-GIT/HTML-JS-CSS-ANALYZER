@@ -20,7 +20,7 @@ export type ParseOptions = {
 };
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const DEFAULT_PARSE_OPTIONS: csstree.ParseOptions = {
+const DEF_PRS_OPTS: csstree.ParseOptions = {
   positions: true,
   parseAtrulePrelude: false,
   parseRulePrelude: true,
@@ -28,7 +28,7 @@ const DEFAULT_PARSE_OPTIONS: csstree.ParseOptions = {
 };
 
 // HELPERS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-const calculateSpecificity = (selector: csstree.CssNode): [number, number, number] => {
+const clclSpcf = (selector: csstree.CssNode): [number, number, number] => {
   let ids = 0;
   let classes = 0;
   let elements = 0;
@@ -43,7 +43,7 @@ const calculateSpecificity = (selector: csstree.CssNode): [number, number, numbe
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const createLineStarts = (text: string): number[] => {
+const crtLnStrt = (text: string): number[] => {
   const starts = [0];
   for (let i = 0; i < text.length; i++) {
     text.charCodeAt(i) === 10 && starts.push(i + 1);
@@ -52,7 +52,7 @@ const createLineStarts = (text: string): number[] => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const getLineColumn = (lineStarts: number[], index: number): { col: number; line: number } => {
+const gtLnClmn = (lineStarts: number[], index: number): { col: number; line: number } => {
   let low = 0;
   let high = lineStarts.length - 1;
   while (low <= high) {
@@ -81,13 +81,13 @@ const isHexDigit = (char: string): boolean => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const isCssWhitespace = (char: string): boolean => {
+const isCssWhts = (char: string): boolean => {
   const code = char.charCodeAt(0);
   return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const readCssEscapeEnd = (text: string, start: number): number => {
+const rdCssEscpEnd = (text: string, start: number): number => {
   let index = start + 1;
   let hexCount = 0;
   while (index < text.length && hexCount < 6 && isHexDigit(text[index])) {
@@ -95,7 +95,7 @@ const readCssEscapeEnd = (text: string, start: number): number => {
     hexCount++;
   }
   if (hexCount > 0) {
-    if (index < text.length && isCssWhitespace(text[index])) {
+    if (index < text.length && isCssWhts(text[index])) {
       index++;
     }
   }
@@ -106,7 +106,7 @@ const readCssEscapeEnd = (text: string, start: number): number => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const unescapeCssIdentifier = (value: string): string => {
+const unscCssId = (value: string): string => {
   let result = ``;
   let index = 0;
   while (index < value.length) {
@@ -120,7 +120,7 @@ const unescapeCssIdentifier = (value: string): string => {
       if (hex.length > 0) {
         const codePoint = Number.parseInt(hex, 16);
         result += codePoint > 0 && codePoint <= 0x10_ff_ff ? String.fromCodePoint(codePoint) : String.fromCodePoint(0xff_fd);
-        if (escapeIndex < value.length && isCssWhitespace(value[escapeIndex])) {
+        if (escapeIndex < value.length && isCssWhts(value[escapeIndex])) {
           escapeIndex++;
         }
         index = escapeIndex;
@@ -148,11 +148,11 @@ const isEscaped = (text: string, index: number): boolean => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const readSelectorNameEnd = (text: string, start: number): number => {
+const rdSelNmEnd = (text: string, start: number): number => {
   let index = start;
   while (index < text.length) {
     if (text[index] === `\\` && index + 1 < text.length) {
-      index = readCssEscapeEnd(text, index);
+      index = rdCssEscpEnd(text, index);
     }
     else if (isNameChar(text[index])) {
       index++;
@@ -165,18 +165,18 @@ const readSelectorNameEnd = (text: string, start: number): number => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const pushSelector = (positions: SelectorPos[], lineStarts: number[], absoluteIndex: number, rawSelector: string, marker: string, options?: ParseOptions): void => {
+const pushSelector = (positions: SelectorPos[], lineStarts: number[], abslIdx: number, rawSelector: string, marker: string, options?: ParseOptions): void => {
   const type = marker === `#` ? SelectorType.ID : SelectorType.CLASS;
   if (options?.filterByType !== undefined && options.filterByType !== type) {
     return;
   }
-  const selector = unescapeCssIdentifier(rawSelector);
+  const selector = unscCssId(rawSelector);
   if (!selector) {
     return;
   }
-  const { line, col } = getLineColumn(lineStarts, absoluteIndex);
+  const { line, col } = gtLnClmn(lineStarts, abslIdx);
   positions.push({
-    index: absoluteIndex,
+    index: abslIdx,
     line,
     col,
     type,
@@ -185,7 +185,7 @@ const pushSelector = (positions: SelectorPos[], lineStarts: number[], absoluteIn
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const scanSelectorPrelude = (positions: SelectorPos[], cssText: string, lineStarts: number[], start: number, end: number, options?: ParseOptions): void => {
+const scnSelPrld = (positions: SelectorPos[], cssText: string, lineStarts: number[], start: number, end: number, options?: ParseOptions): void => {
   const rawPrelude = cssText.slice(start, end);
   const prelude = rawPrelude.trimStart();
   if (!prelude || prelude.startsWith(`@`)) {
@@ -225,7 +225,7 @@ const scanSelectorPrelude = (positions: SelectorPos[], cssText: string, lineStar
     ch === `]` && bracketDepth > 0 && bracketDepth--;
     if ((ch === `.` || ch === `#`) && bracketDepth === 0 && !isEscaped(prelude, i)) {
       const nameStart = i + 1;
-      const nameEnd = readSelectorNameEnd(prelude, nameStart);
+      const nameEnd = rdSelNmEnd(prelude, nameStart);
       nameEnd > nameStart && pushSelector(positions, lineStarts, offset + i, prelude.slice(nameStart, nameEnd), ch, options);
       i = nameEnd - 1;
     }
@@ -233,11 +233,11 @@ const scanSelectorPrelude = (positions: SelectorPos[], cssText: string, lineStar
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const parseSelectorsWithCssTree = (cssText: string, options?: ParseOptions): SelectorPos[] => {
+const prsSeWtCsTr = (cssText: string, options?: ParseOptions): SelectorPos[] => {
   const positions: SelectorPos[] = [];
 
   try {
-    const ast = csstree.parse(cssText, DEFAULT_PARSE_OPTIONS);
+    const ast = csstree.parse(cssText, DEF_PRS_OPTS);
 
     csstree.walk(ast, (node: csstree.CssNode) => {
       const isClass = node.type === `ClassSelector`;
@@ -265,7 +265,7 @@ const parseSelectorsWithCssTree = (cssText: string, options?: ParseOptions): Sel
       };
 
       if (options?.includeSpecificity === true) {
-        pos.specificity = calculateSpecificity(node);
+        pos.specificity = clclSpcf(node);
       }
 
       positions.push(pos);
@@ -278,12 +278,12 @@ const parseSelectorsWithCssTree = (cssText: string, options?: ParseOptions): Sel
 };
 
 // MAIN PARSER ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const parseSelectors = (cssText: string, options?: ParseOptions): SelectorPos[] => {
+export const prsSels = (cssText: string, options?: ParseOptions): SelectorPos[] => {
   if (options?.includeSpecificity === true || options?.includeParentRule === true) {
-    return parseSelectorsWithCssTree(cssText, options);
+    return prsSeWtCsTr(cssText, options);
   }
   const positions: SelectorPos[] = [];
-  const lineStarts = createLineStarts(cssText);
+  const lineStarts = crtLnStrt(cssText);
   let segmentStart = 0;
   let quote: string | null = null;
   let inComment = false;
@@ -314,7 +314,7 @@ export const parseSelectors = (cssText: string, options?: ParseOptions): Selecto
       continue;
     }
     if (ch === `{`) {
-      scanSelectorPrelude(positions, cssText, lineStarts, segmentStart, i, options);
+      scnSelPrld(positions, cssText, lineStarts, segmentStart, i, options);
       segmentStart = i + 1;
     }
     else if (ch === `;`) {
@@ -330,7 +330,7 @@ export const parseSelectors = (cssText: string, options?: ParseOptions): Selecto
 // UTILITY FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const parseCssAst = (cssText: string): csstree.CssNode | null => {
   try {
-    return csstree.parse(cssText, DEFAULT_PARSE_OPTIONS);
+    return csstree.parse(cssText, DEF_PRS_OPTS);
   }
   catch {
     return null;

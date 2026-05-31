@@ -5,16 +5,16 @@
  */
 
 import { logger } from "@exportScripts";
-import type { PerformanceMetricsType } from "@exportTypes";
+import type { PerformanceMetricsType as PerfMtrcTyp } from "@exportTypes";
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-let __pmInstance: { metrics: Map<string, PerformanceMetricsType>; start: (operationName: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
-export const performanceMonitor = () => {
+let __pmInstance: { metrics: Map<string, PerfMtrcTyp>; start: (opNm: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
+export const perfMntr = () => {
   !__pmInstance && (__pmInstance = {
-      metrics: new Map<string, PerformanceMetricsType>(),
-      start(operationName: string): string {
-        const key = `${operationName}_${Date.now()}_${Math.random()}`;
-        this.metrics.set(key, { startTime: performance.now(), operationName });
+      metrics: new Map<string, PerfMtrcTyp>(),
+      start(opNm: string): string {
+        const key = `${opNm}_${Date.now()}_${Math.random()}`;
+        this.metrics.set(key, { startTime: performance.now(), operationName: opNm });
         return key;
       },
       end(key: string): number {
@@ -22,8 +22,8 @@ export const performanceMonitor = () => {
         const rs = !metric ? -1 : (
             (() => {
               const duration = performance.now() - metric.startTime;
-              const formattedDuration = Math.round(duration * 100) / 100;
-              duration > 500 ? logger(`debug`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`) : duration > 100 ? logger(`debug`, `Timing: ${metric.operationName} took ${formattedDuration}ms`) : void 0;
+              const frmtDrtn = Math.round(duration * 100) / 100;
+              duration > 500 ? logger(`debug`, `Slow operation: ${metric.operationName} took ${frmtDrtn}ms`) : duration > 100 ? logger(`debug`, `Timing: ${metric.operationName} took ${frmtDrtn}ms`) : void 0;
               this.metrics.delete(key);
               return duration;
             })()
@@ -45,14 +45,14 @@ export const performanceMonitor = () => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const withPerformanceMonitoring = async <T>(operationName: string, operation: () => Promise<T> | T): Promise<T> => {
-  const key = performanceMonitor().start(operationName);
+export const wthPerfMon = async <T>(opNm: string, operation: () => Promise<T> | T): Promise<T> => {
+  const key = perfMntr().start(opNm);
   try {
     const result = await operation();
     return result;
   }
   finally {
-    performanceMonitor().end(key);
+    perfMntr().end(key);
   }
 };
 
@@ -80,7 +80,7 @@ export const debounce = <T extends (...args: any[]) => any>(func: T, delay: numb
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void };
 let __rlInstance: ResourceLimiterType | null = null;
-export const resourceLimiter = () => {
+export const resLmtr = () => {
   !__rlInstance && (__rlInstance = {
       MAX_CONCURRENT_OPERATIONS: 5,
       activeOperations: 0,

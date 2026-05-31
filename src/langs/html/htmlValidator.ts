@@ -4,33 +4,33 @@
  * @description HTML 문서 유효성 검사 로직
  */
 
-import { analyzeHtmlCode, generateHtmlAnalysisDiagnostics } from "@exportLangs";
-import { Diagnostic, DiagnosticSeverity, Position, vscode } from "@exportLibs";
+import { analyzeHtmlCode as anlyHtmlCd, generateHtmlAnalysisDiagnostics as gnrHtAnDi } from "@exportLangs";
+import { Diagnostic, DiagnosticSeverity as DiagSvrt, Position, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import { loadConfig, loadHtmlHint } from "@langs/html/htmlConfig";
-import type { HtmlHintError, HtmlHintInstance } from "@langs/html/htmlType";
+import type { HtmlHintError as HtmlHntErr, HtmlHintInstance as HtmlHntInst } from "@langs/html/htmlType";
 import { clamp } from "@langs/html/htmlUtils";
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 // CONSTANTS
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const HTML_FILE_REGEX = /\.html?$/i;
-const DIAGNOSTIC_SOURCE = `HTMLHint`;
+const HTML_FL_RE = /\.html?$/i;
+const DIAG_SRC = `HTMLHint`;
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 // MODULE STATE
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-let htmlhintCache: HtmlHintInstance | null | undefined;
+let htmlCch: HtmlHntInst | null | undefined;
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const getHtmlHint = (): HtmlHintInstance | null => {
-  let result: HtmlHintInstance | null;
+const getHtmlHint = (): HtmlHntInst | null => {
+  let result: HtmlHntInst | null;
 
-  htmlhintCache === undefined ? (
-    (htmlhintCache = loadHtmlHint()),
-    (result = htmlhintCache)
+  htmlCch === undefined ? (
+    (htmlCch = loadHtmlHint()),
+    (result = htmlCch)
   ) : (
-    result = htmlhintCache
+    result = htmlCch
   );
 
   return result;
@@ -44,7 +44,7 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
         try {
           const config = loadConfig(doc.uri.fsPath);
           const text = doc.getText();
-          const errors: HtmlHintError[] = htmlhint.verify(text, config) || [];
+          const errors: HtmlHntErr[] = htmlhint.verify(text, config) || [];
           const maxLine = doc.lineCount - 1;
           const diags: Diagnostic[] = [];
 
@@ -58,8 +58,8 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
               lineText.length > 0 ? lineText.length : col + len,
             );
             const range = new vscode.Range(new Position(line, col), new Position(line, endCol));
-            const diagnostic = new Diagnostic(range, err.message, DiagnosticSeverity.Warning);
-            diagnostic.source = DIAGNOSTIC_SOURCE;
+            const diagnostic = new Diagnostic(range, err.message, DiagSvrt.Warning);
+            diagnostic.source = DIAG_SRC;
             diagnostic.code = err.rule?.id;
             (diagnostic as any).data = {
               ruleId: err.rule?.id,
@@ -70,9 +70,9 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
             diags.push(diagnostic);
           }
           // Add custom analysis diagnostics
-          const analysis = analyzeHtmlCode(text);
-          const analysisDiagnostics = generateHtmlAnalysisDiagnostics(doc, analysis);
-          diags.push(...analysisDiagnostics);
+          const analysis = anlyHtmlCd(text);
+          const anlyDiags = gnrHtAnDi(doc, analysis);
+          diags.push(...anlyDiags);
 
           return diags;
         }
@@ -84,4 +84,4 @@ export const runHtmlHint = (doc: vscode.TextDocument): Diagnostic[] => {
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const isHtmlDocument = (doc: vscode.TextDocument): boolean => HTML_FILE_REGEX.test(doc.fileName) || doc.languageId === `html`;
+export const isHtmlDoc2 = (doc: vscode.TextDocument): boolean => HTML_FL_RE.test(doc.fileName) || doc.languageId === `html`;

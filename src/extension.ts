@@ -4,16 +4,16 @@
  * @description VS Code 확장 진입점 (활성화, 프로바이더 등록)
  */
 
-import { clearConfigurationCache } from "@exportConsts";
-import { CssSupport, HtmlHintCodeActionProvider, JSHintCodeActionProvider } from "@exportLangs";
+import { clearConfigurationCache as clrCfgCch } from "@exportConsts";
+import { CssSupport, HtmlHintCodeActionProvider as HtmHnCdAcPr, JSHintCodeActionProvider as JsHnCdAcPr } from "@exportLangs";
 import { vscode } from "@exportLibs";
-import { bindCssSupport, clearAll, clearValidationState, initLogger, logger, onClosed, scheduleValidate, updateDiagnostics } from "@exportScripts";
-import { AutoValidationMode } from "@exportTypes";
+import { bindCssSupport as bndCssSup, clearAll, clearValidationState as clrValSt, initLogger, logger, onClosed, scheduleValidate as schedVal, updateDiagnostics as updtDiags } from "@exportScripts";
+import { AutoValidationMode as AtValMd } from "@exportTypes";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const HTML_LANGUAGE: vscode.DocumentSelector = [{ language: `html` }];
+const HTML_LANG: vscode.DocumentSelector = [{ language: `html` }];
 const JS_LANGUAGES: vscode.DocumentSelector = [{ language: `javascript` }];
-const CSS_LANGUAGES: vscode.DocumentSelector = [{ language: `html` }, { language: `css` }];
+const CSS_LANGS: vscode.DocumentSelector = [{ language: `html` }, { language: `css` }];
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 export const deactivate = () => {};
@@ -21,46 +21,46 @@ export const activate = (context: vscode.ExtensionContext) => {
   initLogger(context);
   logger(`info`, `Html-Js-Css-Analyzer is now active!`);
   const cssSupport = new CssSupport();
-  bindCssSupport(cssSupport);
+  bndCssSup(cssSupport);
 
-  registerProviders(context, cssSupport);
-  registerEventHandlers(context, cssSupport);
-  registerCommands(context, cssSupport);
+  rgstPrvd(context, cssSupport);
+  rgstEvtHndl(context, cssSupport);
+  rgstCmds(context, cssSupport);
 
   const activeEditor = vscode.window.activeTextEditor;
-  activeEditor && void updateDiagnostics(cssSupport, activeEditor.document, AutoValidationMode.ALWAYS);
+  activeEditor && void updtDiags(cssSupport, activeEditor.document, AtValMd.ALWAYS);
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const registerProviders = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const rgstPrvd = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
   context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(CSS_LANGUAGES, cssSupport, `.`, `#`, `"`, `'`, "`", ` `),
-    vscode.languages.registerDefinitionProvider(CSS_LANGUAGES, cssSupport),
-    vscode.languages.registerCodeActionsProvider(HTML_LANGUAGE, new HtmlHintCodeActionProvider(), {
-      providedCodeActionKinds: HtmlHintCodeActionProvider.metadata.providedCodeActionKinds,
+    vscode.languages.registerCompletionItemProvider(CSS_LANGS, cssSupport, `.`, `#`, `"`, `'`, "`", ` `),
+    vscode.languages.registerDefinitionProvider(CSS_LANGS, cssSupport),
+    vscode.languages.registerCodeActionsProvider(HTML_LANG, new HtmHnCdAcPr(), {
+      providedCodeActionKinds: HtmHnCdAcPr.metadata.providedCodeActionKinds,
     }),
-    vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JSHintCodeActionProvider(), {
-      providedCodeActionKinds: JSHintCodeActionProvider.metadata.providedCodeActionKinds,
+    vscode.languages.registerCodeActionsProvider(JS_LANGUAGES, new JsHnCdAcPr(), {
+      providedCodeActionKinds: JsHnCdAcPr.metadata.providedCodeActionKinds,
     }),
   );
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const registerEventHandlers = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const rgstEvtHndl = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (savedDoc: vscode.TextDocument) => {
-      await updateDiagnostics(cssSupport, savedDoc, AutoValidationMode.SAVE);
+      await updtDiags(cssSupport, savedDoc, AtValMd.SAVE);
     }),
     vscode.workspace.onDidOpenTextDocument(async (openedDoc: vscode.TextDocument) => {
-      await updateDiagnostics(cssSupport, openedDoc, AutoValidationMode.ALWAYS);
+      await updtDiags(cssSupport, openedDoc, AtValMd.ALWAYS);
     }),
     vscode.workspace.onDidChangeTextDocument(async (changeEvent: vscode.TextDocumentChangeEvent) => {
-      scheduleValidate(cssSupport, changeEvent.document, AutoValidationMode.ALWAYS);
+      schedVal(cssSupport, changeEvent.document, AtValMd.ALWAYS);
     }),
     vscode.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
       if (event.affectsConfiguration(`Html-Js-Css-Analyzer`)) {
-        clearConfigurationCache();
-        clearValidationState();
+        clrCfgCch();
+        clrValSt();
         cssSupport.clearWorkspaceIndex();
       }
     }),
@@ -69,11 +69,11 @@ const registerEventHandlers = (context: vscode.ExtensionContext, cssSupport: Css
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const registerCommands = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
+const rgstCmds = (context: vscode.ExtensionContext, cssSupport: CssSupport): void => {
   context.subscriptions.push(
-    vscode.commands.registerCommand(`Html-Js-Css-Analyzer.validate`, async (mode?: AutoValidationMode) => {
+    vscode.commands.registerCommand(`Html-Js-Css-Analyzer.validate`, async (mode?: AtValMd) => {
       const editor = vscode.window.activeTextEditor;
-      editor && (await updateDiagnostics(cssSupport, editor.document, mode ?? AutoValidationMode.FORCE));
+      editor && (await updtDiags(cssSupport, editor.document, mode ?? AtValMd.FORCE));
     }),
     vscode.commands.registerCommand(`Html-Js-Css-Analyzer.clear`, clearAll),
   );

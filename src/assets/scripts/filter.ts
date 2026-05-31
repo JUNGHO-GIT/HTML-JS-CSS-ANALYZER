@@ -4,48 +4,48 @@
  * @description 문서 필터링 및 분석 대상 판별
  */
 
-import { getAnalyzableExtensions, getCssExcludePatterns } from "@exportConsts";
+import { getAnalyzableExtensions as gtAnlyExts, getCssExcludePatterns as gtCsExPa } from "@exportConsts";
 import type { vscode } from "@exportLibs";
-import { isUriExcludedByGlob } from "@exportScripts";
+import { isUriExcludedByGlob as isUrExByGl } from "@exportScripts";
 
 // CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const SUPPORTED_SCHEMES = [`file`, `vscode-file`, `vscode-remote`] as const;
-const EXCLUDED_PATH_PATTERNS = [`/appdata/roaming/code/user/`, `settings.json`, `mcp.json`] as const;
+const SUP_SCHM = [`file`, `vscode-file`, `vscode-remote`] as const;
+const EXC_PTH_PAT = [`/appdata/roaming/code/user/`, `settings.json`, `mcp.json`] as const;
 
 // FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const isValidScheme = (scheme: string): boolean => SUPPORTED_SCHEMES.includes(scheme as any);
+const isVldSchm = (scheme: string): boolean => SUP_SCHM.includes(scheme as any);
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const isExcludedPath = (fileName: string): boolean => {
-  const normalizedPath = fileName.replaceAll(`\\`, `/`).toLowerCase();
+const isExclPth = (fileName: string): boolean => {
+  const normPth = fileName.replaceAll(`\\`, `/`).toLowerCase();
 
-  return EXCLUDED_PATH_PATTERNS.some((pattern) => (pattern.startsWith(`/`) ? normalizedPath.includes(pattern) : normalizedPath.endsWith(pattern)));
+  return EXC_PTH_PAT.some((pattern) => (pattern.startsWith(`/`) ? normPth.includes(pattern) : normPth.endsWith(pattern)));
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const getFileExtension = (fileName: string): string | null => {
-  const normalizedPath = fileName.replaceAll(`\\`, `/`).toLowerCase();
-  const lastDotIndex = normalizedPath.lastIndexOf(`.`);
+const gtFlExt = (fileName: string): string | null => {
+  const normPth = fileName.replaceAll(`\\`, `/`).toLowerCase();
+  const lastDotIndex = normPth.lastIndexOf(`.`);
 
-  return lastDotIndex > 0 && lastDotIndex < normalizedPath.length - 1 ? normalizedPath.slice(lastDotIndex + 1) : null;
+  return lastDotIndex > 0 && lastDotIndex < normPth.length - 1 ? normPth.slice(lastDotIndex + 1) : null;
 };
 
 // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
 export const isAnalyzable = (document: vscode.TextDocument): boolean => {
-  if (!isValidScheme(document.uri.scheme)) {
+  if (!isVldSchm(document.uri.scheme)) {
   	return false;
   }
-  if (isExcludedPath(document.fileName)) {
+  if (isExclPth(document.fileName)) {
   	return false;
   }
-  const fileExtension = getFileExtension(document.fileName);
-  if (!fileExtension) {
+  const flExt = gtFlExt(document.fileName);
+  if (!flExt) {
   	return false;
   }
-  const analyzableExtensions = getAnalyzableExtensions(document.uri);
-  if (!analyzableExtensions.includes(fileExtension)) {
+  const anlyExts = gtAnlyExts(document.uri);
+  if (!anlyExts.includes(flExt)) {
   	return false;
   }
-  const excludePatterns = getCssExcludePatterns(document.uri);
-  return !isUriExcludedByGlob(document.uri, excludePatterns);
+  const exclPats = gtCsExPa(document.uri);
+  return !isUrExByGl(document.uri, exclPats);
 };
