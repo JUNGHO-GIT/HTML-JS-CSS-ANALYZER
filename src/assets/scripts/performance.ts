@@ -1,0 +1,115 @@
+/**
+ * @file performance.ts
+ * @since 2026-01-04
+ * @description 성능 모니터링 및 리소스 제한
+ */
+
+import { logger } from "@exportScripts";
+import type { PerformanceMetricsType as PerfMtrcTyp } from "@exportTypes";
+
+// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+let __pmInstance: { metrics: Map<string, PerfMtrcTyp>; start: (opNm: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
+export const perfMntr = () => {
+  !__pmInstance && (__pmInstance = {
+      metrics: new Map<string, PerfMtrcTyp>(),
+      start(opNm: string): string {
+        const key = `${opNm}_${Date.now()}_${Math.random()}`;
+        this.metrics.set(key, { startTime: performance.now(), operationName: opNm });
+        return key;
+      },
+      end(key: string): number {
+        const metric = this.metrics.get(key);
+        const rs = !metric ? -1 : (
+            (() => {
+              const duration = performance.now() - metric.startTime;
+              const frmtDrtn = Math.round(duration * 100) / 100;
+              duration > 500 ? logger(`debug`, `Slow operation: ${metric.operationName} took ${frmtDrtn}ms`) : duration > 100 ? logger(`debug`, `Timing: ${metric.operationName} took ${frmtDrtn}ms`) : void 0;
+              this.metrics.delete(key);
+              return duration;
+            })()
+          );
+        return rs;
+      },
+      checkMemoryUsage(): void {
+        (global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
+        const usage = process.memoryUsage();
+        const heapUsedMB = Math.round((usage.heapUsed / 1024 / 1024) * 100) / 100;
+        const heapTotalMB = Math.round((usage.heapTotal / 1024 / 1024) * 100) / 100;
+        heapUsedMB > 100 && logger(`debug`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
+      },
+      cleanup(): void {
+        this.metrics.clear();
+      },
+    });
+  return __pmInstance;
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export const wthPerfMon = async <T>(opNm: string, operation: () => Promise<T> | T): Promise<T> => {
+  const key = perfMntr().start(opNm);
+  try {
+    const result = await operation();
+    return result;
+  }
+  finally {
+    perfMntr().end(key);
+  }
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export const throttle = <T extends (...args: any[]) => any>(func: T, limit: number): T => {
+  let inThrottle: boolean;
+  return ((...args: any[]) => {
+    if (!inThrottle) {
+    	func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  }) as T;
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+export const debounce = <T extends (...args: any[]) => any>(func: T, delay: number): T => {
+  let timeoutId: NodeJS.Timeout;
+  return ((...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  }) as T;
+};
+
+// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void };
+let __rlInstance: ResourceLimiterType | null = null;
+export const resLmtr = () => {
+  !__rlInstance && (__rlInstance = {
+      MAX_CONCURRENT_OPERATIONS: 5,
+      activeOperations: 0,
+      queue: [] as (() => void)[],
+      async execute<T>(operation: () => Promise<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+          const fnExecute = async () => {
+            this.activeOperations++;
+            try {
+              const result = await operation();
+              resolve(result);
+            }
+            catch (error) {
+              reject(error);
+            }
+            finally {
+              this.activeOperations--;
+              this.processQueue();
+            }
+          };
+          this.activeOperations < this.MAX_CONCURRENT_OPERATIONS ? fnExecute() : this.queue.push(fnExecute);
+        });
+      },
+      processQueue(): void {
+        while (this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
+          const operation = this.queue.shift();
+          operation?.();
+        }
+      },
+    });
+  return __rlInstance;
+};

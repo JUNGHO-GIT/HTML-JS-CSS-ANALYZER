@@ -1,0 +1,175 @@
+{
+  "name": "html-js-css-analyzer",
+  "displayName": "Html-Js-Css-Analyzer",
+  "description": "HTML, JavaScript, CSS analyzer and linter extension for Visual Studio Code.",
+  "publisher": "JUNGHO",
+  "icon": "logo.webp",
+  "license": "Apache-2.0",
+  "version": "3.4.4",
+  "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jungho-dev/html-js-css-analyzer.git"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "css",
+    "html",
+    "javascript",
+    "jshint",
+    "htmlhint",
+    "intellisense",
+    "diagnostics",
+    "unused",
+    "selectors"
+  ],
+  "activationEvents": [
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:javascript",
+    "onCommand:Html-Js-Css-Analyzer.validate",
+    "onCommand:Html-Js-Css-Analyzer.clear"
+  ],
+  "contributes": {
+    "outputChannels": [
+      "Html-Js-Css-Analyzer"
+    ],
+    "commands": [
+      {
+        "command": "Html-Js-Css-Analyzer.validate",
+        "title": "Html-Js-Css-Analyzer: Validate Current Document"
+      },
+      {
+        "command": "Html-Js-Css-Analyzer.clear",
+        "title": "Html-Js-Css-Analyzer: Clear Style Cache"
+      }
+    ],
+    "configuration": {
+      "title": "Html-Js-Css-Analyzer",
+      "properties": {
+        "Html-Js-Css-Analyzer.logLevel": {
+          "type": "string",
+          "scope": "window",
+          "enum": [
+            "off",
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info"
+        },
+        "Html-Js-Css-Analyzer.exclude": {
+          "type": "array",
+          "scope": "resource",
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/out/**",
+            "**/.svn/**",
+            "**/.hg/**",
+            "**/CVS/**",
+            "**/.idea/**",
+            "**/.vscode/**",
+            "**/.settings/**",
+            "**/.metadata/**",
+            "**/.history/**",
+            "**/.backup/**",
+            "**/.etc/**",
+            "**/.cache/**",
+            "**/.gradle/**",
+            "**/.mvn/**",
+            "**/bin/**",
+            "**/build/**",
+            "**/target/**",
+            "**/logs/**",
+            "**/.pytest_cache/**",
+            "**/.scannerwork/**",
+            "**/.terraform/**",
+            "**/__pycache__/**",
+            "**/.venv/**",
+            "**/.classpath",
+            "**/.project",
+            "**/.factorypath",
+            "**/.DS_Store",
+            "**/Thumbs.db",
+            "**/desktop.ini",
+            "**/.coverage"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "Html-Js-Css-Analyzer.additionalExtensions": {
+          "type": "array",
+          "scope": "resource",
+          "default": [
+            "html",
+            "js",
+            "css"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "[Html-Js-Css-Analyzer] Additional file extensions to analyze"
+        },
+        "Html-Js-Css-Analyzer.htmlHint.enabled": {
+          "type": "boolean",
+          "scope": "resource",
+          "default": true,
+          "description": "[Html-Js-Css-Analyzer] Enable/disable HTML analysis and hints"
+        },
+        "Html-Js-Css-Analyzer.cssHint.enabled": {
+          "type": "boolean",
+          "scope": "resource",
+          "default": true,
+          "description": "[Html-Js-Css-Analyzer] Enable/disable CSS analysis and hints"
+        },
+        "Html-Js-Css-Analyzer.jsHint.enabled": {
+          "type": "boolean",
+          "scope": "resource",
+          "default": false,
+          "description": "[Html-Js-Css-Analyzer] Enable/disable JavaScript analysis and hints"
+        }
+      }
+    }
+  },
+  "engines": {
+    "vscode": ">=1.116.0",
+    "node": ">=21.0.0",
+    "npm": ">=10.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "git": "bun run ~/.bootstrap/bootstrap-sync.ts --git",
+    "swc": "bun run ~/.bootstrap/bootstrap-sync.ts --swc",
+    "sync": "bun run ~/.bootstrap/bootstrap-sync.ts --sync",
+    "tools": "bun run ~/.bootstrap/bootstrap-sync.ts --tools"
+  },
+  "dependencies": {
+    "css-tree": "^3.2.1",
+    "htmlhint": "^1.9.2",
+    "jshint": "^2.13.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.14",
+    "@swc/cli": "0.8.1",
+    "@swc/core": "1.15.33",
+    "@swc/helpers": "0.5.21",
+    "@types/css-tree": "^2.3.11",
+    "@types/htmlhint": "^1.1.5",
+    "@types/jshint": "^2.12.4",
+    "@types/node": "25.6.0",
+    "@types/vscode": "^1.116.0",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "0.28.0",
+    "ts-morph": "28.0.0",
+    "ts-prune": "0.10.3",
+    "tsc-alias": "1.8.17",
+    "typescript": "6.0.3"
+  }
+}
