@@ -7,7 +7,7 @@
 import { vscode } from "@exportLibs";
 
 const MAIN = `Html-Js-Css-Analyzer`;
-const AT_CLS_MS = 1000;
+const AUTO_CLOSE_MS = 1000;
 const LOG_CONFIG = {
   "debug": {
     "str": `[D]`,
@@ -28,7 +28,7 @@ const LOG_CONFIG = {
 
 type NotifyType = keyof typeof LOG_CONFIG;
 
-// 1. Show progress ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 1. Show progress -------------------------------------------------------------
 const showProgress = async (text: string): Promise<void> => {
   await vscode.window.withProgress(
     {
@@ -38,16 +38,16 @@ const showProgress = async (text: string): Promise<void> => {
     },
     async () => {
       await new Promise<void>((resolve) => {
-        setTimeout(resolve, AT_CLS_MS);
+        setTimeout(resolve, AUTO_CLOSE_MS);
       });
     },
   );
 };
 
-// 2. Format notify ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 2. Format notify -------------------------------------------------------------
 const formatNotify = (type: NotifyType, value: string): string => `[${MAIN}] ${LOG_CONFIG[type].str} ${value}`;
 
-// 3. Notify ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 3. Notify -------------------------------------------------------------------
 export const notify = async (type: NotifyType, value: string): Promise<void> => {
   await showProgress(formatNotify(type, value));
 };

@@ -7,21 +7,21 @@
 import { vscode } from "@exportLibs";
 import * as csstree from "css-tree";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const MX_ID_SELS = 2;
-const MX_SEL_DPTH = 4;
-const VNDR_PRFX_RE = /^-(?:webkit|moz|ms|o)-/;
-const DPRC_PRPR = new Set([`clip`, `zoom`, `behavior`]);
-const PER_HVY_ATT = new Set([`class`, `id`, `style`]);
+// CONSTANTS ---------------------------------------------------------------------------------------
+const MAX_ID_SELECTORS = 2;
+const MAX_SELECTOR_DEPTH = 4;
+const VENDOR_PREFIX_RE = /^-(?:webkit|moz|ms|o)-/;
+const DEPRECATED_PROPERTIES = new Set([`clip`, `zoom`, `behavior`]);
+const PERF_HEAVY_ATTRS = new Set([`class`, `id`, `style`]);
 
-// DUPLICATE SELECTOR TRACKING ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const selCch = new Map<string, number>();
+// DUPLICATE SELECTOR TRACKING ---------------------------------------------------------------------
+const selectorCache = new Map<string, number>();
 
-const rstSelCch = (): void => {
-  selCch.clear();
+const resetSelectorCache = (): void => {
+  selectorCache.clear();
 };
 
-// TYPE DEFINITIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
 export type CssSeverity = `error` | `warning` | `info`;
 
 export type CssIssueType = `empty-rule` | `too-many-ids` | `important-usage` | `universal-selector` | `deep-nesting` | `duplicate-selector` | `vendor-prefix` | `deprecated-property` | `syntax-error`;
@@ -44,11 +44,13 @@ export type CssAnalysisResult = {
   };
 };
 
-// HELPER FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-const gtSelDpth = (selector: csstree.CssNode): number => {
+// HELPER FUNCTIONS --------------------------------------------------------------------------------
+const getSelectorDepth = (selector: csstree.CssNode): number => {
   let depth = 0;
   csstree.walk(selector, (node) => {
-    (node.type === `Combinator` || node.type === `WhiteSpace`) && depth++;
+    if (node.type === `Combinator` || node.type === `WhiteSpace`) {
+      depth++;
+    }
   });
   return depth + 1;
 };
@@ -64,73 +66,92 @@ const addIssue = (issues: CssAnalysisIssue[], type: CssIssueType | string, line:
   });
 };
 
-// ANALYSIS RULES ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// ANALYSIS RULES ----------------------------------------------------------------------------------
 const analyzeRule = (node: csstree.Rule, issues: CssAnalysisIssue[]): { rules: number; selectors: number } => {
   const ruleCount = 1;
-  let selCnt = 0;
+  let selectorCount = 0;
 
-  // 1. Empty Rules
-  node.block.children.isEmpty && node.loc && addIssue(issues, `empty-rule`, node.loc.start.line, `Empty CSS rule detected`, `warning`, node.loc.start.column, `Remove empty rule or add declarations`);
+  // 1. 빈 규칙
+  if (node.block.children.isEmpty && node.loc) {
+    addIssue(issues, `empty-rule`, node.loc.start.line, `Empty CSS rule detected`, `warning`, node.loc.start.column, `Remove empty rule or add declarations`);
+  }
 
-  // 2. Selector Analysis
-  node.prelude.type === `SelectorList` && node.prelude.children.forEach((selector) => {
-      selCnt += 1;
+  // 2. 선택자 분석
+  if (node.prelude.type === `SelectorList`) {
+    node.prelude.children.forEach((selector) => {
+      selectorCount += 1;
       let idCount = 0;
-      const depth = gtSelDpth(selector);
+      const depth = getSelectorDepth(selector);
 
       csstree.walk(selector, (child) => {
-        child.type === `IdSelector` && idCount++;
+        if (child.type === `IdSelector`) {
+          idCount++;
+        }
       });
 
-      // Too many IDs
-      idCount > MX_ID_SELS && node.loc && addIssue(issues, `too-many-ids`, node.loc.start.line, `High specificity: ${idCount} ID selectors in one rule`, `warning`, node.loc.start.column, `Use classes instead of IDs for styling`);
+      // ID 과다 (specificity 상승)
+      if (idCount > MAX_ID_SELECTORS && node.loc) {
+        addIssue(issues, `too-many-ids`, node.loc.start.line, `High specificity: ${idCount} ID selectors in one rule`, `warning`, node.loc.start.column, `Use classes instead of IDs for styling`);
+      }
 
-      // Deep nesting
-      depth > MX_SEL_DPTH && node.loc && addIssue(issues, `deep-nesting`, node.loc.start.line, `Selector depth (${depth}) exceeds recommended maximum (${MX_SEL_DPTH})`, `info`, node.loc.start.column, `Simplify selector hierarchy`);
+      // 과도한 중첩
+      if (depth > MAX_SELECTOR_DEPTH && node.loc) {
+        addIssue(issues, `deep-nesting`, node.loc.start.line, `Selector depth (${depth}) exceeds recommended maximum (${MAX_SELECTOR_DEPTH})`, `info`, node.loc.start.column, `Simplify selector hierarchy`);
+      }
     });
+  }
 
-  return { rules: ruleCount, selectors: selCnt };
+  return { rules: ruleCount, selectors: selectorCount };
 };
 
-const anlyDecl = (node: csstree.Declaration, issues: CssAnalysisIssue[]): number => {
-  const declCnt = 1;
+const analyzeDeclaration = (node: csstree.Declaration, issues: CssAnalysisIssue[]): number => {
+  const declarationCount = 1;
 
-  // !important usage
-  node.important === true && node.loc && addIssue(issues, `important-usage`, node.loc.start.line, `Avoid using !important; it breaks cascading`, `info`, node.loc.start.column, `Use more specific selectors instead`);
+  // !important 사용
+  if (node.important === true && node.loc) {
+    addIssue(issues, `important-usage`, node.loc.start.line, `Avoid using !important; it breaks cascading`, `info`, node.loc.start.column, `Use more specific selectors instead`);
+  }
 
-  // Vendor prefixes
-  VNDR_PRFX_RE.test(node.property) && node.loc && addIssue(issues, `vendor-prefix`, node.loc.start.line, `Vendor prefix '${node.property}' detected`, `info`, node.loc.start.column, `Consider using autoprefixer`);
+  // 벤더 프리픽스
+  if (VENDOR_PREFIX_RE.test(node.property) && node.loc) {
+    addIssue(issues, `vendor-prefix`, node.loc.start.line, `Vendor prefix '${node.property}' detected`, `info`, node.loc.start.column, `Consider using autoprefixer`);
+  }
 
-  // Deprecated properties
-  DPRC_PRPR.has(node.property) && node.loc && addIssue(issues, `deprecated-property`, node.loc.start.line, `Property '${node.property}' is deprecated`, `warning`, node.loc.start.column, `Use modern CSS alternatives`);
+  // 폐기된 속성
+  if (DEPRECATED_PROPERTIES.has(node.property) && node.loc) {
+    addIssue(issues, `deprecated-property`, node.loc.start.line, `Property '${node.property}' is deprecated`, `warning`, node.loc.start.column, `Use modern CSS alternatives`);
+  }
 
-  return declCnt;
+  return declarationCount;
 };
 
-const anlyTypSel = (node: csstree.TypeSelector, issues: CssAnalysisIssue[]): void => {
-  // Universal Selector (*)
-  node.name === `*` && node.loc && addIssue(issues, `universal-selector`, node.loc.start.line, `Universal selector (*) can impact performance`, `info`, node.loc.start.column, `Use specific element or class selectors`);
+const analyzeTypeSelector = (node: csstree.TypeSelector, issues: CssAnalysisIssue[]): void => {
+  // 전체 선택자 (*)
+  if (node.name === `*` && node.loc) {
+    addIssue(issues, `universal-selector`, node.loc.start.line, `Universal selector (*) can impact performance`, `info`, node.loc.start.column, `Use specific element or class selectors`);
+  }
 };
 
-const anlyAttrSel = (node: csstree.AttributeSelector, issues: CssAnalysisIssue[]): void => {
-  // Performance-heavy attribute selectors like [class], [id], [style]
+const analyzeAttributeSelector = (node: csstree.AttributeSelector, issues: CssAnalysisIssue[]): void => {
+  // [class], [id], [style] 처럼 성능에 부담을 주는 속성 선택자
   const attrName = node.name.name;
   if (typeof attrName !== `string` || attrName.length === 0 || !node.loc) {
-  	return;
+    return;
   }
-  const isHeavyAttr = PER_HVY_ATT.has(attrName);
-  // node.matcher is null when selector has no value (e.g., [class] vs [class="foo"])
-  isHeavyAttr && node.matcher === null && addIssue(issues, `universal-selector`, node.loc.start.line, `Attribute selector [${attrName}] without value can impact performance`, `info`, node.loc.start.column, `Use specific class or ID selectors`);
+  // node.matcher 는 값이 없는 선택자([class] vs [class="foo"])에서 null
+  if (PERF_HEAVY_ATTRS.has(attrName) && node.matcher === null) {
+    addIssue(issues, `universal-selector`, node.loc.start.line, `Attribute selector [${attrName}] without value can impact performance`, `info`, node.loc.start.column, `Use specific class or ID selectors`);
+  }
 };
 
-// MAIN ANALYSIS FUNCTION ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-export const anlyCssCd = (sourceCode: string): CssAnalysisResult => {
+// MAIN ANALYSIS FUNCTION --------------------------------------------------------------------------
+export const analyzeCssCode = (sourceCode: string): CssAnalysisResult => {
   const issues: CssAnalysisIssue[] = [];
   let ruleCount = 0;
-  let selCnt = 0;
-  let declCnt = 0;
+  let selectorCount = 0;
+  let declarationCount = 0;
 
-  rstSelCch();
+  resetSelectorCache();
 
   try {
     const ast = csstree.parse(sourceCode, {
@@ -146,55 +167,72 @@ export const anlyCssCd = (sourceCode: string): CssAnalysisResult => {
     csstree.walk(ast, {
       enter: (node: csstree.CssNode) => {
         // @media, @supports 등 at-rule 진입 시 컨텍스트 푸시
-        node.type === `Atrule` && node.name && mediaStack.push(`@${node.name}${node.prelude ? csstree.generate(node.prelude) : ``}`);
+        if (node.type === `Atrule` && node.name) {
+          mediaStack.push(`@${node.name}${node.prelude ? csstree.generate(node.prelude) : ``}`);
+        }
 
         if (node.type === `Rule`) {
           const result = analyzeRule(node, issues);
           ruleCount += result.rules;
-          selCnt += result.selectors;
+          selectorCount += result.selectors;
 
-          // Duplicate selector check (미디어쿼리 컨텍스트 포함)
+          // 중복 선택자 검사 (미디어쿼리 컨텍스트 포함)
           if (node.prelude.type === `SelectorList`) {
             const selectorText = csstree.generate(node.prelude);
             // 미디어쿼리 컨텍스트를 포함한 고유 키 생성
             const contextKey = mediaStack.length > 0 ? `${mediaStack.join(`|`)}::${selectorText}` : selectorText;
-            const existingLine = selCch.get(contextKey);
-            existingLine !== undefined && node.loc ? addIssue(issues, `duplicate-selector`, node.loc.start.line, `Duplicate selector (first defined at line ${existingLine})`, `warning`, node.loc.start.column, `Merge rules or use more specific selectors`) : node.loc && selCch.set(contextKey, node.loc.start.line);
+            const existingLine = selectorCache.get(contextKey);
+            if (existingLine !== undefined && node.loc) {
+              addIssue(issues, `duplicate-selector`, node.loc.start.line, `Duplicate selector (first defined at line ${existingLine})`, `warning`, node.loc.start.column, `Merge rules or use more specific selectors`);
+            }
+            else if (node.loc) {
+              selectorCache.set(contextKey, node.loc.start.line);
+            }
           }
         }
-        node.type === `Declaration` && (declCnt += anlyDecl(node, issues));
-        node.type === `TypeSelector` && anlyTypSel(node, issues);
-        node.type === `AttributeSelector` && anlyAttrSel(node, issues);
+        if (node.type === `Declaration`) {
+          declarationCount += analyzeDeclaration(node, issues);
+        }
+        if (node.type === `TypeSelector`) {
+          analyzeTypeSelector(node, issues);
+        }
+        if (node.type === `AttributeSelector`) {
+          analyzeAttributeSelector(node, issues);
+        }
       },
       leave: (node: csstree.CssNode) => {
         // at-rule 이탈 시 컨텍스트 팝
-        node.type === `Atrule` && node.name && mediaStack.pop();
+        if (node.type === `Atrule` && node.name) {
+          mediaStack.pop();
+        }
       },
     });
   }
   catch (error) {
-    error instanceof Error && addIssue(issues, `syntax-error`, 1, `CSS syntax error: ${error.message}`, `error`);
+    if (error instanceof Error) {
+      addIssue(issues, `syntax-error`, 1, `CSS syntax error: ${error.message}`, `error`);
+    }
   }
-  return { issues, stats: { ruleCount, selectorCount: selCnt, declarationCount: declCnt } };
+  return { issues, stats: { ruleCount, selectorCount: selectorCount, declarationCount: declarationCount } };
 };
 
-// DIAGNOSTIC GENERATION ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// DIAGNOSTIC GENERATION ---------------------------------------------------------------------------
 const severityMap: Record<CssSeverity, vscode.DiagnosticSeverity> = {
   error: vscode.DiagnosticSeverity.Error,
   warning: vscode.DiagnosticSeverity.Warning,
   info: vscode.DiagnosticSeverity.Information,
 };
 
-export const gnrCsAnDi = (document: vscode.TextDocument, analysis: CssAnalysisResult): vscode.Diagnostic[] =>
+export const generateCssAnalysisDiagnostics = (document: vscode.TextDocument, analysis: CssAnalysisResult): vscode.Diagnostic[] =>
   analysis.issues.map((issue) => {
     const line = Math.max(issue.line - 1, 0);
-    const sfLnIdx = Math.min(line, document.lineCount - 1);
-    const lineText = document.lineAt(sfLnIdx).text;
+    const safeLineIndex = Math.min(line, document.lineCount - 1);
+    const lineText = document.lineAt(safeLineIndex).text;
 
     const startCol = issue.column !== undefined ? Math.max(issue.column - 1, 0) : 0;
     const endCol = lineText.length;
 
-    const range = new vscode.Range(new vscode.Position(sfLnIdx, startCol), new vscode.Position(sfLnIdx, endCol));
+    const range = new vscode.Range(new vscode.Position(safeLineIndex, startCol), new vscode.Position(safeLineIndex, endCol));
 
     const message = issue.suggestion !== undefined ? `${issue.message}. ${issue.suggestion}` : issue.message;
     const diagnostic = new vscode.Diagnostic(range, message, severityMap[issue.severity]);
@@ -212,8 +250,8 @@ export const gnrCsAnDi = (document: vscode.TextDocument, analysis: CssAnalysisRe
     return diagnostic;
   });
 
-// UTILITY EXPORTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const gtAnlyStts = (result: CssAnalysisResult): string => {
+// UTILITY EXPORTS ---------------------------------------------------------------------------------
+export const getAnalysisStats = (result: CssAnalysisResult): string => {
   const { stats } = result;
   return `Rules: ${stats.ruleCount}, Selectors: ${stats.selectorCount}, Declarations: ${stats.declarationCount}, Issues: ${result.issues.length}`;
 };

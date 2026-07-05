@@ -7,109 +7,129 @@
 import { logger } from "@exportScripts";
 import type { PerformanceMetricsType as PerfMtrcTyp } from "@exportTypes";
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-let __pmInstance: { metrics: Map<string, PerfMtrcTyp>; start: (opNm: string) => string; end: (key: string) => number; checkMemoryUsage: () => void; cleanup: () => void } | null = null;
-export const perfMntr = () => {
-  !__pmInstance && (__pmInstance = {
-      metrics: new Map<string, PerfMtrcTyp>(),
-      start(opNm: string): string {
-        const key = `${opNm}_${Date.now()}_${Math.random()}`;
-        this.metrics.set(key, { startTime: performance.now(), operationName: opNm });
-        return key;
-      },
-      end(key: string): number {
-        const metric = this.metrics.get(key);
-        const rs = !metric ? -1 : (
-            (() => {
-              const duration = performance.now() - metric.startTime;
-              const frmtDrtn = Math.round(duration * 100) / 100;
-              duration > 500 ? logger(`debug`, `Slow operation: ${metric.operationName} took ${frmtDrtn}ms`) : duration > 100 ? logger(`debug`, `Timing: ${metric.operationName} took ${frmtDrtn}ms`) : void 0;
-              this.metrics.delete(key);
-              return duration;
-            })()
-          );
-        return rs;
-      },
-      checkMemoryUsage(): void {
-        (global as any).gc && typeof (global as any).gc === `function` && (global as any).gc();
-        const usage = process.memoryUsage();
-        const heapUsedMB = Math.round((usage.heapUsed / 1024 / 1024) * 100) / 100;
-        const heapTotalMB = Math.round((usage.heapTotal / 1024 / 1024) * 100) / 100;
-        heapUsedMB > 100 && logger(`debug`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
-      },
-      cleanup(): void {
-        this.metrics.clear();
-      },
-    });
-  return __pmInstance;
+// TYPE DEFINITIONS --------------------------------------------------------------------------------
+type PerfMonitor = {
+  metrics: Map<string, PerfMtrcTyp>;
+  start: (operationName: string) => string;
+  end: (key: string) => number;
+  checkMemoryUsage: () => void;
+  cleanup: () => void;
+};
+type ResourceLimiterType = {
+  MAX_CONCURRENT_OPERATIONS: number;
+  activeOperations: number;
+  queue: (() => void)[];
+  execute: <T>(operation: () => Promise<T>) => Promise<T>;
+  processQueue: () => void;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const wthPerfMon = async <T>(opNm: string, operation: () => Promise<T> | T): Promise<T> => {
-  const key = perfMntr().start(opNm);
+// SLOW/TIMING THRESHOLDS -------------------------------------------------------------------------
+const SLOW_OP_MS = 500;
+const TIMING_OP_MS = 100;
+const HIGH_HEAP_MB = 100;
+
+// PERFORMANCE MONITOR -----------------------------------------------------------------------------
+let monitorInstance: PerfMonitor | null = null;
+
+export const performanceMonitor = (): PerfMonitor => {
+  if (monitorInstance) {
+    return monitorInstance;
+  }
+  monitorInstance = {
+    metrics: new Map<string, PerfMtrcTyp>(),
+    start(operationName: string): string {
+      const key = `${operationName}_${Date.now()}_${Math.random()}`;
+      this.metrics.set(key, { startTime: performance.now(), operationName: operationName });
+      return key;
+    },
+    end(key: string): number {
+      const metric = this.metrics.get(key);
+      if (!metric) {
+        return -1;
+      }
+      const duration = performance.now() - metric.startTime;
+      const formattedDuration = Math.round(duration * 100) / 100;
+      if (duration > SLOW_OP_MS) {
+        logger(`debug`, `Slow operation: ${metric.operationName} took ${formattedDuration}ms`);
+      }
+      else if (duration > TIMING_OP_MS) {
+        logger(`debug`, `Timing: ${metric.operationName} took ${formattedDuration}ms`);
+      }
+      this.metrics.delete(key);
+      return duration;
+    },
+    checkMemoryUsage(): void {
+      const glbl = globalThis as { gc?: () => void };
+      if (typeof glbl.gc === `function`) {
+        glbl.gc();
+      }
+      const usage = process.memoryUsage();
+      const heapUsedMB = Math.round((usage.heapUsed / 1024 / 1024) * 100) / 100;
+      const heapTotalMB = Math.round((usage.heapTotal / 1024 / 1024) * 100) / 100;
+      if (heapUsedMB > HIGH_HEAP_MB) {
+        logger(`debug`, `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`);
+      }
+    },
+    cleanup(): void {
+      this.metrics.clear();
+    },
+  };
+  return monitorInstance;
+};
+
+// -------------------------------------------------------------------------------------------------
+export const withPerformanceMonitoring = async <T>(operationName: string, operation: () => Promise<T> | T): Promise<T> => {
+  const key = performanceMonitor().start(operationName);
   try {
     const result = await operation();
     return result;
   }
   finally {
-    perfMntr().end(key);
+    performanceMonitor().end(key);
   }
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const throttle = <T extends (...args: any[]) => any>(func: T, limit: number): T => {
-  let inThrottle: boolean;
-  return ((...args: any[]) => {
-    if (!inThrottle) {
-    	func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  }) as T;
-};
+// RESOURCE LIMITER ---------------------------------------------------------------------------------
+let limiterInstance: ResourceLimiterType | null = null;
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const debounce = <T extends (...args: any[]) => any>(func: T, delay: number): T => {
-  let timeoutId: NodeJS.Timeout;
-  return ((...args: any[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  }) as T;
-};
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-type ResourceLimiterType = { MAX_CONCURRENT_OPERATIONS: number; activeOperations: number; queue: (() => void)[]; execute: <T>(operation: () => Promise<T>) => Promise<T>; processQueue: () => void };
-let __rlInstance: ResourceLimiterType | null = null;
-export const resLmtr = () => {
-  !__rlInstance && (__rlInstance = {
-      MAX_CONCURRENT_OPERATIONS: 5,
-      activeOperations: 0,
-      queue: [] as (() => void)[],
-      async execute<T>(operation: () => Promise<T>): Promise<T> {
-        return new Promise<T>((resolve, reject) => {
-          const fnExecute = async () => {
-            this.activeOperations++;
-            try {
-              const result = await operation();
-              resolve(result);
-            }
-            catch (error) {
-              reject(error);
-            }
-            finally {
-              this.activeOperations--;
-              this.processQueue();
-            }
-          };
-          this.activeOperations < this.MAX_CONCURRENT_OPERATIONS ? fnExecute() : this.queue.push(fnExecute);
-        });
-      },
-      processQueue(): void {
-        while (this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
-          const operation = this.queue.shift();
-          operation?.();
+export const resourceLimiter = (): ResourceLimiterType => {
+  if (limiterInstance) {
+    return limiterInstance;
+  }
+  limiterInstance = {
+    MAX_CONCURRENT_OPERATIONS: 5,
+    activeOperations: 0,
+    queue: [] as (() => void)[],
+    async execute<T>(operation: () => Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        const fnExecute = async () => {
+          this.activeOperations++;
+          try {
+            const result = await operation();
+            resolve(result);
+          }
+          catch (error) {
+            reject(error);
+          }
+          finally {
+            this.activeOperations--;
+            this.processQueue();
+          }
+        };
+        if (this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
+          void fnExecute();
         }
-      },
-    });
-  return __rlInstance;
+        else {
+          this.queue.push(fnExecute);
+        }
+      });
+    },
+    processQueue(): void {
+      while (this.queue.length > 0 && this.activeOperations < this.MAX_CONCURRENT_OPERATIONS) {
+        const operation = this.queue.shift();
+        operation?.();
+      }
+    },
+  };
+  return limiterInstance;
 };

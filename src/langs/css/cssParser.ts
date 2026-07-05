@@ -7,52 +7,58 @@
 import { type SelectorPos, SelectorType } from "@exportTypes";
 import * as csstree from "css-tree";
 
-// TYPES ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// TYPES -------------------------------------------------------------------------------------------
 export type ParsedSelector = SelectorPos & {
   specificity?: [number, number, number];
-  parentRule?: string;
 };
 
 export type ParseOptions = {
   includeSpecificity?: boolean;
-  includeParentRule?: boolean;
   filterByType?: SelectorType;
 };
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const DEF_PRS_OPTS: csstree.ParseOptions = {
+// CONSTANTS ---------------------------------------------------------------------------------------
+const DEFAULT_PARSE_OPTIONS: csstree.ParseOptions = {
   positions: true,
   parseAtrulePrelude: false,
   parseRulePrelude: true,
   parseValue: false,
 };
 
-// HELPERS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――--
-const clclSpcf = (selector: csstree.CssNode): [number, number, number] => {
+// HELPERS -----------------------------------------------------------------------------------------
+const calculateSpecificity = (selector: csstree.CssNode): [number, number, number] => {
   let ids = 0;
   let classes = 0;
   let elements = 0;
 
   csstree.walk(selector, (node) => {
-    node.type === `IdSelector` && ids++;
-    (node.type === `ClassSelector` || node.type === `AttributeSelector` || node.type === `PseudoClassSelector`) && classes++;
-    (node.type === `TypeSelector` || node.type === `PseudoElementSelector`) && node.name !== `*` && elements++;
+    if (node.type === `IdSelector`) {
+      ids++;
+    }
+    else if (node.type === `ClassSelector` || node.type === `AttributeSelector` || node.type === `PseudoClassSelector`) {
+      classes++;
+    }
+    else if ((node.type === `TypeSelector` || node.type === `PseudoElementSelector`) && node.name !== `*`) {
+      elements++;
+    }
   });
 
   return [ids, classes, elements];
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtLnStrt = (text: string): number[] => {
+// -------------------------------------------------------------------------------------------------
+const createLineStarts = (text: string): number[] => {
   const starts = [0];
   for (let i = 0; i < text.length; i++) {
-    text.charCodeAt(i) === 10 && starts.push(i + 1);
+    if (text.charCodeAt(i) === 10) {
+      starts.push(i + 1);
+    }
   }
   return starts;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const gtLnClmn = (lineStarts: number[], index: number): { col: number; line: number } => {
+// -------------------------------------------------------------------------------------------------
+const getLineColumn = (lineStarts: number[], index: number): { col: number; line: number } => {
   let low = 0;
   let high = lineStarts.length - 1;
   while (low <= high) {
@@ -68,26 +74,26 @@ const gtLnClmn = (lineStarts: number[], index: number): { col: number; line: num
   return { line, col: index - lineStarts[line] };
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 const isNameChar = (char: string): boolean => {
   const code = char.charCodeAt(0);
   return code === 45 || code === 95 || (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 const isHexDigit = (char: string): boolean => {
   const code = char.charCodeAt(0);
   return (code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102);
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const isCssWhts = (char: string): boolean => {
+// -------------------------------------------------------------------------------------------------
+const isCssWhitespace = (char: string): boolean => {
   const code = char.charCodeAt(0);
   return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const rdCssEscpEnd = (text: string, start: number): number => {
+// -------------------------------------------------------------------------------------------------
+const readCssEscapeEnd = (text: string, start: number): number => {
   let index = start + 1;
   let hexCount = 0;
   while (index < text.length && hexCount < 6 && isHexDigit(text[index])) {
@@ -95,7 +101,7 @@ const rdCssEscpEnd = (text: string, start: number): number => {
     hexCount++;
   }
   if (hexCount > 0) {
-    if (index < text.length && isCssWhts(text[index])) {
+    if (index < text.length && isCssWhitespace(text[index])) {
       index++;
     }
   }
@@ -105,8 +111,9 @@ const rdCssEscpEnd = (text: string, start: number): number => {
   return index;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const unscCssId = (value: string): string => {
+// -------------------------------------------------------------------------------------------------
+// CSS 이스케이프 시퀀스를 복원한다. 스캐너 경로와 AST 경로가 동일한 결과를 내도록 공용으로 사용.
+const unescapeCssIdentifier = (value: string): string => {
   let result = ``;
   let index = 0;
   while (index < value.length) {
@@ -120,7 +127,7 @@ const unscCssId = (value: string): string => {
       if (hex.length > 0) {
         const codePoint = Number.parseInt(hex, 16);
         result += codePoint > 0 && codePoint <= 0x10_ff_ff ? String.fromCodePoint(codePoint) : String.fromCodePoint(0xff_fd);
-        if (escapeIndex < value.length && isCssWhts(value[escapeIndex])) {
+        if (escapeIndex < value.length && isCssWhitespace(value[escapeIndex])) {
           escapeIndex++;
         }
         index = escapeIndex;
@@ -138,7 +145,7 @@ const unscCssId = (value: string): string => {
   return result;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 const isEscaped = (text: string, index: number): boolean => {
   let slashCount = 0;
   for (let i = index - 1; i >= 0 && text[i] === `\\`; i--) {
@@ -147,12 +154,12 @@ const isEscaped = (text: string, index: number): boolean => {
   return slashCount % 2 === 1;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const rdSelNmEnd = (text: string, start: number): number => {
+// -------------------------------------------------------------------------------------------------
+const readSelectorNameEnd = (text: string, start: number): number => {
   let index = start;
   while (index < text.length) {
     if (text[index] === `\\` && index + 1 < text.length) {
-      index = rdCssEscpEnd(text, index);
+      index = readCssEscapeEnd(text, index);
     }
     else if (isNameChar(text[index])) {
       index++;
@@ -164,19 +171,19 @@ const rdSelNmEnd = (text: string, start: number): number => {
   return index;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const pushSelector = (positions: SelectorPos[], lineStarts: number[], abslIdx: number, rawSelector: string, marker: string, options?: ParseOptions): void => {
+// -------------------------------------------------------------------------------------------------
+const pushSelector = (positions: SelectorPos[], lineStarts: number[], absoluteIndex: number, rawSelector: string, marker: string, options?: ParseOptions): void => {
   const type = marker === `#` ? SelectorType.ID : SelectorType.CLASS;
   if (options?.filterByType !== undefined && options.filterByType !== type) {
     return;
   }
-  const selector = unscCssId(rawSelector);
+  const selector = unescapeCssIdentifier(rawSelector);
   if (!selector) {
     return;
   }
-  const { line, col } = gtLnClmn(lineStarts, abslIdx);
+  const { line, col } = getLineColumn(lineStarts, absoluteIndex);
   positions.push({
-    index: abslIdx,
+    index: absoluteIndex,
     line,
     col,
     type,
@@ -184,8 +191,8 @@ const pushSelector = (positions: SelectorPos[], lineStarts: number[], abslIdx: n
   });
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const scnSelPrld = (positions: SelectorPos[], cssText: string, lineStarts: number[], start: number, end: number, options?: ParseOptions): void => {
+// -------------------------------------------------------------------------------------------------
+const scanSelectorPrelude = (positions: SelectorPos[], cssText: string, lineStarts: number[], start: number, end: number, options?: ParseOptions): void => {
   const rawPrelude = cssText.slice(start, end);
   const prelude = rawPrelude.trimStart();
   if (!prelude || prelude.startsWith(`@`)) {
@@ -221,41 +228,51 @@ const scnSelPrld = (positions: SelectorPos[], cssText: string, lineStarts: numbe
       quote = ch;
       continue;
     }
-    ch === `[` && bracketDepth++;
-    ch === `]` && bracketDepth > 0 && bracketDepth--;
+    if (ch === `[`) {
+      bracketDepth++;
+    }
+    else if (ch === `]` && bracketDepth > 0) {
+      bracketDepth--;
+    }
     if ((ch === `.` || ch === `#`) && bracketDepth === 0 && !isEscaped(prelude, i)) {
       const nameStart = i + 1;
-      const nameEnd = rdSelNmEnd(prelude, nameStart);
-      nameEnd > nameStart && pushSelector(positions, lineStarts, offset + i, prelude.slice(nameStart, nameEnd), ch, options);
+      const nameEnd = readSelectorNameEnd(prelude, nameStart);
+      if (nameEnd > nameStart) {
+        pushSelector(positions, lineStarts, offset + i, prelude.slice(nameStart, nameEnd), ch, options);
+      }
       i = nameEnd - 1;
     }
   }
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const prsSeWtCsTr = (cssText: string, options?: ParseOptions): SelectorPos[] => {
+// -------------------------------------------------------------------------------------------------
+const parseWithCssTree = (cssText: string, options?: ParseOptions): SelectorPos[] => {
   const positions: SelectorPos[] = [];
 
   try {
-    const ast = csstree.parse(cssText, DEF_PRS_OPTS);
+    const ast = csstree.parse(cssText, DEFAULT_PARSE_OPTIONS);
 
     csstree.walk(ast, (node: csstree.CssNode) => {
       const isClass = node.type === `ClassSelector`;
       const isId = node.type === `IdSelector`;
 
       if (!isClass && !isId) {
-      	return;
+        return;
       }
       const type = isClass ? SelectorType.CLASS : SelectorType.ID;
 
       if (options?.filterByType !== undefined && options.filterByType !== type) {
-      	return;
+        return;
       }
       const loc = node.loc;
       if (!loc) {
-      	return;
+        return;
       }
-      const selector = typeof node.name === `string` ? node.name.replaceAll(/\\/g, ``) : ``;
+      // 스캐너 경로(unescapeCssIdentifier)와 동일하게 이스케이프를 복원하여 두 경로 결과를 일치시킨다.
+      const selector = typeof node.name === `string` ? unescapeCssIdentifier(node.name) : ``;
+      if (!selector) {
+        return;
+      }
       const pos: ParsedSelector = {
         index: loc.start.offset,
         line: loc.start.line - 1,
@@ -265,7 +282,7 @@ const prsSeWtCsTr = (cssText: string, options?: ParseOptions): SelectorPos[] => 
       };
 
       if (options?.includeSpecificity === true) {
-        pos.specificity = clclSpcf(node);
+        pos.specificity = calculateSpecificity(node);
       }
 
       positions.push(pos);
@@ -277,13 +294,13 @@ const prsSeWtCsTr = (cssText: string, options?: ParseOptions): SelectorPos[] => 
   return positions;
 };
 
-// MAIN PARSER ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const prsSels = (cssText: string, options?: ParseOptions): SelectorPos[] => {
-  if (options?.includeSpecificity === true || options?.includeParentRule === true) {
-    return prsSeWtCsTr(cssText, options);
+// MAIN PARSER -------------------------------------------------------------------------------------
+export const parseSelectors = (cssText: string, options?: ParseOptions): SelectorPos[] => {
+  if (options?.includeSpecificity === true) {
+    return parseWithCssTree(cssText, options);
   }
   const positions: SelectorPos[] = [];
-  const lineStarts = crtLnStrt(cssText);
+  const lineStarts = createLineStarts(cssText);
   let segmentStart = 0;
   let quote: string | null = null;
   let inComment = false;
@@ -314,23 +331,20 @@ export const prsSels = (cssText: string, options?: ParseOptions): SelectorPos[] 
       continue;
     }
     if (ch === `{`) {
-      scnSelPrld(positions, cssText, lineStarts, segmentStart, i, options);
+      scanSelectorPrelude(positions, cssText, lineStarts, segmentStart, i, options);
       segmentStart = i + 1;
     }
-    else if (ch === `;`) {
-      segmentStart = i + 1;
-    }
-    else if (ch === `}`) {
+    else if (ch === `;` || ch === `}`) {
       segmentStart = i + 1;
     }
   }
   return positions;
 };
 
-// UTILITY FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// UTILITY FUNCTIONS -------------------------------------------------------------------------------
 export const parseCssAst = (cssText: string): csstree.CssNode | null => {
   try {
-    return csstree.parse(cssText, DEF_PRS_OPTS);
+    return csstree.parse(cssText, DEFAULT_PARSE_OPTIONS);
   }
   catch {
     return null;

@@ -6,12 +6,12 @@
 
 import type { vscode } from "@exportLibs";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const glbRgExpCch = new Map<string, RegExp>();
+// CONSTANTS ---------------------------------------------------------------------------------------
+const globRegexCache = new Map<string, RegExp>();
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// FUNCTIONS ---------------------------------------------------------------------------------------
 export const globToRegExp = (glob: string): RegExp => {
-  const cachedRegExp = glbRgExpCch.get(glob);
+  const cachedRegExp = globRegexCache.get(glob);
   if (cachedRegExp) {
     return cachedRegExp;
   }
@@ -22,12 +22,12 @@ export const globToRegExp = (glob: string): RegExp => {
   s = s.replaceAll(`§§DS§§`, `.*`);
   s = s.replaceAll(`?`, `[^/]`);
   const rs = new RegExp(`^${s}$`);
-  glbRgExpCch.set(glob, rs);
+  globRegexCache.set(glob, rs);
   return rs;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const isUrExByGl = (uri: vscode.Uri, patterns: string[]) => {
+// -------------------------------------------------------------------------------------------------
+export const isUriExcludedByGlob = (uri: vscode.Uri, patterns: string[]) => {
   const rel = uri.fsPath.replaceAll(`\\`, `/`);
   return patterns.some((p) => globToRegExp(p).test(rel));
 };

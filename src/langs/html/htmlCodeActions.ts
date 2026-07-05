@@ -5,43 +5,46 @@
  */
 
 import type { FixFactory } from "@exportLangs";
-import { getDocumentLine as gtDocLn, getHeadMatch, getRuleId, makeQuickFix } from "@exportLangs";
+import { getDocumentLine, getHeadMatch, getRuleId, makeQuickFix } from "@exportLangs";
 import { type CodeAction, CodeActionKind as CdActnKnd, Position, Range, type vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
+import { getDiagData } from "@langs/html/htmlUtils";
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-// CONSTANTS
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// CONSTANTS ---------------------------------------------------------------------------------------
+// htmlValidator 의 진단 source 와 반드시 동일해야 Quick Fix 가 매칭된다.
+const DIAGNOSTIC_SOURCE = `HTMLHint`;
+
 const VOID_TAGS = new Set([`br`, `hr`, `img`, `meta`, `link`, `input`, `source`, `embed`, `param`, `track`, `area`, `col`, `base`]);
-const OBSL_TGS = new Set([`center`, `font`, `big`, `strike`, `tt`, `acronym`, `applet`, `basefont`, `bgsound`, `blink`, `marquee`]);
+const OBSOLETE_TAGS = new Set([`center`, `font`, `big`, `strike`, `tt`, `acronym`, `applet`, `basefont`, `bgsound`, `blink`, `marquee`]);
 
-// REGEX PATTERNS
-const HTML_TG_PAT = /<html(\s[^>]*)?>/i;
-const HD_TTL_PAT = /<title(\s[^>]*)?>/i;
-const DCTY_PAT = /<!doctype/i;
-const SQAP = /(\w[\w:-]*)='([^']*)'/g;
-const UPPR_TG_PAT = /<\/?([A-Z][\dA-Za-z]*)\b/g;
-const UPP_ATT_PAT = /\s([A-Z][\w-]*)\s*=/g;
-const MT_CHRS_PAT = /<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i;
-const MT_VWPR_PAT = /<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i;
-const MT_DSCR_PAT = /<meta\s+name\s*=\s*["']description["'][^/>]*>/i;
-const IATP = /<(img|area)([^>]*)>/gi;
-const BTTN_TG_PAT = /<button([^>]*)>/gi;
-const ATT_WHT_PAT = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
-const ATT_SPC_PAT = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
-const VTOP = /<([A-Za-z][\dA-Za-z-]*)([^>]*)>/g;
-const BD_CLS_PAT = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
-const ALL_TG_PAT = /<\/?.+?>/g;
+// REGEX PATTERNS ----------------------------------------------------------------------------------
+// 공용 상수로 일원화. /g 패턴은 exec 루프 진입 전 lastIndex=0 으로 초기화한다.
+const HTML_TAG_MATCH_RE = /<html(\s[^>]*)?>/i;
+const HEAD_TITLE_RE = /<title(\s[^>]*)?>/i;
+const DOCTYPE_MATCH_RE = /<!doctype/i;
+const SINGLE_QUOTE_ATTR_RE = /(\w[\w:-]*)='([^']*)'/g;
+const UPPER_TAG_RE = /<\/?([A-Z][\dA-Za-z]*)\b/g;
+const UPPER_ATTR_RE = /\s([A-Z][\w-]*)\s*=/g;
+const META_CHARSET_RE = /<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i;
+const META_VIEWPORT_RE = /<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i;
+const META_DESC_RE = /<meta\s+name\s*=\s*["']description["'][^/>]*>/i;
+const IMG_AREA_TAG_RE = /<(img|area)([^>]*)>/gi;
+const BUTTON_TAG_RE = /<button([^>]*)>/gi;
+const ATTR_WHITESPACE_RE = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
+const ATTR_SPACING_RE = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
+const TAG_OPEN_RE = /<([A-Za-z][\dA-Za-z-]*)([^>]*)>/g;
+const BODY_CLASS_RE = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
+const ALL_TAGS_RE = /<\/?.+?>/g;
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtLngFx: FixFactory = (doc, diagnostic) => {
+// FIX FACTORIES ----------------------------------------------------------------------------------
+const createLangFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `html-lang-require`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
-  const match = text.match(/<html(\s[^>]*)?>/i);
+  const match = text.match(HTML_TAG_MATCH_RE);
   if (!match || match[0].includes(`lang=`)) {
-  	return null;
+    return null;
   }
   const start = doc.positionAt((match.index as number) + 5);
   return makeQuickFix(
@@ -53,18 +56,18 @@ const crtLngFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtTtlFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createTitleFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `title-require`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
   const head = getHeadMatch(text);
   if (!head) {
-  	return null;
+    return null;
   }
-  if (/<title(\s[^>]*)?>/i.test(head[2])) {
-  	return null;
+  if (HEAD_TITLE_RE.test(head[2])) {
+    return null;
   }
   const headStart = (head.index as number) + head[0].indexOf(`>`) + 1;
   const insertPos = doc.positionAt(headStart);
@@ -77,14 +80,14 @@ const crtTtlFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtDctyFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createDoctypeFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `doctype-first`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
-  if (/<!doctype/i.test(text.slice(0, 50))) {
-  	return null;
+  if (DOCTYPE_MATCH_RE.test(text.slice(0, 50))) {
+    return null;
   }
   const pos = new Position(0, 0);
   return makeQuickFix(
@@ -96,25 +99,25 @@ const crtDctyFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtAtVaDbQtF: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createAttrValueDblQuoteFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-value-double-quotes`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const snglQtPat = /(\w[\w:-]*)='([^']*)'/g;
+  const col = info.col ? info.col - 1 : 0;
+  SINGLE_QUOTE_ATTR_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = snglQtPat.exec(lineStr))) {
+  while ((m = SINGLE_QUOTE_ATTR_RE.exec(lineStr))) {
     const startCol = m.index;
     const endCol = startCol + m[0].length;
-    const col = info.col ? info.col - 1 : 0;
     if (Math.abs(startCol - col) <= 10) {
       const start = new Position(info.line - 1, startCol);
       const end = new Position(info.line - 1, endCol);
@@ -131,20 +134,23 @@ const crtAtVaDbQtF: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtTgLwFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createTagLowercaseFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tagname-lowercase`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
-  const lineStr = gtDocLn(doc, info?.line);
+  const info = getDiagData(diagnostic);
+  if (typeof info?.line !== `number`) {
+    return null;
+  }
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const tagPattern = /<\/?([A-Z][\dA-Za-z]*)\b/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = tagPattern.exec(lineStr))) {
+  UPPER_TAG_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = UPPER_TAG_RE.exec(lineStr))) {
     const startCol = m.index + 1 + (m[0].startsWith(`</`) ? 1 : 0);
     const endCol = startCol + m[1].length;
     if (Math.abs(m.index - col) <= 5) {
@@ -163,20 +169,23 @@ const crtTgLwFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtAtLwFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createAttrLowercaseFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-lowercase`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
-  const lineStr = gtDocLn(doc, info?.line);
+  const info = getDiagData(diagnostic);
+  if (typeof info?.line !== `number`) {
+    return null;
+  }
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const attrPattern = /\s([A-Z][\w-]*)\s*=/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = attrPattern.exec(lineStr))) {
+  UPPER_ATTR_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = UPPER_ATTR_RE.exec(lineStr))) {
     const startCol = m.index + 1;
     const endCol = startCol + m[1].length;
     if (Math.abs(startCol - col) <= 5) {
@@ -195,18 +204,18 @@ const crtAtLwFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtMtChRqFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createMetaCharsetReqFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-charset-require`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
   const head = getHeadMatch(text);
   if (!head) {
-  	return null;
+    return null;
   }
-  if (/<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i.test(head[2])) {
-  	return null;
+  if (META_CHARSET_RE.test(head[2])) {
+    return null;
   }
   const insert = (head.index as number) + head[0].indexOf(`>`) + 1;
   const pos = doc.positionAt(insert);
@@ -219,21 +228,21 @@ const crtMtChRqFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtMtVwRqFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createMetaViewportReqFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-viewport-require`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
   const head = getHeadMatch(text);
   if (!head) {
-  	return null;
+    return null;
   }
-  if (/<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i.test(head[2])) {
-  	return null;
+  if (META_VIEWPORT_RE.test(head[2])) {
+    return null;
   }
   const headStart = (head.index as number) + head[0].indexOf(`>`) + 1;
-  const metaCharset = head[2].match(/<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i);
+  const metaCharset = head[2].match(META_CHARSET_RE);
   const insert = metaCharset ? headStart + (metaCharset.index as number) + metaCharset[0].length : headStart;
   const pos = doc.positionAt(insert);
   return makeQuickFix(
@@ -245,28 +254,28 @@ const crtMtVwRqFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtMtDsRqFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createMetaDescReqFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `meta-description-require`) {
-  	return null;
+    return null;
   }
   const text = doc.getText();
   const head = getHeadMatch(text);
   if (!head) {
-  	return null;
+    return null;
   }
-  if (/<meta\s+name\s*=\s*["']description["'][^/>]*>/i.test(head[2])) {
-  	return null;
+  if (META_DESC_RE.test(head[2])) {
+    return null;
   }
   const headStart = (head.index as number) + head[0].indexOf(`>`) + 1;
-  const metaViewport = head[2].match(/<meta\s+name\s*=\s*["']viewport["'][^/>]*>/i);
-  const metaCharset = head[2].match(/<meta\s+charset\s*=\s*["'][^"']*["'][^/>]*>/i);
+  const metaViewport = head[2].match(META_VIEWPORT_RE);
+  const metaCharset = head[2].match(META_CHARSET_RE);
   let insert = headStart;
   if (metaViewport) {
-  	insert = headStart + (metaViewport.index as number) + metaViewport[0].length;
+    insert = headStart + (metaViewport.index as number) + metaViewport[0].length;
   }
   else if (metaCharset) {
-  	insert = headStart + (metaCharset.index as number) + metaCharset[0].length;
+    insert = headStart + (metaCharset.index as number) + metaCharset[0].length;
   }
   const pos = doc.positionAt(insert);
   return makeQuickFix(
@@ -278,95 +287,97 @@ const crtMtDsRqFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtAltRqrFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createAltRequiredFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `alt-require`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const tagPattern = /<(img|area)([^>]*)>/gi;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = tagPattern.exec(lineStr))) {
-    if (!/\balt\s*=/.test(m[0])) {
-      const startCol = m.index;
-      if (Math.abs(startCol - col) <= 40) {
-        const insertCol = m.index + 1 + m[1].length;
-        const hasSpace = /\s/.test(lineStr.charAt(insertCol));
-        const pos = new Position(info.line - 1, insertCol);
-        return makeQuickFix(
-          `Add alt=""`,
-          (we) => {
-            we.insert(doc.uri, pos, `${hasSpace ? `` : ` `}alt="" `);
-          },
-          diagnostic,
-        );
-      }
+  IMG_AREA_TAG_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = IMG_AREA_TAG_RE.exec(lineStr))) {
+    if (/\balt\s*=/.test(m[0])) {
+      continue;
+    }
+    const startCol = m.index;
+    if (Math.abs(startCol - col) <= 40) {
+      const insertCol = m.index + 1 + m[1].length;
+      const hasSpace = /\s/.test(lineStr.charAt(insertCol));
+      const pos = new Position(info.line - 1, insertCol);
+      return makeQuickFix(
+        `Add alt=""`,
+        (we) => {
+          we.insert(doc.uri, pos, `${hasSpace ? `` : ` `}alt="" `);
+        },
+        diagnostic,
+      );
     }
   }
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtBtTyRqFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createButtonTypeReqFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `button-type-require`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const tagPattern = /<button([^>]*)>/gi;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = tagPattern.exec(lineStr))) {
-    if (!/\btype\s*=/.test(m[0])) {
-      const startCol = m.index;
-      if (Math.abs(startCol - col) <= 40) {
-        const insertCol = m.index + `<button`.length;
-        const hasSpace = /\s/.test(lineStr.charAt(insertCol));
-        const pos = new Position(info.line - 1, insertCol);
-        return makeQuickFix(
-          `Add type="button"`,
-          (we) => {
-            we.insert(doc.uri, pos, `${hasSpace ? `` : ` `}type="button" `);
-          },
-          diagnostic,
-        );
-      }
+  BUTTON_TAG_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = BUTTON_TAG_RE.exec(lineStr))) {
+    if (/\btype\s*=/.test(m[0])) {
+      continue;
+    }
+    const startCol = m.index;
+    if (Math.abs(startCol - col) <= 40) {
+      const insertCol = m.index + `<button`.length;
+      const hasSpace = /\s/.test(lineStr.charAt(insertCol));
+      const pos = new Position(info.line - 1, insertCol);
+      return makeQuickFix(
+        `Add type="button"`,
+        (we) => {
+          we.insert(doc.uri, pos, `${hasSpace ? `` : ` `}type="button" `);
+        },
+        diagnostic,
+      );
     }
   }
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtAtNUnWhFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createAttrNoUnneedWsFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-no-unnecessary-whitespace`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const simpler = /(\w[\w:-]*)\s*=\s*(["'])(\s+)([^"']*?)(\s+)(\2)/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = simpler.exec(lineStr))) {
+  ATTR_WHITESPACE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ATTR_WHITESPACE_RE.exec(lineStr))) {
     const startCol = m.index;
     if (Math.abs(startCol - col) <= 50) {
       const cleaned = `${m[1]}=${m[2]}${m[4].trim()}${m[2]}`;
@@ -384,23 +395,23 @@ const crtAtNUnWhFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtAtWhFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createAttrWhitespaceFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `attr-whitespace`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const pattern = /(\w[\w:-]*)\s*=\s*(["'][^"']*["'])/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = pattern.exec(lineStr))) {
+  ATTR_SPACING_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ATTR_SPACING_RE.exec(lineStr))) {
     const raw = m[0];
     if (/\s=\s|\s=|=\s/.test(raw)) {
       const startCol = m.index;
@@ -421,29 +432,30 @@ const crtAtWhFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtTgSlClFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createTagSelfCloseFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tag-self-close`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const voidOpen = /<([A-Za-z][\dA-Za-z-]*)([^>]*)>/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = voidOpen.exec(lineStr))) {
+
+  TAG_OPEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TAG_OPEN_RE.exec(lineStr))) {
     const tag = m[1].toLowerCase();
     if (!VOID_TAGS.has(tag)) {
-    	continue;
+      continue;
     }
     if (m[0].endsWith(`/>`)) {
-    	continue;
+      continue;
     }
     const startCol = m.index;
     if (Math.abs(startCol - col) <= 50) {
@@ -460,12 +472,12 @@ const crtTgSlClFx: FixFactory = (doc, diagnostic) => {
       );
     }
   }
-  const badClose = /<\/(br|hr|img|meta|link|input|source|embed|param|track|area|col|base)\s*>/gi;
+
+  BODY_CLASS_RE.lastIndex = 0;
   let c: RegExpExecArray | null;
-  while ((c = badClose.exec(lineStr))) {
+  while ((c = BODY_CLASS_RE.exec(lineStr))) {
     const startCol = c.index;
-    const colNear = info.col ? info.col - 1 : 0;
-    if (Math.abs(startCol - colNear) <= 20) {
+    if (Math.abs(startCol - col) <= 20) {
       const start = new Position(info.line - 1, startCol);
       const end = new Position(info.line - 1, startCol + c[0].length);
       return makeQuickFix(
@@ -480,25 +492,25 @@ const crtTgSlClFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtTgNObslFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createTagNotObsoleteFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `tag-no-obsolete`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
-  const pattern = /<\/?.+?>/g;
-  let m: RegExpExecArray | null;
   const col = info.col ? info.col - 1 : 0;
-  while ((m = pattern.exec(lineStr))) {
+  ALL_TAGS_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ALL_TAGS_RE.exec(lineStr))) {
     const tagName = m[0].replace(/<\/?\s*([\dA-Za-z-]+).*/, `$1`).toLowerCase();
-    if (OBSL_TGS.has(tagName)) {
+    if (OBSOLETE_TAGS.has(tagName)) {
       const startCol = m.index;
       if (Math.abs(startCol - col) <= 30) {
         const start = new Position(info.line - 1, startCol);
@@ -516,47 +528,47 @@ const crtTgNObslFx: FixFactory = (doc, diagnostic) => {
   return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const crtSpChEsFx: FixFactory = (doc, diagnostic) => {
+// -------------------------------------------------------------------------------------------------
+const createSpecialCharEscFix: FixFactory = (doc, diagnostic) => {
   if (getRuleId(diagnostic) !== `spec-char-escape`) {
-  	return null;
+    return null;
   }
-  const info = (diagnostic as any).data;
+  const info = getDiagData(diagnostic);
   if (typeof info?.line !== `number`) {
-  	return null;
+    return null;
   }
-  const lineStr = gtDocLn(doc, info.line);
+  const lineStr = getDocumentLine(doc, info.line);
   if (!lineStr) {
-  	return null;
+    return null;
   }
   const col = info.col ? info.col - 1 : 0;
   if (col < 0 || col >= lineStr.length) {
-  	return null;
+    return null;
   }
   const ch = lineStr[col];
   if (ch !== `&` && ch !== `<` && ch !== `>`) {
-  	return null;
+    return null;
   }
   const openCount = (lineStr.slice(0, col).match(/</g) || []).length;
   const closeCount = (lineStr.slice(0, col).match(/>/g) || []).length;
   if (openCount > closeCount) {
-  	return null;
+    return null;
   }
   let replacement = ``;
   if (ch === `&`) {
     if (/^&[A-Za-z]+;/.test(lineStr.slice(col))) {
-    	return null;
+      return null;
     }
     replacement = `&amp;`;
   }
   else if (ch === `<`) {
-  	replacement = `&lt;`;
+    replacement = `&lt;`;
   }
   else if (ch === `>`) {
-  	replacement = `&gt;`;
+    replacement = `&gt;`;
   }
   if (!replacement) {
-  	return null;
+    return null;
   }
   const start = new Position(info.line - 1, col);
   const end = new Position(info.line - 1, col + 1);
@@ -569,24 +581,27 @@ const crtSpChEsFx: FixFactory = (doc, diagnostic) => {
   );
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const factories: FixFactory[] = [crtLngFx, crtTtlFx, crtDctyFx, crtAtVaDbQtF, crtTgLwFx, crtAtLwFx, crtMtChRqFx, crtMtVwRqFx, crtMtDsRqFx, crtAltRqrFx, crtBtTyRqFx, crtAtNUnWhFx, crtAtWhFx, crtTgSlClFx, crtTgNObslFx, crtSpChEsFx];
+// FACTORY REGISTRY --------------------------------------------------------------------------------
+const factories: FixFactory[] = [createLangFix, createTitleFix, createDoctypeFix, createAttrValueDblQuoteFix, createTagLowercaseFix, createAttrLowercaseFix, createMetaCharsetReqFix, createMetaViewportReqFix, createMetaDescReqFix, createAltRequiredFix, createButtonTypeReqFix, createAttrNoUnneedWsFix, createAttrWhitespaceFix, createTagSelfCloseFix, createTagNotObsoleteFix, createSpecialCharEscFix];
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// PROVIDER ----------------------------------------------------------------------------------------
 export class HtmlHintCodeActionProvider implements vscode.CodeActionProvider {
   provideCodeActions(doc: vscode.TextDocument, _range: Range, context: vscode.CodeActionContext): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
     const list: CodeAction[] = [];
     for (const d of context.diagnostics) {
-      if (d.source !== `htmlhint`) {
-      	continue;
+      if (d.source !== DIAGNOSTIC_SOURCE) {
+        continue;
       }
       for (const f of factories) {
         try {
           const act = f(doc, d);
-          act && list.push(act);
+          if (act) {
+            list.push(act);
+          }
         }
-        catch (error: any) {
-          logger(`error`, `code action error: ${error?.message || error}`);
+        catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger(`error`, `code action error: ${msg}`);
         }
       }
     }

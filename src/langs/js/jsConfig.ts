@@ -8,8 +8,8 @@ import { createRequire as crtRqr, fs, path, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { JSHintInstance as JsHntInst } from "@langs/js/jsType";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const DEF_JSHN_CFG: Record<string, any> = {
+// CONSTANTS ---------------------------------------------------------------------------------------
+export const DEFAULT_JSHINT_CONFIG: Record<string, any> = {
   esversion: 2022,
   moz: false,
   bitwise: false,
@@ -93,68 +93,59 @@ export const DEF_JSHN_CFG: Record<string, any> = {
   predef: [`console`, `process`, `Buffer`, `global`, `__dirname`, `__filename`, `module`, `exports`, `require`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `setImmediate`, `clearImmediate`, `Promise`, `Symbol`, `Map`, `Set`, `WeakMap`, `WeakSet`, `Proxy`, `Reflect`, `ArrayBuffer`, `DataView`, `Int8Array`, `Uint8Array`, `Uint8ClampedArray`, `Int16Array`, `Uint16Array`, `Int32Array`, `Uint32Array`, `Float32Array`, `Float64Array`, `BigInt`, `BigInt64Array`, `BigUint64Array`, `SharedArrayBuffer`, `Atomics`, `WebAssembly`, `URL`, `URLSearchParams`, `TextEncoder`, `TextDecoder`, `AbortController`, `AbortSignal`, `Event`, `EventTarget`, `document`, `window`, `navigator`, `location`, `history`, `screen`, `alert`, `confirm`, `prompt`, `XMLHttpRequest`, `fetch`, `FormData`, `Blob`, `File`, `FileReader`, `localStorage`, `sessionStorage`],
 };
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const loadJSHint = (): JsHntInst | null => {
-  let result: JsHntInst | null = null;
-
-  const fnValidate = (mod: unknown): JsHntInst | null => {
-    const candidate = mod as { JSHINT?: unknown } | undefined;
-    const jshint = candidate?.JSHINT as { data?: unknown } | undefined;
-    const isValid = typeof candidate?.JSHINT === `function` && typeof jshint?.data === `function`;
-    return isValid ? mod as JsHntInst : null;
-  };
-
-  const candidates: string[] = [];
-
-  try {
-    const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
-    const extPath = ext?.extensionPath;
-    if (typeof extPath === `string` && extPath.length > 0) {
-      candidates.push(extPath);
-    }
+// HELPERS ----------------------------------------------------------------------------------------
+// 파싱 결과를 기본 설정과 병합. 객체가 아니면 기본 설정으로 폴백 (predef/browser/esversion 유지)
+const mergeWithDefault = (parsed: unknown): Record<string, any> => {
+  if (parsed && typeof parsed === `object` && !Array.isArray(parsed)) {
+    return { ...DEFAULT_JSHINT_CONFIG, ...(parsed as Record<string, any>) };
   }
-  catch {}
-  try {
-    if (typeof __dirname === `string` && __dirname.length > 0) {
-      candidates.push(__dirname, path.resolve(__dirname, `..`), path.resolve(__dirname, `..`, `..`));
-    }
-  }
-  catch {}
-  candidates.push(process.cwd());
-
-  if (vscode.workspace.workspaceFolders) {
-    for (const f of vscode.workspace.workspaceFolders) {
-      candidates.push(f.uri.fsPath);
-    }
-  }
-
-  for (const base of candidates) {
-    if (result) {
-      break;
-    }
-    try {
-      const reqPath = path.join(base, `index.js`);
-      const req = crtRqr(reqPath);
-      const mod = fnValidate(req(`jshint`));
-      if (mod) {
-        result = mod;
-        logger(`debug`, `module loaded: ${base}`);
-      }
-    }
-    catch {
-      logger(`debug`, `load attempt failed: ${base}`);
-    }
-  }
-  if (!result) {
-    logger(`warn`, `module not loaded - JSHint is optional`);
-  }
-
-  return result;
+  return { ...DEFAULT_JSHINT_CONFIG };
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const prsCfgVal = (value: string): any => {
+// -------------------------------------------------------------------------------------------------
+// 문자열 리터럴을 인식하며 균형 잡힌 중괄호 객체 리터럴을 추출 (중첩 객체 안전)
+const QUOTE_CHAR_RE = /["'`]/;
+const extractObjectLiteral = (text: string, startIdx: number): string | null => {
+  let depth = 0;
+  let inStr = false;
+  let quote = ``;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inStr) {
+      if (ch === `\\`) {
+        i++;
+        continue;
+      }
+      if (ch === quote) {
+        inStr = false;
+      }
+      continue;
+    }
+    if (QUOTE_CHAR_RE.test(ch)) {
+      inStr = true;
+      quote = ch;
+      continue;
+    }
+    if (ch === `{`) {
+      depth++;
+      continue;
+    }
+    if (ch === `}`) {
+      depth--;
+      if (depth === 0) {
+        return text.slice(startIdx, i + 1);
+      }
+    }
+  }
+  return null;
+};
+
+// -------------------------------------------------------------------------------------------------
+const parseConfigValue = (value: string): any => {
   const trimmed = value.trim();
+
   if (trimmed === `true`) {
     return true;
   }
@@ -195,55 +186,63 @@ const prsCfgVal = (value: string): any => {
   return trimmed;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const prsJsHnCfJs = (cfgCont: string): Record<string, any> => {
+// -------------------------------------------------------------------------------------------------
+// .jshintrc.js 파싱: 보안상 eval/new Function 을 사용하지 않는다.
+// module.exports 객체는 균형 중괄호로 추출 후 JSON.parse 시도, 실패 시 기본 설정 폴백.
+const parseJSHintConfigJs = (cfgCont: string): Record<string, any> => {
+  const config: Record<string, any> = {};
+
   try {
-    let config: Record<string, any> = {};
     const cleanContent = cfgCont.replaceAll(/\/\*[\S\s]*?\*\//g, ``).replaceAll(/\/\/.*$/gm, ``);
 
-    const modExprPat = /module\.exports\s*=\s*({[\S\s]*?});?\s*(?:$|\n)/;
-    const modExprMtch = cleanContent.match(modExprPat);
+    const exportsIdx = cleanContent.search(/module\.exports\s*=\s*\{/);
+    if (exportsIdx >= 0) {
+      const braceIdx = cleanContent.indexOf(`{`, exportsIdx);
+      const objectStr = braceIdx >= 0 ? extractObjectLiteral(cleanContent, braceIdx) : null;
 
-    if (modExprMtch) {
-      try {
-        const objectStr = modExprMtch[1];
-        config = new Function(`"use strict"; return (${objectStr})`)();
-      }
-      catch {
+      if (objectStr) {
         try {
-          config = JSON.parse(modExprMtch[1]);
+          const parsed = JSON.parse(objectStr);
+          if (parsed && typeof parsed === `object`) {
+            Object.assign(config, parsed);
+          }
         }
         catch {
-          logger(`error`, `JS config parsing failed - module.exports format`);
+          logger(`warn`, `.jshintrc.js is not JSON-compatible; code execution is disabled for security, using default config`);
+          return { ...DEFAULT_JSHINT_CONFIG };
         }
       }
     }
 
     const exprPats = cleanContent.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/g);
-    exprPats?.forEach((pattern) => {
-      const match = pattern.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/);
-      if (match) {
-        const key = match[1].trim();
-        const value = match[2].trim();
-        config[key] = prsCfgVal(value);
+    if (exprPats) {
+      for (const pattern of exprPats) {
+        const match = pattern.match(/exports\.(\w+)\s*=\s*([^\n,;}]+)/);
+        if (match) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          config[key] = parseConfigValue(value);
+        }
       }
-    });
+    }
 
-    return { ...DEF_JSHN_CFG, ...config };
+    return { ...DEFAULT_JSHINT_CONFIG, ...config };
   }
-  catch (error: any) {
-    logger(`error`, `JS config file parsing failed: ${error?.message || error}`);
-    return DEF_JSHN_CFG;
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger(`error`, `JS config file parsing failed: ${msg}`);
+    return { ...DEFAULT_JSHINT_CONFIG };
   }
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const prsJsHnCfGn = (cfgCont: string): Record<string, any> => {
+// -------------------------------------------------------------------------------------------------
+const parseJSHintConfigGeneric = (cfgCont: string): Record<string, any> => {
   try {
     try {
-      return JSON.parse(cfgCont);
+      return mergeWithDefault(JSON.parse(cfgCont));
     }
     catch {}
+
     const config: Record<string, any> = {};
     const lines = cfgCont.split(`\n`);
 
@@ -258,27 +257,89 @@ const prsJsHnCfGn = (cfgCont: string): Record<string, any> => {
       if (match) {
         const key = match[1].trim();
         const value = match[2].trim().replace(/[,;]$/, ``);
-        config[key] = prsCfgVal(value);
+        config[key] = parseConfigValue(value);
       }
     }
 
-    return { ...DEF_JSHN_CFG, ...config };
+    return { ...DEFAULT_JSHINT_CONFIG, ...config };
   }
-  catch (error: any) {
-    logger(`error`, `file parsing failed: ${error?.message || error}`);
-    return DEF_JSHN_CFG;
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger(`error`, `file parsing failed: ${msg}`);
+    return { ...DEFAULT_JSHINT_CONFIG };
   }
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const ldJsHntCfg = (filePath: string): Record<string, any> => {
+// FUNCTIONS ---------------------------------------------------------------------------------------
+export const loadJSHint = (): JsHntInst | null => {
+  let result: JsHntInst | null = null;
+
+  const fnValidate = (mod: unknown): JsHntInst | null => {
+    const candidate = mod as { JSHINT?: unknown } | undefined;
+    const jshint = candidate?.JSHINT as { data?: unknown } | undefined;
+    const isValid = typeof candidate?.JSHINT === `function` && typeof jshint?.data === `function`;
+    return isValid ? mod as JsHntInst : null;
+  };
+
+  const candidates: string[] = [];
+
+  try {
+    const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+    const extPath = ext?.extensionPath;
+    if (typeof extPath === `string` && extPath.length > 0) {
+      candidates.push(extPath);
+    }
+  }
+  catch {}
+
+  try {
+    if (typeof __dirname === `string` && __dirname.length > 0) {
+      candidates.push(__dirname, path.resolve(__dirname, `..`), path.resolve(__dirname, `..`, `..`));
+    }
+  }
+  catch {}
+
+  candidates.push(process.cwd());
+
+  if (vscode.workspace.workspaceFolders) {
+    for (const folder of vscode.workspace.workspaceFolders) {
+      candidates.push(folder.uri.fsPath);
+    }
+  }
+
+  for (const base of candidates) {
+    if (result) {
+      break;
+    }
+    try {
+      const reqPath = path.join(base, `index.js`);
+      const req = crtRqr(reqPath);
+      const mod = fnValidate(req(`jshint`));
+      if (mod) {
+        result = mod;
+        logger(`debug`, `module loaded: ${base}`);
+      }
+    }
+    catch {
+      logger(`debug`, `load attempt failed: ${base}`);
+    }
+  }
+
+  if (!result) {
+    logger(`warn`, `module not loaded - JSHint is optional`);
+  }
+
+  return result;
+};
+
+// -------------------------------------------------------------------------------------------------
+export const loadJSHintConfig = (filePath: string): Record<string, any> => {
   try {
     let baseDir = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
     const rootDir = path.parse(baseDir).root;
+    const configFiles = [`.jshintrc`, `.jshintrc.json`, `.jshintrc.js`];
 
     while (true) {
-      const configFiles = [`.jshintrc`, `.jshintrc.json`, `.jshintrc.js`];
-
       for (const configFile of configFiles) {
         const configPath = path.join(baseDir, configFile);
 
@@ -287,36 +348,39 @@ export const ldJsHntCfg = (filePath: string): Record<string, any> => {
         }
         try {
           const cfgCont = fs.readFileSync(configPath, `utf8`);
+
           if (configFile.endsWith(`.js`)) {
-            return prsJsHnCfJs(cfgCont);
+            return parseJSHintConfigJs(cfgCont);
           }
           if (configFile.endsWith(`.json`) || configFile === `.jshintrc`) {
             try {
-              return JSON.parse(cfgCont);
+              return mergeWithDefault(JSON.parse(cfgCont));
             }
             catch {
-              return prsJsHnCfGn(cfgCont);
+              return parseJSHintConfigGeneric(cfgCont);
             }
           }
-          return prsJsHnCfGn(cfgCont);
+          return parseJSHintConfigGeneric(cfgCont);
         }
-        catch (parseError: any) {
-          logger(`error`, `file parsing error: ${configPath} -> ${parseError?.message || parseError}`);
-          return DEF_JSHN_CFG;
+        catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          logger(`error`, `file parsing error: ${configPath} -> ${msg}`);
+          return { ...DEFAULT_JSHINT_CONFIG };
         }
       }
       if (baseDir === rootDir) {
-      	break;
+        break;
       }
       const parentDir = path.dirname(baseDir);
       if (parentDir === baseDir) {
-      	break;
+        break;
       }
       baseDir = parentDir;
     }
   }
-  catch (error: any) {
-    logger(`debug`, `search error: ${error?.message || error}`);
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger(`debug`, `search error: ${msg}`);
   }
-  return DEF_JSHN_CFG;
+  return { ...DEFAULT_JSHINT_CONFIG };
 };

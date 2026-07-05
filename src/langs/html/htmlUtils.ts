@@ -4,42 +4,67 @@
  * @description HTML 유틸리티 함수
  */
 
-import { CodeAction, CodeActionKind as CdActnKnd, type Diagnostic, vscode } from "@exportLibs";
+import { CodeAction, CodeActionKind, type Diagnostic, vscode } from "@exportLibs";
+import type { HtmlDiagData } from "@langs/html/htmlType";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const HD_TG_RE = /<head(?:\s[^>]*)?>[\S\s]*?<\/head>/i;
+// CONSTANTS ---------------------------------------------------------------------------------------
+// 캡처그룹 3개: [1]=여는 <head> 태그, [2]=head 내부 콘텐츠, [3]=닫는 </head> 태그
+export const HEAD_TAG_REGEX = /(<head(?:\s[^>]*)?>)([\S\s]*?)(<\/head>)/i;
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-export const clamp = (value: number, min: number, max: number): number => (
-    value < min ? min : value > max ? max : value
-  );
-
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const getRuleId = (diagnostic: Diagnostic): string | undefined => {
-  try {
-    const diagDt = (diagnostic as any).data;
-    return diagDt?.ruleId ?? diagnostic.code?.toString();
+// FUNCTIONS ---------------------------------------------------------------------------------------
+export const clamp = (value: number, min: number, max: number): number => {
+  if (value < min) {
+    return min;
   }
-  catch {
-    return undefined;
+  if (value > max) {
+    return max;
   }
+  return value;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const gtDocLn = (document: vscode.TextDocument, onBsdLnNmbr: number): string => document.lineCount <= 0 ? `` : (() => {
-  const zrBsdLnIdx = clamp(onBsdLnNmbr - 1, 0, document.lineCount - 1);
-  return document.lineAt(zrBsdLnIdx).text;
-})();
+// -------------------------------------------------------------------------------------------------
+// 진단 data 필드를 안전하게 읽는 단일 접근 지점.
+export const getDiagData = (diagnostic: Diagnostic): HtmlDiagData | undefined => {
+  const data = (diagnostic as Diagnostic & { data?: unknown }).data;
+  if (data === null || typeof data !== `object`) {
+    return undefined;
+  }
+  return data as HtmlDiagData;
+};
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const getHeadMatch = (htmlText: string): RegExpMatchArray | null => HD_TG_RE.exec(htmlText);
+// -------------------------------------------------------------------------------------------------
+// 진단 data 필드를 기록하는 단일 진입 지점.
+export const setDiagData = (diagnostic: Diagnostic, data: HtmlDiagData): void => {
+  (diagnostic as Diagnostic & { data?: HtmlDiagData }).data = data;
+};
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const makeQuickFix = (title: string, editBuilder: (we: vscode.WorkspaceEdit) => void, diagnostic: Diagnostic): CodeAction => {
-  const ca = new CodeAction(title, CdActnKnd.QuickFix);
-  const we = new vscode.WorkspaceEdit();
-  editBuilder(we);
-  ca.edit = we;
-  ca.diagnostics = [diagnostic];
-  return ca;
+// -------------------------------------------------------------------------------------------------
+export const getRuleId = (diagnostic: Diagnostic): string | undefined => {
+  const data = getDiagData(diagnostic);
+  if (typeof data?.ruleId === `string`) {
+    return data.ruleId;
+  }
+  return diagnostic.code?.toString();
+};
+
+// -------------------------------------------------------------------------------------------------
+export const getDocumentLine = (document: vscode.TextDocument, oneBasedLineNumber: number): string => {
+  if (document.lineCount <= 0) {
+    return ``;
+  }
+  const zeroBasedLineIndex = clamp(oneBasedLineNumber - 1, 0, document.lineCount - 1);
+  return document.lineAt(zeroBasedLineIndex).text;
+};
+
+// -------------------------------------------------------------------------------------------------
+export const getHeadMatch = (htmlText: string): RegExpMatchArray | null => HEAD_TAG_REGEX.exec(htmlText);
+
+// -------------------------------------------------------------------------------------------------
+export const makeQuickFix = (title: string, editBuilder: (workspaceEdit: vscode.WorkspaceEdit) => void, diagnostic: Diagnostic): CodeAction => {
+  const codeAction = new CodeAction(title, CodeActionKind.QuickFix);
+  const workspaceEdit = new vscode.WorkspaceEdit();
+  editBuilder(workspaceEdit);
+  codeAction.edit = workspaceEdit;
+  codeAction.diagnostics = [diagnostic];
+  return codeAction;
 };

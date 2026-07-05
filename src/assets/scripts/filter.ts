@@ -4,48 +4,54 @@
  * @description 문서 필터링 및 분석 대상 판별
  */
 
-import { getAnalyzableExtensions as gtAnlyExts, getCssExcludePatterns as gtCsExPa } from "@exportConsts";
+import { getAnalyzableExtensions, getCssExcludePatterns } from "@exportConsts";
 import type { vscode } from "@exportLibs";
-import { isUriExcludedByGlob as isUrExByGl } from "@exportScripts";
+import { isUriExcludedByGlob } from "@exportScripts";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const SUP_SCHM = [`file`, `vscode-file`, `vscode-remote`] as const;
-const EXC_PTH_PAT = [`/appdata/roaming/code/user/`, `settings.json`, `mcp.json`] as const;
+// CONSTANTS ---------------------------------------------------------------------------------------
+const SUPPORTED_SCHEMES = [`file`, `vscode-file`, `vscode-remote`] as const;
+const EXCLUDED_PATH_PATTERNS = [`/appdata/roaming/code/user/`, `settings.json`, `mcp.json`] as const;
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const isVldSchm = (scheme: string): boolean => SUP_SCHM.includes(scheme as any);
+// FUNCTIONS ---------------------------------------------------------------------------------------
+const isValidScheme = (scheme: string): boolean => (SUPPORTED_SCHEMES as readonly string[]).includes(scheme);
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const isExclPth = (fileName: string): boolean => {
-  const normPth = fileName.replaceAll(`\\`, `/`).toLowerCase();
-
-  return EXC_PTH_PAT.some((pattern) => (pattern.startsWith(`/`) ? normPth.includes(pattern) : normPth.endsWith(pattern)));
+// -------------------------------------------------------------------------------------------------
+const isExcludedPath = (fileName: string): boolean => {
+  const normalizedPath = fileName.replaceAll(`\\`, `/`).toLowerCase();
+  return EXCLUDED_PATH_PATTERNS.some((pattern) => {
+    if (pattern.startsWith(`/`)) {
+      return normalizedPath.includes(pattern);
+    }
+    return normalizedPath.endsWith(pattern);
+  });
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-const gtFlExt = (fileName: string): string | null => {
-  const normPth = fileName.replaceAll(`\\`, `/`).toLowerCase();
-  const lastDotIndex = normPth.lastIndexOf(`.`);
-
-  return lastDotIndex > 0 && lastDotIndex < normPth.length - 1 ? normPth.slice(lastDotIndex + 1) : null;
+// -------------------------------------------------------------------------------------------------
+const getFileExtension = (fileName: string): string | null => {
+  const normalizedPath = fileName.replaceAll(`\\`, `/`).toLowerCase();
+  const lastDotIndex = normalizedPath.lastIndexOf(`.`);
+  if (lastDotIndex > 0 && lastDotIndex < normalizedPath.length - 1) {
+    return normalizedPath.slice(lastDotIndex + 1);
+  }
+  return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 export const isAnalyzable = (document: vscode.TextDocument): boolean => {
-  if (!isVldSchm(document.uri.scheme)) {
-  	return false;
+  if (!isValidScheme(document.uri.scheme)) {
+    return false;
   }
-  if (isExclPth(document.fileName)) {
-  	return false;
+  if (isExcludedPath(document.fileName)) {
+    return false;
   }
-  const flExt = gtFlExt(document.fileName);
-  if (!flExt) {
-  	return false;
+  const fileExt = getFileExtension(document.fileName);
+  if (!fileExt) {
+    return false;
   }
-  const anlyExts = gtAnlyExts(document.uri);
-  if (!anlyExts.includes(flExt)) {
-  	return false;
+  const analyzableExts = getAnalyzableExtensions(document.uri);
+  if (!analyzableExts.includes(fileExt)) {
+    return false;
   }
-  const exclPats = gtCsExPa(document.uri);
-  return !isUrExByGl(document.uri, exclPats);
+  const excludePatterns = getCssExcludePatterns(document.uri);
+  return !isUriExcludedByGlob(document.uri, excludePatterns);
 };

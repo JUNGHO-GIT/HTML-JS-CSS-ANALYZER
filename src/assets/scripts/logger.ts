@@ -6,7 +6,7 @@
 
 import { vscode } from "@exportLibs";
 
-const TLR024 = /^\s+/gm;
+const LEADING_WS_RE = /^\s+/gm;
 const MAIN = `Html-Js-Css-Analyzer`;
 const LOG_LEVEL_MAP = {
   "off": 0,
@@ -18,7 +18,7 @@ const LOG_LEVEL_MAP = {
 } as const;
 const LOG_CONFIG = {
   "line": {
-    "str": `―――――――――――――――――――――――――――――――――――――――――`,
+    "str": `-----------------------------------------`,
     "color": `\u001B[38;2;255;162;0m`,
   },
   "debug": {
@@ -49,51 +49,51 @@ const LOG_CONFIG = {
 
 type LogType = Exclude<keyof typeof LOG_LEVEL_MAP, `off`>;
 
-let otptChnn: vscode.OutputChannel | null = null;
-let cchdLgLvl: number | null = null;
-let cfgWtch: vscode.Disposable | null = null;
+let outputChannel: vscode.OutputChannel | null = null;
+let cachedLogLevel: number | null = null;
+let configWatcher: vscode.Disposable | null = null;
 
-// 1. Init logger ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 1. Init logger ---------------------------------------------------------------
 export const initLogger = (context?: vscode.ExtensionContext): void => {
-  otptChnn ??= vscode.window.createOutputChannel(MAIN);
+  outputChannel ??= vscode.window.createOutputChannel(MAIN);
 
-  if (!cfgWtch && typeof vscode.workspace.onDidChangeConfiguration === `function`) {
-    cfgWtch = vscode.workspace.onDidChangeConfiguration((event) => {
+  if (!configWatcher && typeof vscode.workspace.onDidChangeConfiguration === `function`) {
+    configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration || event.affectsConfiguration(MAIN)) {
-        cchdLgLvl = null;
+        cachedLogLevel = null;
       }
     });
-    context?.subscriptions.push(cfgWtch);
+    context?.subscriptions.push(configWatcher);
   }
 };
 
-// 2. Get log level ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 2. Get log level ---------------------------------------------------------------
 const getLogLevel = (): number => {
-  if (cchdLgLvl !== null) {
-    return cchdLgLvl;
+  if (cachedLogLevel !== null) {
+    return cachedLogLevel;
   }
   const config = vscode.workspace.getConfiguration(MAIN);
   const level = config.get<string>(`logLevel`, `info`);
   const result = LOG_LEVEL_MAP[level as keyof typeof LOG_LEVEL_MAP] ?? LOG_LEVEL_MAP.info;
-  cchdLgLvl = result;
+  cachedLogLevel = result;
   return result;
 };
 
-// 3. Should log ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 3. Should log ------------------------------------------------------------------
 const shouldLog = (type: LogType): boolean => {
   const activeLevel = getLogLevel();
   return activeLevel !== LOG_LEVEL_MAP.off && LOG_LEVEL_MAP[type] >= activeLevel;
 };
 
-// 4. Format log ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const formatLog = (text = ``): string => text.trim().replaceAll(TLR024, ``);
+// 4. Format log ------------------------------------------------------------------
+const formatLog = (text = ``): string => text.trim().replaceAll(LEADING_WS_RE, ``);
 
-// 5. Append output ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 5. Append output ----------------------------------------------------------------
 const appendOutput = (message: string): void => {
-  otptChnn?.appendLine(message);
+  outputChannel?.appendLine(message);
 };
 
-// 6. Logger ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// 6. Logger ----------------------------------------------------------------------
 export const logger = (type: LogType, value: string): void => {
   if (!shouldLog(type)) {
     return;

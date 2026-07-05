@@ -8,117 +8,138 @@ import { createRequire as crtRqr, fs, path, vscode } from "@exportLibs";
 import { logger } from "@exportScripts";
 import type { HtmlHintInstance as HtmlHntInst } from "@langs/html/htmlType";
 
-// FUNCTIONS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+// CONSTANTS ---------------------------------------------------------------------------------------
+const EXTENSION_ID = `jungho.html-js-css-analyzer`;
+const CONFIG_NAMES = [`.htmlhintrc`, `.htmlhintrc.json`];
+
+// FUNCTIONS ---------------------------------------------------------------------------------------
 const getBaseUrl = (): string => {
   try {
-    const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
+    const ext = vscode.extensions.getExtension(EXTENSION_ID);
     const extPath = ext?.extensionPath;
     if (typeof extPath === `string` && extPath.length > 0) {
-    	return path.join(extPath, `out`, `index.js`);
+      return path.join(extPath, `out`, `index.js`);
     }
   }
-  catch {}
+  catch {
+    // ignore and try next candidate
+  }
   try {
     if (typeof __dirname === `string` && __dirname.length > 0) {
-    	return path.join(__dirname, `index.js`);
+      return path.join(__dirname, `index.js`);
     }
   }
-  catch {}
+  catch {
+    // ignore and fall back to cwd
+  }
   return path.join(process.cwd(), `index.js`);
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
+// 로드한 모듈이 HTMLHint 계약(verify 함수)을 만족하는지 검증한다.
+const validateModule = (mod: unknown): HtmlHntInst | null => {
+  const m = mod as
+    | {
+        default?: { verify?: unknown };
+        HTMLHint?: { verify?: unknown };
+        verify?: unknown;
+      }
+    | undefined;
+  const raw = (m?.default ?? m?.HTMLHint ?? m) as { verify?: unknown } | undefined;
+  if (raw && typeof raw.verify === `function`) {
+    return raw as HtmlHntInst;
+  }
+  return null;
+};
+
+// -------------------------------------------------------------------------------------------------
+// 1차 로드 실패 시 탐색할 후보 베이스 디렉터리 목록을 구성한다.
+const collectFallbackBases = (): string[] => {
+  const bases: string[] = [];
+
+  try {
+    const ext = vscode.extensions.getExtension(EXTENSION_ID);
+    const extPath = ext?.extensionPath;
+    if (typeof extPath === `string` && extPath.length > 0) {
+      bases.push(extPath);
+    }
+  }
+  catch {
+    // ignore
+  }
+
+  try {
+    if (typeof __dirname === `string` && __dirname.length > 0) {
+      bases.push(__dirname);
+      bases.push(path.resolve(__dirname, `..`));
+      bases.push(path.resolve(__dirname, `..`, `..`));
+    }
+  }
+  catch {
+    // ignore
+  }
+
+  bases.push(process.cwd());
+
+  const folders = vscode.workspace.workspaceFolders;
+  if (folders) {
+    for (const f of folders) {
+      bases.push(f.uri.fsPath);
+    }
+  }
+
+  return bases;
+};
+
+// -------------------------------------------------------------------------------------------------
 export const loadHtmlHint = (): HtmlHntInst | null => {
-  let result: HtmlHntInst | null = null;
-
-  const fnValidate = (mod: unknown): HtmlHntInst | null => {
-    const m = mod as
-      | {
-          default?: { verify?: unknown };
-          HTMLHint?: { verify?: unknown };
-          verify?: unknown;
-        }
-      | undefined;
-    const raw = (m?.default ?? m?.HTMLHint ?? m) as { verify?: unknown } | undefined;
-    return raw && typeof raw.verify === `function` ? (raw as HtmlHntInst) : null;
-  };
-
   try {
     const primaryUrl = getBaseUrl();
     const primaryReq = crtRqr(primaryUrl);
-    const primaryMod = fnValidate(primaryReq(`htmlhint`));
+    const primaryMod = validateModule(primaryReq(`htmlhint`));
     if (primaryMod) {
-      result = primaryMod;
       logger(`debug`, `module loaded successfully (primary: ${primaryUrl})`);
+      return primaryMod;
     }
-    else {
-    	logger(`warn`, `primary validation failed`);
-    }
+    logger(`warn`, `primary validation failed`);
   }
   catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     logger(`debug`, `primary load failed -> ${msg}`);
   }
-  !result ? (() => {
-      const arr: string[] = [];
-      try {
-        const ext = vscode.extensions.getExtension(`jungho.html-js-css-analyzer`);
-        const extPath = ext?.extensionPath;
-        typeof extPath === `string` && extPath.length > 0 && arr.push(extPath);
-      }
-      catch {}
-      try {
-        typeof __dirname === `string` && __dirname.length > 0 && (arr.push(__dirname), arr.push(path.resolve(__dirname, `..`)), arr.push(path.resolve(__dirname, `..`, `..`)));
-      }
-      catch {}
-      arr.push(process.cwd());
-      const folders = vscode.workspace.workspaceFolders;
-      folders && (() => {
-          for (const f of folders) {
-            arr.push(f.uri.fsPath);
-          }
-        })();
 
-      for (const base of arr) {
-        if (result) {
-        	break;
-        }
-        try {
-          const req = crtRqr(path.join(base, `index.js`));
-          const mod = fnValidate(req(`htmlhint`));
-          if (mod) {
-            result = mod;
-            logger(`debug`, `module loaded successfully (fallback: ${base})`);
-          }
-          else {
-            logger(`warn`, `fallback validation failed: ${base}`);
-          }
-        }
-        catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          logger(`debug`, `fallback load failed: ${base} -> ${msg}`);
-        }
+  for (const base of collectFallbackBases()) {
+    try {
+      const req = crtRqr(path.join(base, `index.js`));
+      const mod = validateModule(req(`htmlhint`));
+      if (mod) {
+        logger(`debug`, `module loaded successfully (fallback: ${base})`);
+        return mod;
       }
-    })() : void 0;
-
-  if (!result) {
-  	logger(`warn`, `module not loaded - HTMLHint is optional; install with 'npm install htmlhint' or ensure packaging includes dependency`);
+      logger(`warn`, `fallback validation failed: ${base}`);
+    }
+    catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger(`debug`, `fallback load failed: ${base} -> ${msg}`);
+    }
   }
-  return result;
+
+  logger(`warn`, `module not loaded - HTMLHint is optional; install with 'npm install htmlhint' or ensure packaging includes dependency`);
+  return null;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 export const loadConfig = (filePath: string): Record<string, unknown> => {
   try {
-    let base = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
+    const stat = fs.statSync(filePath);
+    let base = stat.isDirectory() ? filePath : path.dirname(filePath);
     const root = path.parse(base).root;
 
-    while (base !== root) {
-      for (const name of [`.htmlhintrc`, `.htmlhintrc.json`]) {
+    for (;;) {
+      for (const name of CONFIG_NAMES) {
         const fullpath = path.join(base, name);
-
         if (!fs.existsSync(fullpath)) {
-        	continue;
+          continue;
         }
         const json = fs.readFileSync(fullpath, `utf8`);
         try {
@@ -130,12 +151,14 @@ export const loadConfig = (filePath: string): Record<string, unknown> => {
           return {};
         }
       }
+
+      // 루트 디렉터리까지 검사한 뒤 종료 (루트 자체의 설정 파일도 1회 검사됨)
       if (base === root) {
-      	break;
+        break;
       }
       const parent = path.dirname(base);
       if (parent === base) {
-      	break;
+        break;
       }
       base = parent;
     }

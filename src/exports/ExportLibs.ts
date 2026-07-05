@@ -10,7 +10,7 @@ import * as https from "node:https";
 import { createRequire as crtRqr } from "node:module";
 import * as path from "node:path";
 import { TextDecoder, TextEncoder } from "node:util";
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
+// -------------------------------------------------------------------------------------------------
 import * as vscode from "vscode";
 
 const { CodeAction, CodeActionKind: CdActnKnd, Diagnostic, DiagnosticSeverity: DiagSvrt, Position, Range } = vscode;

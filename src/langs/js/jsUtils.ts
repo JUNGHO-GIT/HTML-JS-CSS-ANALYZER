@@ -7,79 +7,93 @@
 import { Position, vscode } from "@exportLibs";
 import type { JSHintError } from "@langs/js/jsType";
 
-// CONSTANTS ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-const ERR_W033_CDS = new Set([`W033`]);
-const EWWC = new Set([`W116`, `W117`]);
-const ERR_W030_CDS = new Set([`W030`]);
-const ERROR_CODES = new Set([`E001`, `E002`, `E003`, `E004`, `E005`, `E006`, `E007`, `E008`, `E009`, `E010`]);
-const WRNN_CDS = new Set([`W033`, `W116`, `W117`, `W098`, `W097`]);
+// CONSTANTS ---------------------------------------------------------------------------------------
+const MISSING_SEMICOLON_CODES = new Set([`W033`]);
+const WORD_OR_OPERATOR_CODES = new Set([`W116`, `W117`]);
+const EXPRESSION_STMT_CODES = new Set([`W030`]);
+const WARNING_CODES = new Set([`W033`, `W116`, `W117`, `W098`, `W097`]);
 const JS_LANGUAGES = new Set([`javascript`]);
-const JS_EXTS = [`.js`, `.mjs`, `.cjs`];
+const JS_EXTENSIONS = [`.js`, `.mjs`, `.cjs`];
 
-// REGEX PATTERNS
-const W116_W117_RE = /^(?:\w+|==|!=)/;
-const W030_REGEX = /^[^;]+/;
-const DEF_TOK_RE = /^\S+/;
+// REGEX PATTERNS ----------------------------------------------------------------------------------
+const WORD_OR_OPERATOR_REGEX = /^(?:\w+|==|!=)/;
+const EXPRESSION_STMT_REGEX = /^[^;]+/;
+const DEFAULT_TOKEN_REGEX = /^\S+/;
 
-// UTILITY FUNCTIONS ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const clamp = (value: number, min: number, max: number): number => (
-  value < min ? min : value > max ? max : value
-);
+// UTILITY FUNCTIONS -------------------------------------------------------------------------------
+export const clamp = (value: number, min: number, max: number): number => {
+  if (value < min) {
+    return min;
+  }
+  if (value > max) {
+    return max;
+  }
+  return value;
+};
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const clclErrRng = (document: vscode.TextDocument, error: JSHintError): vscode.Range => {
+// -------------------------------------------------------------------------------------------------
+export const calculateErrorRange = (document: vscode.TextDocument, error: JSHintError): vscode.Range => {
   const lineNumber = Math.max((error.line || 1) - 1, 0);
   const columnNumber = Math.max((error.character || 1) - 1, 0);
-  const sfLnNmbr = clamp(lineNumber, 0, document.lineCount - 1);
-  const lineText = document.lineAt(sfLnNmbr).text;
+  const safeLineNumber = clamp(lineNumber, 0, document.lineCount - 1);
+  const lineText = document.lineAt(safeLineNumber).text;
 
   let startColumn = columnNumber;
   let endColumn = columnNumber + 1;
 
   if (error.code) {
-    let match: RegExpExecArray | null = null;
-    if (ERR_W033_CDS.has(error.code)) {
+    if (MISSING_SEMICOLON_CODES.has(error.code)) {
       endColumn = lineText.trimEnd().length;
       startColumn = Math.max(endColumn - 1, 0);
     }
-    else if (EWWC.has(error.code)) {
-      match = W116_W117_RE.exec(lineText.slice(columnNumber));
-    }
-    else if (ERR_W030_CDS.has(error.code)) {
-      match = W030_REGEX.exec(lineText.slice(columnNumber));
-    }
     else {
-      match = DEF_TOK_RE.exec(lineText.slice(columnNumber));
-    }
-    if (match) {
-      startColumn = columnNumber;
-      endColumn = columnNumber + match[0].length;
+      let match: RegExpExecArray | null = null;
+      if (WORD_OR_OPERATOR_CODES.has(error.code)) {
+        match = WORD_OR_OPERATOR_REGEX.exec(lineText.slice(columnNumber));
+      }
+      else if (EXPRESSION_STMT_CODES.has(error.code)) {
+        match = EXPRESSION_STMT_REGEX.exec(lineText.slice(columnNumber));
+      }
+      else {
+        match = DEFAULT_TOKEN_REGEX.exec(lineText.slice(columnNumber));
+      }
+      if (match) {
+        startColumn = columnNumber;
+        endColumn = columnNumber + match[0].length;
+      }
     }
   }
 
   startColumn = clamp(startColumn, 0, lineText.length);
   endColumn = clamp(endColumn, startColumn + 1, lineText.length);
 
-  return new vscode.Range(new Position(sfLnNmbr, startColumn), new Position(sfLnNmbr, endColumn));
+  return new vscode.Range(new Position(safeLineNumber, startColumn), new Position(safeLineNumber, endColumn));
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const clclSvrt = (error: JSHintError): vscode.DiagnosticSeverity => {
-  if (!error.code) {
+// -------------------------------------------------------------------------------------------------
+// JSHint 코드 접두문자 기반 심각도 매핑: E* -> Error (E011+ 포함), 지정 W* -> Warning, 그 외 -> Information
+export const calculateSeverity = (error: JSHintError): vscode.DiagnosticSeverity => {
+  const code = error.code;
+
+  if (!code) {
     return vscode.DiagnosticSeverity.Warning;
   }
-  if (error.code.startsWith(`E`) && ERROR_CODES.has(error.code)) {
+  if (code.startsWith(`E`)) {
     return vscode.DiagnosticSeverity.Error;
   }
-  if (WRNN_CDS.has(error.code)) {
+  if (WARNING_CODES.has(code)) {
     return vscode.DiagnosticSeverity.Warning;
   }
   return vscode.DiagnosticSeverity.Information;
 };
 
-// ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-
-export const isJsLkDoc = (doc: vscode.TextDocument): boolean => {
-  const id = doc.languageId;
-  const f = doc.fileName.toLowerCase();
-  return JS_LANGUAGES.has(id) || JS_EXTS.some((ext) => f.endsWith(ext));
+// -------------------------------------------------------------------------------------------------
+export const isJsLikeDocument = (doc: vscode.TextDocument): boolean => {
+  const languageId = doc.languageId;
+  const fileName = doc.fileName.toLowerCase();
+
+  if (JS_LANGUAGES.has(languageId)) {
+    return true;
+  }
+  return JS_EXTENSIONS.some((extension) => fileName.endsWith(extension));
 };
