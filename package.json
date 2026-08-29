@@ -5,7 +5,7 @@
   "publisher": "JUNGHO",
   "icon": "logo.webp",
   "license": "Apache-2.0",
-  "version": "3.4.6",
+  "version": "3.4.7",
   "main": "./out/extension.js",
   "repository": {
     "type": "git",
@@ -156,20 +156,20 @@
     "jshint": "^2.13.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.6",
+    "@biomejs/biome": "2.5.11",
     "@swc/cli": "0.8.1",
-    "@swc/core": "1.15.47",
+    "@swc/core": "1.16.1",
     "@swc/helpers": "0.5.23",
     "@types/css-tree": "^3.2.0",
     "@types/htmlhint": "^1.1.5",
     "@types/jshint": "^2.12.4",
-    "@types/node": "26.1.2",
+    "@types/node": "26.4.0",
     "@types/vscode": "1.116.0",
     "@vscode/vsce": "^3.9.2",
-    "esbuild": "0.28.1",
+    "esbuild": "0.28.2",
     "ts-morph": "28.0.0",
     "ts-prune": "0.10.3",
-    "tsc-alias": "1.9.1",
+    "tsc-alias": "1.9.2",
     "typescript": "7.0.2"
   }
 }
